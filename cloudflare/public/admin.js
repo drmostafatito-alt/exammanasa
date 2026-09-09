@@ -81,7 +81,7 @@
   var TABS = [
     ['overview', 'نظرة عامة'], ['teachers', 'المعلمون'], ['psychology', 'علم النفس'],
     ['philosophy', 'الفلسفة والمنطق'], ['bank', 'بنك الأسئلة'], ['exams', 'الامتحانات'],
-    ['results', 'النتائج']
+    ['results', 'النتائج'], ['settings', 'الإعدادات']
   ];
   function renderTabs() {
     app.innerHTML =
@@ -100,6 +100,51 @@
     else if (A.tab === 'bank') renderBank(body);
     else if (A.tab === 'exams') renderExams(body);
     else if (A.tab === 'results') renderResults(body);
+    else if (A.tab === 'settings') renderSettings(body);
+  }
+
+  /* ================= settings ================= */
+  function renderSettings(body) {
+    Promise.all([api('/api/admin/overview'), api('/api/admin/session')]).then(function (r) {
+      var d = r[0], me = r[1];
+      body.innerHTML =
+        '<div class="grid two">' +
+        '<div class="card" style="margin-top:0">' +
+        '<h3 style="font-size:.98rem">معلومات المنصة</h3>' +
+        '<div class="kv" style="margin-top:12px">' +
+        kv('حساب المسؤول', me.email) +
+        kv('عدد الامتحانات', d.exams + ' امتحانًا') +
+        kv('عدد الأسئلة', d.questions + ' سؤالًا فريدًا') +
+        kv('عدد المعلمين', d.teachersCount) +
+        '</div>' +
+        '<p class="desc" style="margin-top:12px;font-size:.76rem">المنصة تعمل على Cloudflare Workers (الخطة المجانية) — بنك الأسئلة مضمن في الـWorker والمفاتيح على الخادم فقط.</p>' +
+        '</div>' +
+        '<div class="card" style="margin-top:0">' +
+        '<h3 style="font-size:.98rem">تغيير كلمة مرور المسؤول</h3>' +
+        '<p class="desc" style="font-size:.78rem;margin-top:4px">كلمة المرور تُخزَّن مشفّرة (PBKDF2-120k) ولا يمكن استعادتها — فقط تغييرها من هنا.</p>' +
+        '<div class="field" style="margin-top:12px"><label>كلمة المرور الحالية</label><input type="password" id="pwCur" autocomplete="current-password"></div>' +
+        '<div class="field"><label>كلمة المرور الجديدة (8 أحرف على الأقل)</label><input type="password" id="pwNew" autocomplete="new-password"></div>' +
+        '<div class="field"><label>تأكيد كلمة المرور الجديدة</label><input type="password" id="pwNew2" autocomplete="new-password"></div>' +
+        '<div id="pwErr" style="color:var(--bad);font-size:.8rem;min-height:1.2em;margin-bottom:8px"></div>' +
+        '<button class="btn block" id="pwBtn" onclick="changePassword()">تغيير كلمة المرور</button>' +
+        '</div></div>';
+    }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+
+  function changePassword() {
+    var cur = $('pwCur').value, next = $('pwNew').value, next2 = $('pwNew2').value;
+    var err = $('pwErr');
+    err.textContent = '';
+    if (next !== next2) { err.textContent = 'كلمتا المرور الجديدتان غير متطابقتين.'; return; }
+    if (next.length < 8) { err.textContent = 'كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.'; return; }
+    $('pwBtn').disabled = true;
+    api('/api/admin/password', { method: 'POST', body: JSON.stringify({ current: cur, next: next }) })
+      .then(function () {
+        toast('تم تغيير كلمة المرور بنجاح');
+        $('pwCur').value = ''; $('pwNew').value = ''; $('pwNew2').value = '';
+        $('pwBtn').disabled = false;
+      })
+      .catch(function (e) { err.textContent = e.message; $('pwBtn').disabled = false; });
   }
 
   /* ================= overview ================= */
@@ -122,12 +167,13 @@
         kv('علم النفس', a.psychology.questions + ' سؤالًا — ' + a.psychology.verified + ' موثق · ' + a.psychology.corrections.length + ' تصحيح مفتاح موثق') +
         kv('فلسفة ت1', a.philosophyTerm1.questions + ' سؤالًا — ' + a.philosophyTerm1.verified + ' موثق + ' + a.philosophyTerm1.authored + ' مؤلَّف · ' + a.philosophyTerm1.corrected + ' تصحيح مفتاح') +
         kv('فلسفة ت2', a.philosophyTerm2.questions + ' سؤالًا — ' + a.philosophyTerm2.verified + ' موثق + ' + a.philosophyTerm2.authored + ' مؤلَّف · ' + a.philosophyTerm2.corrected + ' تصحيح مفتاح') +
-        kv('مستبعد', (a.philosophyTerm1.excluded || 0) + ' (ت1) + ' + (a.philosophyTerm2.excluded || 0) + ' (ت2) سؤالًا معزولًا') +
+        (a.philosophyTerm2Logic ? kv('منطق ت2', a.philosophyTerm2Logic.questions + ' سؤالًا — ' + a.philosophyTerm2Logic.verified + ' موثق + ' + a.philosophyTerm2Logic.authored + ' مؤلَّف · ' + a.philosophyTerm2Logic.excluded + ' معزول (موثق الأسباب)') : '') +
+        kv('مستبعد', (a.philosophyTerm1.excluded || 0) + ' (ت1) + ' + (a.philosophyTerm2.excluded || 0) + ' (فلسفة ت2) + ' + ((a.philosophyTerm2Logic && a.philosophyTerm2Logic.excluded) || 0) + ' (منطق ت2) سؤالًا معزولًا') +
         '</div>' +
         '<div class="desc" style="margin-top:12px;font-size:.78rem">' + esc(d.notes.curriculumAlignment) + '</div></div>' +
         '<div class="section-title"><h3>تصحيحات مفاتيح علم النفس (توثيق)</h3></div>' +
         '<div class="card">' + (a.psychology.corrections || []).map(function (c) {
-          return '<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.06);font-size:.8rem">' +
+          return '<div style="padding:8px 0;border-bottom:1px solid var(--line);font-size:.8rem">' +
             '<b>' + esc(c.exam) + ' — س' + c.q + ':</b> ' + c.from + ' ← ' + c.to +
             '<div class="desc" style="font-size:.74rem;margin-top:3px">' + esc(c.reason) + '</div></div>';
         }).join('') + '</div>' +
@@ -154,6 +200,7 @@
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>' + esc(t.name) + '</b>' +
             (t.isDefault ? '<span class="badge gold">افتراضي</span>' : '') +
             (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') + '</div>' +
+            (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
             '<div class="desc" style="font-size:.78rem;margin-top:4px">' + esc(t.bio || '') + '</div>' +
             '<div style="margin-top:8px;font-size:.78rem">الرابط العام: <a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a></div>' +
             '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
@@ -175,7 +222,7 @@
   function editTeacher(id) {
     var t = id ? A.teachers.filter(function (x) { return x.id === id; })[0] : null;
     var isNew = !t;
-    t = t || { name: '', slug: '', phone: '', bio: '', photo: '', socialLinks: {}, colors: { primary: '#123B40', accent: '#C9A86A' }, requirePhone: true, enabled: true };
+    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, colors: { primary: '#0E7A5F', accent: '#C99A2E' }, requirePhone: true, enabled: true };
     var overlay = document.createElement('div');
     overlay.className = 'modal-bg';
     overlay.innerHTML =
@@ -185,6 +232,7 @@
       '<div class="field"><label>الرابط (slug) — حروف إنجليزية وأرقام وشرطات</label><input id="tSlug" value="' + esc(t.slug) + '" placeholder="مثال: mostafa" dir="ltr"></div>' +
       '<div class="field"><label>الرابط العام</label><input class="input" dir="ltr" readonly value="' + esc(location.host + '/' + (t.slug || '…')) + '" id="tUrlPreview" style="opacity:.7"></div>' +
       '<div class="field"><label>الهاتف (خاص — لا يظهر للطلاب)</label><input id="tPhone" value="' + esc(t.phone || '') + '" dir="ltr"></div>' +
+      '<div class="field"><label>التخصص (يظهر في الصفحة الرئيسية)</label><input id="tSpecialty" value="' + esc(t.specialty || '') + '" maxlength="120" placeholder="مثال: مدرس الفلسفة والمنطق — المرحلة الثانوية"></div>' +
       '<div class="field"><label>نبذة</label><textarea id="tBio" rows="2" maxlength="500">' + esc(t.bio || '') + '</textarea></div>' +
       '<div class="field"><label>روابط التواصل (تبدأ بـ https://)</label>' +
       '<input id="tWhats" placeholder="واتساب https://…" dir="ltr" value="' + esc(t.socialLinks.whatsapp || '') + '" style="margin-bottom:6px">' +
@@ -234,6 +282,7 @@
       name: $('tName').value.trim(),
       slug: $('tSlug').value.trim(),
       phone: $('tPhone').value.trim(),
+      specialty: $('tSpecialty').value.trim(),
       bio: $('tBio').value.trim(),
       socialLinks: { whatsapp: $('tWhats').value.trim(), facebook: $('tFb').value.trim(), tiktok: $('tTt').value.trim() },
       colors: { primary: $('tPrimary').value, accent: $('tAccent').value },
@@ -273,7 +322,7 @@
       var html = '<div class="section-title"><h3>' + esc(cat.name) + ' — ' + esc(cat.gradeName) + '</h3></div>';
       if (subjectId === 'psychology') {
         cat.units.forEach(function (u) {
-          html += '<div class="card" style="margin-bottom:12px"><div style="font-weight:800;color:var(--accent-2)">' + esc(u.title) + '</div><div class="grid" style="gap:8px;margin-top:10px">';
+          html += '<div class="card" style="margin-bottom:12px"><div style="font-weight:800;color:var(--primary-deep)">' + esc(u.title) + '</div><div class="grid" style="gap:8px;margin-top:10px">';
           u.lessons.forEach(function (l) {
             var e = exams[l.examIds[0]];
             html += treeRow('موضوع ' + l.no, l.title, e.count);
@@ -286,7 +335,7 @@
         cat.terms.forEach(function (term) {
           html += '<div class="section-title" style="margin-top:18px"><h3>' + esc(term.label) + '</h3></div>';
           term.units.forEach(function (u) {
-            html += '<div class="card" style="margin-bottom:12px"><div style="font-weight:800;color:var(--accent-2)">' + esc(u.title) + '</div>';
+            html += '<div class="card" style="margin-bottom:12px"><div style="font-weight:800;color:var(--primary-deep)">' + esc(u.title) + '</div>';
             u.chapters.forEach(function (ch) {
               html += '<div style="font-weight:700;font-size:.88rem;margin:10px 0 6px">' + esc(ch.title) + '</div><div class="grid" style="gap:8px">';
               ch.lessons.forEach(function (l) {
@@ -415,6 +464,7 @@
   window.doLogin = doLogin;
   window.logout = logout;
   window.setTab = setTab;
+  window.changePassword = changePassword;
   window.editTeacher = editTeacher;
   window.saveTeacher = saveTeacher;
   window.deleteTeacher = deleteTeacher;

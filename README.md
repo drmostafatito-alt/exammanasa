@@ -12,11 +12,12 @@
 | [`REBUILD_REPORT.md`](REBUILD_REPORT.md) | تقرير التسليم النهائي (٢٥ بندًا) |
 | [`AUDIT_REPOSITORY.md`](AUDIT_REPOSITORY.md) | تدقيق الكود والبيانات الأصلي |
 | [`AUDIT_EDUCATIONAL_V2.md`](AUDIT_EDUCATIONAL_V2.md) | تدقيق المحتوى مقابل المصادر الرسمية (التصحيحات الموثقة) |
-| [`AUDIT_PHILOSOPHY.md`](AUDIT_PHILOSOPHY.md) / [`AUDIT_PHILOSOPHY_TERM2.md · AUDIT_PHILOSOPHY_TERM2_LOGIC.md`](AUDIT_PHILOSOPHY_TERM2.md · AUDIT_PHILOSOPHY_TERM2_LOGIC.md) | تدقيق مفاتيح الفلسفة (ت1/ت2) |
+| [`AUDIT_PHILOSOPHY.md`](AUDIT_PHILOSOPHY.md) / [`AUDIT_PHILOSOPHY_TERM2.md`](AUDIT_PHILOSOPHY_TERM2.md) / [`AUDIT_PHILOSOPHY_TERM2_LOGIC.md`](AUDIT_PHILOSOPHY_TERM2_LOGIC.md) | تدقيق مفاتيح الفلسفة (ت1 / ت2 فلسفة / ت2 منطق) |
+| [`VERIFICATION.md`](VERIFICATION.md) | قائمة القبول النهائية بندًا بندًا مع الأدلة وحدود المصادر |
 | [`cloudflare/README.md`](cloudflare/README.md) | دليل نشر Cloudflare خطوة بخطوة |
 
 ## المحتوى
-- **١٣٤٧ سؤالًا فريدًا / ٧٥ امتحانًا**: علم النفس (٤٧٤ سؤالًا، ٦ وحدات × ٤ موضوعات + شامل لكل وحدة + شامل المنهج) والفلسفة والمنطق (٨٧٣ سؤالًا عبر الترمين بهيكل الوحدات/الفصول الرسمية).
+- **١٥٤٩ سؤالًا فريدًا / ٨٣ امتحانًا**: علم النفس (٤٧٤ سؤالًا، ٦ وحدات × ٤ موضوعات + شامل لكل وحدة + شامل المنهج كاملًا) والفلسفة والمنطق (١٠٧٥ سؤالًا عبر الترمين بهيكل الوحدات/الفصول الرسمية — منهما ٢٠٢ سؤال منطق للترم الثاني).
 - كل الأسئلة من مصادر رسمية (كتب الشرح وكتب الأسئلة المقدمة) وبمفاتيح متحققة — التفاصيل الكاملة في تقارير التدقيق.
 
 ## الأدوات

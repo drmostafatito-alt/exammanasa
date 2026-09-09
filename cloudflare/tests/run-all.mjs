@@ -152,6 +152,13 @@ try {
     const r = await jfetch('/api/catalog');
     const examCount = Object.keys(r.data.exams).length;
     ok('83 امتحانًا', examCount === 83, 'got ' + examCount);
+    ok('الفهرس يتضمن مالك المنصة (owner) ببيانات عامة فقط',
+      r.data.owner && r.data.owner.name === 'د. مصطفى تيتو' && r.data.owner.slug === 'mostafa' &&
+      'specialty' in r.data.owner && !('phone' in r.data.owner) && !('id' in r.data.owner));
+    const anyExam = r.data.exams['T2L-COMP'];
+    ok('بيانات صعوبة حقيقية في امتحانات الفلسفة (بدون تسريب مفاتيح)',
+      anyExam.difficulty && anyExam.difficulty.easy + anyExam.difficulty.medium + anyExam.difficulty.hard === 20 &&
+      !('questionIds' in anyExam) && !('answer' in anyExam));
     ok('لا مفاتيح إجابة في الكتالوج', !r.text.includes('"answer"'));
     ok('لا قوائم أسئلة في الكتالوج', !r.text.includes('questionIds'));
     ok('لا نصوص أسئلة في الكتالوج', !BANKS.examDefs || !r.text.includes(Object.values(BANKS.questions)[0].text.slice(0, 30)));
@@ -276,11 +283,21 @@ try {
     const create = await post('/api/admin/teachers', {
       name: 'أ. سارة أحمد', slug: 'sara', bio: 'معلمة علم نفس',
       socialLinks: { whatsapp: 'https://wa.me/201000000000' },
+      specialty: 'مدرس الفلسفة والمنطق',
       colors: { primary: '#3a2a5a', accent: '#c9a86a' }, requirePhone: false, enabled: true
     }, { Cookie: cookie });
     ok('إنشاء معلم جديد', create.status === 200 && create.data.teacher.slug === 'sara');
     const publicProfile = await jfetch('/api/teacher/sara');
     ok('الملف العام للمعلمة يعمل', publicProfile.status === 200 && publicProfile.data.teacher.name.includes('سارة'));
+    ok('تخصص المعلم يظهر في الملف العام (قسم المعلم في الرئيسية)',
+      publicProfile.data.teacher.specialty === 'مدرس الفلسفة والمنطق');
+    const updKeep = await jfetch('/api/admin/teachers/' + create.data.teacher.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'أ. سارة أحمد', slug: 'sara', enabled: true, requirePhone: false })
+    });
+    ok('التعديل الجزئي يحافظ على التخصص والنبذة',
+      updKeep.status === 200 && updKeep.data.teacher.specialty === 'مدرس الفلسفة والمنطق');
     ok('هاتف المعلم لا يظهر في الملف العام', !JSON.stringify(publicProfile.data).includes('phone'));
     const dupSlug = await post('/api/admin/teachers', { name: 'آخر', slug: 'sara' }, { Cookie: cookie });
     ok('رفض slug مكرر', dupSlug.status === 409);
@@ -333,6 +350,25 @@ try {
   }
 
   /* ============ 11. shuffle equivalence with GAS ============ */
+  /* ============ 10b. تغيير كلمة مرور المسؤول ============ */
+  console.log('\n[10b] تغيير كلمة مرور المسؤول');
+  {
+    const cookie2 = cookie;
+    const wrongCur = await post('/api/admin/password', { current: 'not-the-password', next: 'NewPass-2026' }, { Cookie: cookie2, 'X-Requested-With': 'fetch' });
+    ok('رفض كلمة المرور الحالية الخاطئة', wrongCur.status === 401);
+    const tooShort = await post('/api/admin/password', { current: 'TestAdminPass-2026', next: 'short' }, { Cookie: cookie2, 'X-Requested-With': 'fetch' });
+    ok('رفض كلمة مرور جديدة قصيرة', tooShort.status === 400);
+    const ch = await post('/api/admin/password', { current: 'TestAdminPass-2026', next: 'TestAdminPass-2027' }, { Cookie: cookie2, 'X-Requested-With': 'fetch' });
+    ok('تغيير كلمة المرور ناجح', ch.status === 200);
+    const oldLogin = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' });
+    ok('كلمة المرور القديمة لم تعد تعمل', oldLogin.status === 401);
+    const newLogin = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2027' });
+    ok('كلمة المرور الجديدة تعمل', newLogin.status === 200);
+    const newCookie = (newLogin.headers.get('set-cookie') || '').split(';')[0];
+    const back = await post('/api/admin/password', { current: 'TestAdminPass-2027', next: 'TestAdminPass-2026' }, { Cookie: newCookie, 'X-Requested-With': 'fetch' });
+    ok('العودة لكلمة المرور الأصلية', back.status === 200);
+  }
+
   console.log('\n[11] تكافؤ خلط الخيارات مع تطبيق GAS الأصلي');
   {
     const ctx = { console, Logger: { log() {} } };

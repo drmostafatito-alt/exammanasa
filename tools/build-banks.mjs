@@ -480,14 +480,22 @@ t2.termComprehensiveExamId = buildT2TermComprehensive();
 catalog.philosophy.terms.push(t2);
 
 // Public exam metadata (no question ids, no answers).
+// difficulty = per-exam distribution of question difficulty (real bank data —
+// psych questions carry no difficulty rating, so the field is omitted there).
 const publicExams = {};
 Object.values(exams).forEach(e => {
-  publicExams[e.id] = {
+  const pub = {
     id: e.id, subjectId: e.subjectId, term: e.term, type: e.type, count: e.count,
     title: e.title, lessonNo: e.lessonNo || null, lessonTitle: e.lessonTitle || null,
     chapterTitle: e.chapterTitle || null, unitTitle: e.unitTitle || null,
     training: e.training || null, variant: e.variant || 1
   };
+  if (e.questionIds) {
+    const d = { easy: 0, medium: 0, hard: 0 };
+    e.questionIds.forEach(qid => { const x = questions[qid].meta.difficulty; if (d[x] !== undefined) d[x]++; });
+    if (d.easy + d.medium + d.hard > 0) pub.difficulty = d;
+  }
+  publicExams[e.id] = pub;
 });
 
 // Server-only exam definitions (question id lists). NEVER served to the browser.

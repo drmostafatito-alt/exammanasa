@@ -9,7 +9,8 @@
     "deploy": "wrangler deploy",
     "build:banks": "node ../tools/build-banks.mjs",
     "validate": "node ../tools/validate-banks.mjs",
-    "test": "node tests/run-all.mjs"
+    "test": "node tests/run-all.mjs",
+    "qa": "node ../tools/ui-qa.mjs"
   },
   "devDependencies": {
     "wrangler": "^4.0.0"

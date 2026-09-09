@@ -112,10 +112,11 @@ const DEFAULT_TEACHERS = [{
   slug: 'mostafa',
   name: 'د. مصطفى تيتو',
   phone: '',
-  bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي.',
+  specialty: 'مدرس الفلسفة والمنطق وعلم النفس — المرحلة الثانوية',
+  bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: اختبر نفسك، اعرف درجتك فورًا، وراجع إجاباتك بعد كل امتحان.',
   photo: '',
   socialLinks: { whatsapp: '', facebook: '', tiktok: '' },
-  colors: { primary: '#123B40', accent: '#C9A86A' },
+  colors: { primary: '#0E7A5F', accent: '#C99A2E' },
   requirePhone: true,
   enabled: true,
   isDefault: true,
@@ -162,13 +163,19 @@ async function readJson(request, maxBytes = 128 * 1024) {
 }
 
 /* ============================ public API ============================ */
-function publicCatalog() {
-  return { version: BANKS.version, generatedAt: BANKS.generatedAt, catalog: BANKS.catalog, exams: BANKS.exams };
+async function publicCatalog(env) {
+  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
+  const owner = teachers.find(t => t.isDefault) || teachers.find(t => t.enabled !== false) || teachers[0] || null;
+  return {
+    version: BANKS.version, generatedAt: BANKS.generatedAt,
+    catalog: BANKS.catalog, exams: BANKS.exams,
+    owner: owner ? teacherPublic(owner) : null
+  };
 }
 
 function teacherPublic(t) {
   return {
-    slug: t.slug, name: t.name, bio: t.bio || '', photo: t.photo || '',
+    slug: t.slug, name: t.name, specialty: t.specialty || '', bio: t.bio || '', photo: t.photo || '',
     socialLinks: t.socialLinks || {}, colors: t.colors || {},
     requirePhone: !!t.requirePhone
   };
@@ -179,7 +186,7 @@ async function handleApi(request, env, ctx, pathname) {
 
   /* ---------- public: catalog ---------- */
   if (pathname === '/api/catalog' && method === 'GET') {
-    return json(publicCatalog(), 200, { 'Cache-Control': 'public, max-age=300, s-maxage=3600' });
+    return json(await publicCatalog(env), 200, { 'Cache-Control': 'public, max-age=300, s-maxage=3600' });
   }
 
   /* ---------- public: teacher profile ---------- */
@@ -253,8 +260,13 @@ async function handleApi(request, env, ctx, pathname) {
     if (!Array.isArray(answers) || answers.length !== BANKS.examDefs[sess.examId].length) {
       return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
     }
-    for (const a of answers) {
-      if (!Number.isInteger(a) || a < 0 || a > 3) return fail('توجد أسئلة بدون إجابة. أكمل جميع الأسئلة قبل التسليم.');
+    const unanswered = [];
+    answers.forEach((a, i) => { if (!Number.isInteger(a) || a < 0 || a > 3) unanswered.push(i + 1); });
+    if (unanswered.length) {
+      return json({
+        error: 'لا يمكن تسليم الامتحان قبل الإجابة على جميع الأسئلة. أسئلة بدون إجابة: ' + unanswered.join('، '),
+        unanswered
+      }, 400);
     }
 
     // dedupe (best-effort across isolates: Cache API + durable KV)
@@ -454,6 +466,23 @@ async function handleAdmin(request, env, ctx, pathname) {
     return fail('طلب غير مصرح.', 403);
   }
 
+  /* ---------- change admin password ---------- */
+  if (pathname === '/api/admin/password' && method === 'POST') {
+    const body = await readJson(request);
+    const current = String(body.current || '');
+    const next = String(body.next || '');
+    const admin = await getAdminRecord(env);
+    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد.', 404);
+    const curHash = await pbkdf2(current, admin.salt, admin.iterations);
+    if (curHash !== admin.hash) return fail('كلمة المرور الحالية غير صحيحة.', 401);
+    if (next.length < 8) return fail('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+    if (next === current) return fail('كلمة المرور الجديدة مطابقة للحالية.');
+    const salt = randomHex(16);
+    const hash = await pbkdf2(next, salt);
+    await kvPut(env, 'admin', JSON.stringify({ ...admin, salt, hash, iterations: 120000, updatedAt: new Date().toISOString() }));
+    return json({ ok: true });
+  }
+
   /* ---------- overview ---------- */
   if (pathname === '/api/admin/overview' && method === 'GET') {
     const teachers = await getTeachers(env);
@@ -588,7 +617,8 @@ function sanitizeTeacher(body, existing) {
   };
   return {
     slug, name, phone,
-    bio: String(body.bio || '').trim().slice(0, 500),
+    specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
+    bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
     socialLinks: social,
     colors,
@@ -647,8 +677,13 @@ export default {
         }
       }
 
-      // everything else: static assets (JS/CSS/icons) — 404 if unknown
+      // everything else: static assets (JS/CSS/icons) — cached for fast repeat loads
       const res = await env.ASSETS.fetch(request);
+      if (res.status === 200 && /\.(js|css|svg)$/.test(pathname)) {
+        const headers = new Headers(res.headers);
+        headers.set('Cache-Control', 'public, max-age=3600');
+        return securityHeaders(new Response(res.body, { status: res.status, headers }));
+      }
       return securityHeaders(res);
     } catch (e) {
       return securityHeaders(fail('خطأ في الخادم.', 500));
