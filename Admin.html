@@ -47,7 +47,6 @@
 
     .wrap{max-width:1180px;margin:auto;padding:24px 18px 80px}
 
-    /* Login */
     .login-wrap{max-width:430px;margin:8vh auto 0}
     .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:32px;text-align:center}
     .login-card .l-logo{width:64px;height:64px;margin:0 auto 16px;border-radius:20px;display:grid;place-items:center;font-weight:900;font-size:20px;
@@ -59,7 +58,6 @@
     .login-card input:focus{border-color:var(--a);box-shadow:0 0 0 4px var(--a-ring)}
     .login-err{color:var(--error);font-size:13px;font-weight:700;margin-top:12px;min-height:20px}
 
-    /* Cards & tabs */
     .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);padding:22px;margin-top:16px}
     .card h2{margin:0;color:var(--p);font-size:19px;font-weight:900}
     .card .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
@@ -70,7 +68,24 @@
     .tab.active{background:var(--p);color:#fff;box-shadow:var(--shadow-sm)}
     .tab:not(.active):hover{background:var(--p-09);color:var(--p)}
 
-    /* Stats */
+    /* subject overview cards */
+    .subj-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    .subj-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-lg);padding:22px;box-shadow:var(--shadow-sm)}
+    .subj-card .s-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+    .subj-card .s-ico{width:44px;height:44px;border-radius:13px;display:grid;place-items:center}
+    .subj-card .s-ico svg{width:22px;height:22px}
+    .subj-card.s-psych .s-ico{background:var(--p-08);color:var(--p)}
+    .subj-card.s-philo .s-ico{background:var(--a-16);color:#7a5c2e}
+    .subj-card h3{margin:0;color:var(--p);font-size:17px;font-weight:900}
+    .subj-card .s-grade{font-size:12px;color:var(--muted)}
+    .mini-stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}
+    .mini-stat{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;text-align:center}
+    .mini-stat b{display:block;font-size:18px;color:var(--p);font-weight:900}
+    .mini-stat span{font-size:10.5px;color:var(--muted);font-weight:700}
+    .data-row{display:flex;flex-wrap:wrap;gap:8px}
+    .data-tag{background:var(--surface2);border:1px solid var(--border);border-radius:99px;padding:5px 11px;font-size:11.5px;color:var(--muted);font-weight:700}
+    .data-tag b{color:var(--p)}
+
     .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-top:16px}
     .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow-sm)}
     .stat .s-icon{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;margin-bottom:10px}
@@ -82,7 +97,6 @@
     .stat.c3 .s-icon{background:var(--success-soft);color:var(--success)}
     .stat.c4 .s-icon{background:var(--warning-soft);color:var(--warning)}
 
-    /* Form */
     .grid2{display:grid;grid-template-columns:1fr 1fr;gap:15px}
     .field label{display:block;font-size:12.5px;font-weight:800;margin-bottom:6px}
     .field input[type=text],.field input[type=password],.field textarea{
@@ -111,7 +125,6 @@
     .brand-preview span{font-size:11.5px;opacity:.75}
     .brand-preview .bp-accent{margin-inline-start:auto;width:34px;height:34px;border-radius:10px;background:var(--a)}
 
-    /* Buttons */
     .btn{border:0;border-radius:var(--r-md);padding:11px 18px;font-size:13.5px;font-weight:800;transition:.15s;display:inline-flex;align-items:center;gap:8px}
     .btn:disabled{opacity:.55;cursor:not-allowed}
     .btn-primary{background:var(--p);color:#fff}
@@ -123,11 +136,11 @@
     .btn-outline{background:#fff;color:var(--p);border:1.5px solid var(--border)}
     .btn-outline:hover:not(:disabled){border-color:var(--p)}
 
-    /* Table */
     .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0 12px}
     .toolbar input,.toolbar select{padding:10px 13px;border:1.5px solid var(--border);border-radius:12px;font-size:13.5px;outline:0;background:#fff}
     .toolbar input:focus,.toolbar select:focus{border-color:var(--a)}
     .toolbar input{min-width:200px;flex:1}
+
     .tablewrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r-md)}
     table{width:100%;border-collapse:collapse;min-width:780px;font-size:13px}
     th,td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right;vertical-align:middle}
@@ -141,8 +154,23 @@
     .pct-pill.low{background:var(--error-soft);color:var(--error)}
     .empty{padding:40px;text-align:center;color:var(--muted);font-size:14px}
     .empty svg{width:40px;height:40px;color:var(--border);margin-bottom:10px}
+    .qbox{background:var(--surface2);border:1px solid var(--border);border-radius:var(--r-md);padding:14px;margin-bottom:10px}
+    .qbox .qtext{font-weight:800;color:var(--text);font-size:14px;margin:0 0 10px;white-space:pre-line}
+    .qbox .qopts{display:grid;grid-template-columns:1fr 1fr;gap:6px;font-size:12.5px;color:var(--muted)}
+    .qbox .qopts .correct{color:var(--success);font-weight:800}
+    .qbox .qmeta{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px}
+    .qbox .qmeta .tag{font-size:10.5px;font-weight:700;background:#fff;border:1px solid var(--border);border-radius:99px;padding:3px 9px;color:var(--muted)}
+    .diff-easy{background:var(--success-soft);color:var(--success)}
+    .diff-medium{background:var(--warning-soft);color:var(--warning)}
+    .diff-hard{background:var(--error-soft);color:var(--error)}
+    .exam-cards{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+    .exam-card{background:var(--surface);border:1.5px solid var(--border);border-radius:var(--r-md);padding:16px}
+    .exam-card h4{margin:0 0 4px;color:var(--p);font-size:14px;font-weight:900}
+    .exam-card .em{font-size:11.5px;color:var(--muted);margin-bottom:10px}
+    .exam-card .ediffs{display:flex;gap:5px;flex-wrap:wrap}
+    .exam-card .ediff{font-size:10.5px;font-weight:800;border-radius:99px;padding:3px 8px}
+    .exam-card.comp{border-color:var(--a-55);background:linear-gradient(135deg, var(--a-09), #fff)}
 
-    /* Toast */
     .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--text);color:#fff;
       padding:13px 20px;border-radius:14px;z-index:120;box-shadow:var(--shadow-md);max-width:92vw;text-align:center;
       font-size:14px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
@@ -159,9 +187,9 @@
     .hidden{display:none!important}
     .divider{border:0;border-top:1px solid var(--border);margin:18px 0}
 
-    @media (max-width:900px){ .stats{grid-template-columns:1fr 1fr} }
+    @media (max-width:900px){ .stats{grid-template-columns:1fr 1fr} .subj-grid{grid-template-columns:1fr} .exam-cards{grid-template-columns:1fr 1fr} .mini-stats{grid-template-columns:1fr 1fr} }
     @media (max-width:620px){
-      .grid2,.stats{grid-template-columns:1fr}
+      .grid2,.stats,.exam-cards{grid-template-columns:1fr}
       .topbar-in{padding:12px 14px}
       .topbar .t-actions{margin-inline-start:0}
       .login-wrap{margin-top:4vh}
@@ -178,7 +206,7 @@
 <!-- ===================== LOGIN ===================== -->
 <div class="wrap login-wrap" id="login">
   <div class="login-card">
-    <div class="l-logo">PSY</div>
+    <div class="l-logo">EDU</div>
     <h1>لوحة تحكم المدرس</h1>
     <p>أدخل رمز لوحة التحكم للمتابعة. الرمز الافتراضي للنسخة الجديدة هو <b>1234</b> ويمكنك تغييره من الإعدادات بعد الدخول.</p>
     <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="رمز الدخول">
@@ -191,10 +219,10 @@
 <div id="app" class="hidden">
   <header class="topbar">
     <div class="topbar-in">
-      <div class="logo" id="navLogo">PSY</div>
+      <div class="logo" id="navLogo">EDU</div>
       <div class="t-brand">
         <strong id="navTitle">لوحة تحكم المنصة</strong>
-        <span id="navSub">إدارة الهوية والإعدادات والنتائج</span>
+        <span id="navSub">إدارة الهوية والمواد والنتائج</span>
       </div>
       <div class="t-actions">
         <a class="link-btn" id="siteLink" target="_blank" rel="noopener">↗ فتح منصة الطلاب</a>
@@ -207,82 +235,22 @@
   <div class="wrap">
     <div class="tabs" role="tablist">
       <button class="tab active" id="tab-overview" role="tab" onclick="showTab('overview')">نظرة عامة</button>
-      <button class="tab" id="tab-settings" role="tab" onclick="showTab('settings')">إعدادات المنصة</button>
       <button class="tab" id="tab-results" role="tab" onclick="showTab('results')">النتائج</button>
+      <button class="tab" id="tab-bank" role="tab" onclick="showTab('bank')">بنك الأسئلة</button>
+      <button class="tab" id="tab-exams" role="tab" onclick="showTab('exams')">الامتحانات</button>
+      <button class="tab" id="tab-settings" role="tab" onclick="showTab('settings')">الإعدادات</button>
     </div>
 
     <!-- Overview -->
     <section id="panel-overview">
-      <div class="stats" id="stats"></div>
+      <div class="subj-grid" id="subjCards"></div>
       <div class="card">
         <h2>أحدث النتائج</h2>
-        <div class="sub">آخر ما تم تسجيله من محاولات الطلاب</div>
+        <div class="sub">آخر ما تم تسجيله من محاولات الطلاب في جميع المواد</div>
         <div class="tablewrap" style="margin-top:12px"><table>
-          <thead><tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الوحدة</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+          <thead><tr><th>التاريخ</th><th>المادة</th><th>الطالب</th><th>الوحدة / القسم</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
           <tbody id="recentRows"></tbody>
         </table></div>
-        <div style="margin-top:14px;text-align:center">
-          <button class="btn btn-outline" onclick="showTab('results')">عرض كل النتائج</button>
-        </div>
-      </div>
-    </section>
-
-    <!-- Settings -->
-    <section id="panel-settings" class="hidden">
-      <div class="card">
-        <h2>بيانات المنصة والهوية</h2>
-        <div class="sub">تظهر هذه البيانات للطلاب ويمكن تعديلها دون لمس أي كود</div>
-        <div class="grid2" style="margin-top:16px">
-          <div class="field"><label for="teacherName">اسم المدرس</label><input id="teacherName" type="text"></div>
-          <div class="field"><label for="subjectName">المادة الدراسية</label><input id="subjectName" type="text"></div>
-          <div class="field"><label for="gradeName">الصف / المرحلة</label><input id="gradeName" type="text"></div>
-          <div class="field"><label for="academicYear">العام الدراسي</label><input id="academicYear" type="text"></div>
-          <div class="field"><label for="appTitleInput">اسم المنصة (العنوان الرئيسي)</label><input id="appTitleInput" type="text"></div>
-          <div class="field"><label for="subtitle">العنوان الفرعي</label><input id="subtitle" type="text"></div>
-          <div class="field"><label for="logoText">اختصار الشعار</label><input id="logoText" type="text" maxlength="4"><div class="hint">حرفان إلى أربعة أحرف تظهر في مربع الشعار</div></div>
-          <div class="field"><label for="welcomeText">النص الترحيبي</label><textarea id="welcomeText"></textarea></div>
-        </div>
-
-        <hr class="divider">
-
-        <h2 style="font-size:16px">الألوان والهوية البصرية</h2>
-        <div class="grid2" style="margin-top:14px">
-          <div class="field"><label>اللون الأساسي</label>
-            <div class="color-row"><input type="color" id="primaryColorPicker" value="#123B40"><input id="primaryColor" type="text" placeholder="#123B40"></div>
-          </div>
-          <div class="field"><label>لون التمييز</label>
-            <div class="color-row"><input type="color" id="accentColorPicker" value="#C9A86A"><input id="accentColor" type="text" placeholder="#C9A86A"></div>
-          </div>
-        </div>
-        <div class="brand-preview" id="brandPreview">
-          <div class="bp-logo" id="bpLogo">PSY</div>
-          <div><strong id="bpTitle">اسم المنصة</strong><br><span id="bpSub">العنوان الفرعي</span></div>
-          <div class="bp-accent"></div>
-        </div>
-
-        <hr class="divider">
-
-        <div class="grid2">
-          <div class="field">
-            <label>اشتراط رقم الهاتف من الطالب</label>
-            <label class="switch">
-              <input type="checkbox" id="requirePhone" checked>
-              <span class="track"></span>
-              <span class="s-label" id="requirePhoneLabel">مطلوب</span>
-            </label>
-            <div class="hint">عند الإيقاف يمكن للطالب الدخول بدون رقم هاتف</div>
-          </div>
-          <div class="field">
-            <label for="newAdminPin">رمز لوحة التحكم الجديد (اختياري)</label>
-            <input id="newAdminPin" type="password" placeholder="اتركه فارغًا لعدم التغيير" autocomplete="new-password">
-            <div class="hint">الرمز الحالي لا يظهر هنا حفاظًا على الخصوصية</div>
-          </div>
-        </div>
-
-        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-gold" id="saveBtn" onclick="save()">حفظ جميع التعديلات</button>
-          <span id="saveStatus" style="font-size:12.5px;color:var(--muted)"></span>
-        </div>
       </div>
     </section>
 
@@ -300,27 +268,123 @@
           </div>
         </div>
         <div class="toolbar">
+          <select id="filterSubject" onchange="loadDash()">
+            <option value="">كل المواد</option>
+            <option value="علم النفس">علم النفس</option>
+            <option value="الفلسفة والمنطق">الفلسفة والمنطق</option>
+          </select>
           <input id="filterSearch" type="text" placeholder="ابحث باسم الطالب أو الهاتف أو الامتحان…" oninput="applyFilters()">
-          <select id="filterType" onchange="applyFilters()">
-            <option value="">كل الأنواع</option>
-            <option value="topic">موضوع</option>
-            <option value="comprehensive">شامل</option>
-          </select>
-          <select id="filterUnit" onchange="applyFilters()">
-            <option value="">كل الوحدات</option>
-            <option value="1">الوحدة 1</option>
-            <option value="2">الوحدة 2</option>
-            <option value="3">الوحدة 3</option>
-            <option value="4">الوحدة 4</option>
-            <option value="5">الوحدة 5</option>
-            <option value="6">الوحدة 6</option>
-          </select>
         </div>
-        <div class="tablewrap">
+        <div class="stats" id="stats"></div>
+        <div class="tablewrap" style="margin-top:14px">
           <table>
-            <thead><tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الوحدة</th><th>النوع</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+            <thead><tr><th>التاريخ</th><th>المادة</th><th>الطالب</th><th>الهاتف</th><th>الوحدة / القسم</th><th>النوع</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
             <tbody id="rows"></tbody>
           </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- Question bank -->
+    <section id="panel-bank" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2>بنك الأسئلة</h2>
+            <div class="sub" id="bankCount">مفتاح الإجابة يظهر للمدير فقط</div>
+          </div>
+          <button class="btn btn-primary" onclick="loadBank()">↻ تحديث</button>
+        </div>
+        <div class="toolbar">
+          <select id="bankSubject" onchange="onBankSubjectChange()">
+            <option value="philosophy">الفلسفة والمنطق</option>
+            <option value="psychology">علم النفس</option>
+          </select>
+          <select id="bankChapter" onchange="loadBank()"><option value="">كل الفصول</option></select>
+          <select id="bankTraining" onchange="loadBank()"><option value="">كل التدريبات</option></select>
+          <select id="bankDifficulty" onchange="loadBank()">
+            <option value="">كل المستويات</option>
+            <option value="easy">سهل</option>
+            <option value="medium">متوسط</option>
+            <option value="hard">صعب</option>
+          </select>
+          <input id="bankSearch" type="text" placeholder="ابحث في نص السؤال…" oninput="debounceSearch()">
+        </div>
+        <div id="bankList"></div>
+      </div>
+    </section>
+
+    <!-- Exams -->
+    <section id="panel-exams" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2>هرم الامتحانات</h2>
+            <div class="sub" id="examsCount"></div>
+          </div>
+          <div style="display:flex;gap:9px">
+            <button class="btn btn-ghost" id="hierPsychBtn" onclick="loadHierarchy('psychology')">علم النفس</button>
+            <button class="btn btn-ghost" id="hierPhiloBtn" onclick="loadHierarchy('philosophy')">الفلسفة والمنطق</button>
+          </div>
+        </div>
+        <div class="exam-cards" id="examCards" style="margin-top:14px"></div>
+        <div class="card" id="auditBox" style="margin-top:16px;background:var(--surface2)">
+          <h2 style="font-size:16px">سجل تدقيق بنك الفلسفة والمنطق</h2>
+          <div class="sub" id="auditInfo"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="panel-settings" class="hidden">
+      <div class="card">
+        <h2>بيانات المنصة والهوية</h2>
+        <div class="sub">تظهر هذه البيانات للطلاب ويمكن تعديلها دون لمس أي كود</div>
+        <div class="grid2" style="margin-top:16px">
+          <div class="field"><label for="teacherName">اسم المدرس</label><input id="teacherName" type="text"></div>
+          <div class="field"><label for="subjectName">اسم المادة / المواد</label><input id="subjectName" type="text"></div>
+          <div class="field"><label for="gradeName">الصف / المرحلة</label><input id="gradeName" type="text"></div>
+          <div class="field"><label for="academicYear">العام الدراسي</label><input id="academicYear" type="text"></div>
+          <div class="field"><label for="appTitleInput">اسم المنصة (العنوان الرئيسي)</label><input id="appTitleInput" type="text"></div>
+          <div class="field"><label for="subtitle">العنوان الفرعي</label><input id="subtitle" type="text"></div>
+          <div class="field"><label for="logoText">اختصار الشعار</label><input id="logoText" type="text" maxlength="4"><div class="hint">حرفان إلى أربعة أحرف تظهر في مربع الشعار</div></div>
+          <div class="field"><label for="welcomeText">النص الترحيبي</label><textarea id="welcomeText"></textarea></div>
+        </div>
+        <hr class="divider">
+        <h2 style="font-size:16px">الألوان والهوية البصرية</h2>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field"><label>اللون الأساسي</label>
+            <div class="color-row"><input type="color" id="primaryColorPicker" value="#123B40"><input id="primaryColor" type="text" placeholder="#123B40"></div>
+          </div>
+          <div class="field"><label>لون التمييز</label>
+            <div class="color-row"><input type="color" id="accentColorPicker" value="#C9A86A"><input id="accentColor" type="text" placeholder="#C9A86A"></div>
+          </div>
+        </div>
+        <div class="brand-preview" id="brandPreview">
+          <div class="bp-logo" id="bpLogo">EDU</div>
+          <div><strong id="bpTitle">اسم المنصة</strong><br><span id="bpSub">العنوان الفرعي</span></div>
+          <div class="bp-accent"></div>
+        </div>
+        <hr class="divider">
+        <div class="grid2">
+          <div class="field">
+            <label>اشتراط رقم الهاتف من الطالب</label>
+            <label class="switch">
+              <input type="checkbox" id="requirePhone" checked>
+              <span class="track"></span>
+              <span class="s-label" id="requirePhoneLabel">مطلوب</span>
+            </label>
+            <div class="hint">عند الإيقاف يمكن للطالب الدخول بدون رقم هاتف</div>
+          </div>
+          <div class="field">
+            <label for="newAdminPin">رمز لوحة التحكم الجديد (اختياري)</label>
+            <input id="newAdminPin" type="password" placeholder="اتركه فارغًا لعدم التغيير" autocomplete="new-password">
+            <div class="hint">الرمز الحالي لا يظهر هنا حفاظًا على الخصوصية</div>
+          </div>
+        </div>
+        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-gold" id="saveBtn" onclick="save()">حفظ جميع التعديلات</button>
+          <span id="saveStatus" style="font-size:12.5px;color:var(--muted)"></span>
         </div>
       </div>
     </section>
@@ -334,64 +398,54 @@
   let PIN = '';
   let SET = null;
   let ROWS = [];
+  let BANK = [];
 
   const $ = id => document.getElementById(id);
 
-  /* ---------- Theme helpers ---------- */
-  function hexToRgb(h) {
-    h = String(h || '').replace('#', '');
-    if (h.length !== 6) return null;
-    const n = parseInt(h, 16);
-    if (isNaN(n)) return null;
-    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
-  }
-  function tintColor(hex, pct) { const c = hexToRgb(hex); if (!c) return ''; const f = pct / 100;
-    return 'rgb(' + Math.round(c.r * f + 255 * (1 - f)) + ',' + Math.round(c.g * f + 255 * (1 - f)) + ',' + Math.round(c.b * f + 255 * (1 - f)) + ')'; }
-  function shadeColor(hex, pct) { const c = hexToRgb(hex); if (!c) return ''; const f = 1 - pct / 100;
-    return 'rgb(' + Math.round(c.r * f) + ',' + Math.round(c.g * f) + ',' + Math.round(c.b * f) + ')'; }
-  function rgbaColor(hex, a) { const c = hexToRgb(hex); if (!c) return '';
-    return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')'; }
-  function applyTheme(p, a) {
-    const st = document.documentElement.style;
-    if (/^#[0-9a-fA-F]{6}$/.test(p || '')) {
-      st.setProperty('--p', p);
-      [['--p-07', 7], ['--p-08', 8], ['--p-09', 9], ['--p-10', 10], ['--p-12', 12], ['--p-14', 14], ['--p-35', 35], ['--p-40', 40]]
-        .forEach(t => st.setProperty(t[0], tintColor(p, t[1])));
-      st.setProperty('--p-shadow', rgbaColor(p, .3));
-      st.setProperty('--p-glow', rgbaColor(p, .12));
+  function hexToRgb(h){ h=String(h||'').replace('#',''); if(h.length!==6) return null;
+    const n=parseInt(h,16); if(isNaN(n)) return null; return {r:(n>>16)&255,g:(n>>8)&255,b:n&255}; }
+  function tintColor(hex,pct){ const c=hexToRgb(hex); if(!c) return ''; const f=pct/100;
+    return 'rgb('+Math.round(c.r*f+255*(1-f))+','+Math.round(c.g*f+255*(1-f))+','+Math.round(c.b*f+255*(1-f))+')'; }
+  function shadeColor(hex,pct){ const c=hexToRgb(hex); if(!c) return ''; const f=1-pct/100;
+    return 'rgb('+Math.round(c.r*f)+','+Math.round(c.g*f)+','+Math.round(c.b*f)+')'; }
+  function rgbaColor(hex,a){ const c=hexToRgb(hex); if(!c) return '';
+    return 'rgba('+c.r+','+c.g+','+c.b+','+a+')'; }
+  function applyTheme(p,a){
+    const st=document.documentElement.style;
+    if(/^#[0-9a-fA-F]{6}$/.test(p||'')){
+      st.setProperty('--p',p);
+      [['--p-07',7],['--p-08',8],['--p-09',9],['--p-10',10],['--p-12',12],['--p-14',14],['--p-35',35],['--p-40',40]]
+        .forEach(t=>st.setProperty(t[0],tintColor(p,t[1])));
+      st.setProperty('--p-shadow',rgbaColor(p,.3)); st.setProperty('--p-glow',rgbaColor(p,.12));
     }
-    if (/^#[0-9a-fA-F]{6}$/.test(a || '')) {
-      st.setProperty('--a', a);
-      [['--a-07', 7], ['--a-09', 9], ['--a-13', 13], ['--a-16', 16], ['--a-18', 18], ['--a-30', 30], ['--a-40', 40], ['--a-55', 55], ['--a-60', 60]]
-        .forEach(t => st.setProperty(t[0], tintColor(a, t[1])));
-      st.setProperty('--a-deep', shadeColor(a, 35));
-      st.setProperty('--a-ring', rgbaColor(a, .22));
-      st.setProperty('--a-shadow', rgbaColor(a, .35));
-      st.setProperty('--a-glow', rgbaColor(a, .16));
+    if(/^#[0-9a-fA-F]{6}$/.test(a||'')){
+      st.setProperty('--a',a);
+      [['--a-07',7],['--a-09',9],['--a-13',13],['--a-16',16],['--a-18',18],['--a-30',30],['--a-40',40],['--a-55',55],['--a-60',60]]
+        .forEach(t=>st.setProperty(t[0],tintColor(a,t[1])));
+      st.setProperty('--a-deep',shadeColor(a,35)); st.setProperty('--a-ring',rgbaColor(a,.22));
+      st.setProperty('--a-shadow',rgbaColor(a,.35)); st.setProperty('--a-glow',rgbaColor(a,.16));
     }
   }
+
+  function serverReady(){ return !!(window.google && window.google.script && window.google.script.run); }
 
   /* ---------- Login ---------- */
-  function serverReady() {
-    return !!(window.google && window.google.script && window.google.script.run);
-  }
-
-  function login() {
-    if (!serverReady()) { $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.'; return; }
+  function login(){
+    if(!serverReady()){ $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.'; return; }
     PIN = $('pin').value.trim();
-    if (!PIN) { $('loginErr').textContent = 'أدخل رمز الدخول.'; return; }
+    if(!PIN){ $('loginErr').textContent = 'أدخل رمز الدخول.'; return; }
     $('loginErr').textContent = '';
     showLoad('جاري التحقق…');
     google.script.run
-      .withSuccessHandler(function (s) {
+      .withSuccessHandler(function(s){
         SET = s;
         hideLoad();
         $('login').classList.add('hidden');
         $('app').classList.remove('hidden');
         fill(s);
-        loadDash();
+        loadOverview();
       })
-      .withFailureHandler(function (e) {
+      .withFailureHandler(function(e){
         hideLoad();
         $('loginErr').textContent = friendly(e);
         $('pin').select();
@@ -399,7 +453,7 @@
       .getTeacherSettings(PIN);
   }
 
-  function logout() {
+  function logout(){
     PIN = '';
     $('pin').value = '';
     $('app').classList.add('hidden');
@@ -407,12 +461,11 @@
     $('pin').focus();
   }
 
-  document.addEventListener('keydown', function (ev) {
-    if (!$('login').classList.contains('hidden') && ev.key === 'Enter') login();
+  document.addEventListener('keydown', function(ev){
+    if(!$('login').classList.contains('hidden') && ev.key === 'Enter') login();
   });
 
-  /* ---------- Fill ---------- */
-  function fill(s) {
+  function fill(s){
     $('teacherName').value = s.teacherName || '';
     $('subjectName').value = s.subjectName || '';
     $('gradeName').value = s.gradeName || '';
@@ -429,31 +482,29 @@
     $('requirePhoneLabel').textContent = s.requirePhone ? 'مطلوب' : 'غير مطلوب';
     $('newAdminPin').value = '';
     $('navTitle').textContent = s.appTitle || 'لوحة تحكم المنصة';
-    $('navLogo').textContent = s.logoText || 'PSY';
+    $('navLogo').textContent = s.logoText || 'EDU';
     $('siteLink').href = location.href.split('?')[0];
     updatePreview();
   }
 
-  /* ---------- Brand preview ---------- */
-  function updatePreview() {
+  function updatePreview(){
     const p = $('primaryColor').value;
     const a = $('accentColor').value;
     applyTheme(p, a);
-    $('bpLogo').textContent = $('logoText').value || 'PSY';
+    $('bpLogo').textContent = $('logoText').value || 'EDU';
     $('bpTitle').textContent = $('appTitleInput').value || 'اسم المنصة';
     $('bpSub').textContent = $('subtitle').value || 'العنوان الفرعي';
   }
-  ['logoText', 'appTitleInput', 'subtitle'].forEach(id => document.addEventListener('input', function (ev) {
-    if (ev.target && ev.target.id === id) updatePreview();
+  ['logoText','appTitleInput','subtitle'].forEach(id => document.addEventListener('input', function(ev){
+    if(ev.target && ev.target.id === id) updatePreview();
   }));
-  $('primaryColorPicker').addEventListener('input', function () { $('primaryColor').value = this.value; updatePreview(); });
-  $('accentColorPicker').addEventListener('input', function () { $('accentColor').value = this.value; updatePreview(); });
+  $('primaryColorPicker').addEventListener('input', function(){ $('primaryColor').value = this.value; updatePreview(); });
+  $('accentColorPicker').addEventListener('input', function(){ $('accentColor').value = this.value; updatePreview(); });
   $('primaryColor').addEventListener('input', updatePreview);
   $('accentColor').addEventListener('input', updatePreview);
-  $('requirePhone').addEventListener('change', function () { $('requirePhoneLabel').textContent = this.checked ? 'مطلوب' : 'غير مطلوب'; });
+  $('requirePhone').addEventListener('change', function(){ $('requirePhoneLabel').textContent = this.checked ? 'مطلوب' : 'غير مطلوب'; });
 
-  /* ---------- Save ---------- */
-  function save() {
+  function save(){
     const btn = $('saveBtn');
     btn.disabled = true;
     $('saveStatus').textContent = 'جاري الحفظ…';
@@ -472,7 +523,7 @@
       newAdminPin: $('newAdminPin').value
     };
     google.script.run
-      .withSuccessHandler(function (s) {
+      .withSuccessHandler(function(s){
         SET = s;
         btn.disabled = false;
         $('saveStatus').textContent = '';
@@ -480,7 +531,7 @@
         fill(s);
         toast('تم حفظ التعديلات بنجاح.', 'ok');
       })
-      .withFailureHandler(function (e) {
+      .withFailureHandler(function(e){
         btn.disabled = false;
         $('saveStatus').textContent = '';
         toast(friendly(e), 'err');
@@ -488,11 +539,68 @@
       .saveTeacherSettings(PIN, payload);
   }
 
-  /* ---------- Dashboard ---------- */
-  function loadDash() {
-    showLoad('جاري تحميل النتائج…');
+  /* ---------- Overview ---------- */
+  function loadOverview(){
+    showLoad('جاري تحميل النظرة العامة…');
     google.script.run
-      .withSuccessHandler(function (d) {
+      .withSuccessHandler(function(ov){
+        hideLoad();
+        $('sheetLink').href = ov.link || '#';
+        renderSubjCards(ov);
+        loadDash(true);
+      })
+      .withFailureHandler(function(e){ hideLoad(); toast(friendly(e), 'err'); })
+      .getAdminOverview(PIN);
+  }
+
+  function renderSubjCards(ov){
+    const icons = {
+      psych: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9.5 17.5h5"/><path d="M10.5 20.5h3"/><path d="M12 3a5.8 5.8 0 0 0-3.3 10.5c.7.5 1.3 1.3 1.3 2.3v.7h4v-.7c0-1 .6-1.8 1.3-2.3A5.8 5.8 0 0 0 12 3z"/></svg>',
+      philo: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v5.2c0 4.4-3 7.8-7 9.8-4-2-7-5.4-7-9.8V6z"/><path d="M9 12l2 2 4-4"/></svg>'
+    };
+    const p = ov.subjects.psychology;
+    const f = ov.subjects.philosophy;
+    $('subjCards').innerHTML =
+      '<div class="subj-card s-psych">' +
+        '<div class="s-head"><div class="s-ico">' + icons.psych + '</div><div><h3>علم النفس</h3><div class="s-grade">المرحلة الثانوية</div></div></div>' +
+        '<div class="mini-stats">' +
+          '<div class="mini-stat"><b>' + p.exams + '</b><span>امتحان</span></div>' +
+          '<div class="mini-stat"><b>' + p.questions + '</b><span>سؤال</span></div>' +
+          '<div class="mini-stat"><b>' + p.stats.attempts + '</b><span>محاولة</span></div>' +
+          '<div class="mini-stat"><b>' + p.stats.avg + '%</b><span>متوسط</span></div>' +
+        '</div>' +
+        '<div class="data-row">' +
+          '<span class="data-tag"><b>' + p.topicExams + '</b> موضوع</span>' +
+          '<span class="data-tag"><b>' + p.comprehensive + '</b> شامل</span>' +
+          '<span class="data-tag"><b>' + p.stats.students + '</b> طالب</span>' +
+          '<span class="data-tag">مُتحقق <b>' + p.verified + '</b></span>' +
+        '</div>' +
+      '</div>' +
+      '<div class="subj-card s-philo">' +
+        '<div class="s-head"><div class="s-ico">' + icons.philo + '</div><div><h3>الفلسفة والمنطق</h3><div class="s-grade">أولى ثانوي 2027</div></div></div>' +
+        '<div class="mini-stats">' +
+          '<div class="mini-stat"><b>' + f.exams + '</b><span>امتحان</span></div>' +
+          '<div class="mini-stat"><b>' + f.questions + '</b><span>سؤال مُتحقق</span></div>' +
+          '<div class="mini-stat"><b>' + f.stats.attempts + '</b><span>محاولة</span></div>' +
+          '<div class="mini-stat"><b>' + f.stats.avg + '%</b><span>متوسط</span></div>' +
+        '</div>' +
+        '<div class="data-row">' +
+          '<span class="data-tag">المصدر <b>' + f.sourceQuestions + '</b></span>' +
+          '<span class="data-tag">صُحح <b>' + f.corrected + '</b></span>' +
+          '<span class="data-tag">استُبعد <b>' + f.excluded + '</b></span>' +
+          '<span class="data-tag">فصول <b>' + f.chapters + '</b></span>' +
+          '<span class="data-tag">تدريبات <b>' + f.trainings + '</b></span>' +
+          '<span class="data-tag">شامل <b>' + f.comprehensive + '</b></span>' +
+        '</div>' +
+      '</div>';
+  }
+
+  /* ---------- Dashboard ---------- */
+  function loadDash(quiet){
+    if(!quiet) showLoad('جاري تحميل النتائج…');
+    const subject = $('filterSubject').value;
+    google.script.run
+      .withSuccessHandler(function(d){
         hideLoad();
         ROWS = d.rows || [];
         const st = d.stats || {};
@@ -501,14 +609,11 @@
         renderRecent();
         renderAll();
       })
-      .withFailureHandler(function (e) {
-        hideLoad();
-        toast(friendly(e), 'err');
-      })
-      .getDashboardData(PIN);
+      .withFailureHandler(function(e){ hideLoad(); toast(friendly(e), 'err'); })
+      .getDashboardData(PIN, { subject: subject });
   }
 
-  function renderStats(st) {
+  function renderStats(st){
     const icons = {
       c1: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>',
       c2: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
@@ -522,119 +627,225 @@
       '<div class="stat c4"><div class="s-icon">' + icons.c4 + '</div><b>' + st.max + '%</b><span>أعلى نسبة</span></div>';
   }
 
-  function renderRecent() {
+  function renderRecent(){
     const rows = ROWS.slice(0, 8);
     $('recentRows').innerHTML = rows.length
-      ? rows.map(rowHtml).join('')
+      ? rows.map(function(r){ return rowHtml(r, true); }).join('')
       : '<tr><td colspan="7"><div class="empty">لا توجد نتائج بعد.</div></td></tr>';
   }
 
-  function renderAll() {
+  function renderAll(){
     const filtered = filteredRows();
-    $('resultsCount').textContent = 'إجمالي المحاولات المعروضة: ' + filtered.length + (ROWS.length > 500 ? ' (أحدث 500)' : '');
+    $('resultsCount').textContent = 'إجمالي المحاولات المعروضة: ' + filtered.length;
     $('rows').innerHTML = filtered.length
-      ? filtered.map(rowHtml).join('')
-      : '<tr><td colspan="8"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.3-4.3M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z"/></svg><br>لا توجد نتائج مطابقة.</div></td></tr>';
+      ? filtered.map(function(r){ return rowHtml(r, false); }).join('')
+      : '<tr><td colspan="9"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.3-4.3M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z"/></svg><br>لا توجد نتائج مطابقة.</div></td></tr>';
   }
 
-  function rowHtml(r) {
+  function rowHtml(r, recent){
     const pctClass = r.percentage >= 75 ? 'hi' : r.percentage >= 50 ? 'mid' : 'low';
     const unitLabel = r.unit && /^\d+$/.test(r.unit) ? 'وحدة ' + r.unit : r.unit;
-    const typeLabel = r.type === 'comprehensive' ? 'شامل' : r.type === 'topic' ? 'موضوع' : r.type;
+    if(recent){
+      return '<tr>' +
+        '<td>' + esc(r.date) + '</td>' +
+        '<td>' + esc(r.subject) + '</td>' +
+        '<td>' + esc(r.name) + '</td>' +
+        '<td>' + esc(unitLabel) + '</td>' +
+        '<td>' + esc(r.exam) + '</td>' +
+        '<td class="score-cell">' + r.score + ' / ' + r.total + '</td>' +
+        '<td><span class="pct-pill ' + pctClass + '">' + r.percentage + '%</span></td>' +
+        '</tr>';
+    }
     return '<tr>' +
       '<td>' + esc(r.date) + '</td>' +
+      '<td>' + esc(r.subject) + '</td>' +
       '<td>' + esc(r.name) + '</td>' +
       '<td dir="ltr" style="text-align:right">' + esc(r.phone) + '</td>' +
       '<td>' + esc(unitLabel) + '</td>' +
-      '<td>' + esc(typeLabel) + '</td>' +
+      '<td>' + esc(r.type) + '</td>' +
       '<td>' + esc(r.exam) + '</td>' +
       '<td class="score-cell">' + r.score + ' / ' + r.total + '</td>' +
       '<td><span class="pct-pill ' + pctClass + '">' + r.percentage + '%</span></td>' +
       '</tr>';
   }
 
-  function filteredRows() {
+  function filteredRows(){
     const q = $('filterSearch').value.trim().toLowerCase();
-    const type = $('filterType').value;
-    const unit = $('filterUnit').value;
-    return ROWS.filter(function (r) {
-      if (type && (type === 'topic' ? r.type === 'comprehensive' : r.type !== 'comprehensive')) return false;
-      if (unit && String(r.unit) !== String(unit)) return false;
-      if (q) {
-        const hay = (r.name + ' ' + r.phone + ' ' + r.exam + ' ' + r.unit).toLowerCase();
-        if (hay.indexOf(q) === -1) return false;
+    return ROWS.filter(function(r){
+      if(q){
+        const hay = (r.name + ' ' + r.phone + ' ' + r.exam + ' ' + r.unit + ' ' + r.subject).toLowerCase();
+        if(hay.indexOf(q) === -1) return false;
       }
       return true;
     });
   }
+  function applyFilters(){ renderAll(); }
 
-  function applyFilters() { renderAll(); }
-
-  /* ---------- CSV export ---------- */
-  function exportCsv() {
+  function exportCsv(){
     const rows = filteredRows();
-    if (!rows.length) { toast('لا توجد نتائج للتصدير.', 'err'); return; }
-    const header = ['التاريخ', 'الطالب', 'الهاتف', 'الوحدة', 'النوع', 'الامتحان', 'الدرجة', 'النسبة'];
+    if(!rows.length){ toast('لا توجد نتائج للتصدير.', 'err'); return; }
+    const header = ['التاريخ','المادة','الطالب','الهاتف','الوحدة/القسم','النوع','الامتحان','الدرجة','النسبة'];
     const lines = [header.join(',')];
-    rows.forEach(function (r) {
+    rows.forEach(function(r){
       lines.push([
-        '"' + (r.date || '') + '"',
-        '"' + (r.name || '') + '"',
-        '"' + (r.phone || '') + '"',
-        '"' + (r.unit || '') + '"',
-        '"' + (r.type || '') + '"',
-        '"' + (r.exam || '') + '"',
-        r.score + '/' + r.total,
-        r.percentage + '%'
+        '"' + (r.date || '') + '"','"' + (r.subject || '') + '"','"' + (r.name || '') + '"',
+        '"' + (r.phone || '') + '"','"' + (r.unit || '') + '"','"' + (r.type || '') + '"',
+        '"' + (r.exam || '') + '"', r.score + '/' + r.total, r.percentage + '%'
       ].join(','));
     });
     const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
     const a = document.createElement('a');
     a.href = URL.createObjectURL(blob);
     a.download = 'النتائج.csv';
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    setTimeout(function(){ URL.revokeObjectURL(a.href); }, 1500);
+  }
+
+  /* ---------- Question bank ---------- */
+  function onBankSubjectChange(){
+    const subj = $('bankSubject').value;
+    const chSel = $('bankChapter');
+    chSel.innerHTML = '<option value="">كل الفصول</option>';
+    if(subj === 'philosophy'){
+      ['الفصل الأول: التفكير الإنساني','الفصل الثاني: الفلسفة وطبيعة الموقف الفلسفي','الفصل الأول: مبادئ علم المنطق','الفصل الثاني: الاستدلال'].forEach(function(c){
+        const o = document.createElement('option'); o.value = c; o.textContent = c; chSel.appendChild(o);
+      });
+    }
+    loadBank();
+  }
+
+  let searchTimer = null;
+  function debounceSearch(){
+    if(searchTimer) clearTimeout(searchTimer);
+    searchTimer = setTimeout(loadBank, 400);
+  }
+
+  function loadBank(){
+    showLoad('جاري تحميل بنك الأسئلة…');
+    const f = {
+      subject: $('bankSubject').value,
+      chapter: $('bankChapter').value,
+      training: $('bankTraining').value,
+      difficulty: $('bankDifficulty').value,
+      q: $('bankSearch').value
+    };
+    google.script.run
+      .withSuccessHandler(function(d){
+        hideLoad();
+        BANK = d.rows || [];
+        $('bankCount').textContent = 'إجمالي النتائج: ' + d.count + ' — مفتاح الإجابة يظهر للمدير فقط';
+        const box = $('bankList');
+        if(!BANK.length){ box.innerHTML = '<div class="empty">لا توجد أسئلة مطابقة.</div>'; return; }
+        const L = ['أ','ب','ج','د'];
+        box.innerHTML = BANK.map(function(q){
+          const opts = [q.A, q.B, q.C, q.D].map(function(o, i){
+            const isC = (String.fromCharCode(65+i)) === q.correctAnswer;
+            return '<span class="' + (isC ? 'correct' : '') + '">' + L[i] + ') ' + esc(o) + (isC ? ' ✓' : '') + '</span>';
+          }).join('');
+          const diffClass = q.difficulty === 'easy' ? 'diff-easy' : q.difficulty === 'hard' ? 'diff-hard' : 'diff-medium';
+          const diffLabel = q.difficulty === 'easy' ? 'سهل' : q.difficulty === 'hard' ? 'صعب' : (q.difficulty ? 'متوسط' : '');
+          return '<div class="qbox">' +
+            '<p class="qtext">' + esc(q.question) + '</p>' +
+            '<div class="qopts">' + opts + '</div>' +
+            '<div class="qmeta">' +
+              '<span class="tag">' + esc(q.section) + '</span>' +
+              '<span class="tag">' + esc(q.chapter) + '</span>' +
+              (q.training ? '<span class="tag">' + esc(q.training) + '</span>' : '') +
+              (diffLabel ? '<span class="tag ' + diffClass + '">' + diffLabel + '</span>' : '') +
+              '<span class="tag">الإجابة: ' + q.correctAnswer + '</span>' +
+              '<span class="tag">' + esc(q.verificationStatus) + '</span>' +
+            '</div></div>';
+        }).join('');
+      })
+      .withFailureHandler(function(e){ hideLoad(); toast(friendly(e), 'err'); })
+      .getQuestionBank(PIN, f);
+  }
+
+  /* ---------- Exam hierarchy ---------- */
+  function loadHierarchy(subject){
+    showLoad('جاري تحميل الامتحانات…');
+    $('hierPsychBtn').style.opacity = subject === 'psychology' ? '1' : '.5';
+    $('hierPhiloBtn').style.opacity = subject === 'philosophy' ? '1' : '.5';
+    google.script.run
+      .withSuccessHandler(function(d){
+        hideLoad();
+        const exams = d.exams || [];
+        $('examsCount').textContent = 'إجمالي الامتحانات: ' + exams.length;
+        const box = $('examCards');
+        if(!exams.length){ box.innerHTML = '<div class="empty">لا توجد امتحانات.</div>'; return; }
+        box.innerHTML = exams.map(function(e){
+          const isComp = e.type === 'comprehensive';
+          const diffs = e.difficulty || {};
+          const diffHtml = Object.keys(diffs).map(function(k){
+            const cls = k === 'easy' ? 'diff-easy' : k === 'hard' ? 'diff-hard' : 'diff-medium';
+            const lbl = k === 'easy' ? 'سهل' : k === 'hard' ? 'صعب' : 'متوسط';
+            return '<span class="ediff ' + cls + '">' + lbl + ': ' + diffs[k] + '</span>';
+          }).join('');
+          const meta = [e.section, e.chapter, e.training].filter(Boolean).join(' · ');
+          return '<div class="exam-card' + (isComp ? ' comp' : '') + '">' +
+            '<h4>' + esc(e.title) + '</h4>' +
+            '<div class="em">' + esc(meta || (e.typeLabel || '')) + ' · ' + e.count + ' سؤال</div>' +
+            '<div class="ediffs">' + diffHtml + '</div>' +
+          '</div>';
+        }).join('');
+        // audit box (philosophy only)
+        if(d.audit){
+          const a = d.audit;
+          $('auditBox').classList.remove('hidden');
+          $('auditInfo').textContent =
+            'المصدر: ' + a.sourceCount + ' سؤال · مُتحقق: ' + a.verifiedCount +
+            ' · صُحح: ' + a.correctedKeys + ' · استُبعد: ' + a.quarantinedCount +
+            ' · مُؤلَّف: ' + (a.generatedQuestions || 0) +
+            ' · توزيع المفاتيح: ' + Object.keys(a.keyDistribution).map(k => k + '=' + a.keyDistribution[k]).join('، ');
+        } else {
+          $('auditBox').classList.add('hidden');
+        }
+      })
+      .withFailureHandler(function(e){ hideLoad(); toast(friendly(e), 'err'); })
+      .getExamHierarchy(PIN, subject);
   }
 
   /* ---------- Tabs ---------- */
-  function showTab(name) {
-    ['overview', 'settings', 'results'].forEach(function (t) {
+  function showTab(name){
+    ['overview','results','bank','exams','settings'].forEach(function(t){
       $('panel-' + t).classList.toggle('hidden', t !== name);
       $('tab-' + t).classList.toggle('active', t === name);
     });
+    if(name === 'overview'){ loadOverview(); }
+    else if(name === 'results'){ loadDash(); }
+    else if(name === 'bank'){ if(!BANK.length) onBankSubjectChange(); }
+    else if(name === 'exams'){ loadHierarchy('philosophy'); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }
 
   /* ---------- Helpers ---------- */
-  function showLoad(t) { $('loadText').textContent = t || 'جاري التحميل…'; $('loading').classList.remove('hidden'); }
-  function hideLoad() { $('loading').classList.add('hidden'); }
+  function showLoad(t){ $('loadText').textContent = t || 'جاري التحميل…'; $('loading').classList.remove('hidden'); }
+  function hideLoad(){ $('loading').classList.add('hidden'); }
 
   let toastTimer = null;
-  function toast(msg, kind) {
+  function toast(msg, kind){
     const t = $('toast');
     t.textContent = msg;
     t.className = 'toast show ' + (kind || '');
-    if (toastTimer) clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3400);
+    if(toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 3400);
   }
 
-  function friendly(e) {
+  function friendly(e){
     const m = (e && e.message) ? String(e.message) : '';
-    if (/[\u0600-\u06FF]/.test(m)) return m;
+    if(/[\u0600-\u06FF]/.test(m)) return m;
     return 'حدث خطأ غير متوقع. حاول مرة أخرى.';
   }
 
-  function esc(s) {
-    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
-      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  function esc(s){
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function(m){
+      return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[m];
     });
   }
 
-  window.addEventListener('load', function () {
+  window.addEventListener('load', function(){
     $('pin').focus();
-    if (!serverReady()) $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.';
+    if(!serverReady()) $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.';
   });
 </script>
 </body>

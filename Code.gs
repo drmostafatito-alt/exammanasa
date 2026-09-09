@@ -1,8 +1,9 @@
 /**
- * منصة الامتحانات — Master Web App (نسخة محسّنة)
- * رابط واحد | 6 وحدات | 30 امتحانًا | 840 سؤالًا
+ * منصة الامتحانات التعليمية — Master Web App (متعددة المواد)
+ * رابط واحد | علم النفس + الفلسفة والمنطق
  *
- * - بنك الأسئلة (EXAMS / CATALOG) موجود في Data.gs ولا يُعدَّل من هنا.
+ * - بنك أسئلة علم النفس: Data.gs (EXAMS / CATALOG) — 30 امتحانًا / 840 سؤالًا.
+ * - بنك أسئلة الفلسفة والمنطق: PhiloData.gs (PHILO_BANK / PHILO_EXAMS).
  * - إعدادات الهوية والشكل والـPIN تُحفظ في Script Properties وتُدار من لوحة التحكم.
  * - التصحيح يتم بالكامل على الخادم، ولا يصل مفتاح الإجابة إلى المتصفح أبدًا.
  * - الجلسة موقَّعة رقميًا (HMAC) ولا تعتمد على ذاكرة مؤقتة لصحة التصحيح.
@@ -10,21 +11,26 @@
 
 const DEFAULT_SETTINGS = {
   teacherName: 'د. مصطفى تيتو',
-  subjectName: 'علم النفس',
+  subjectName: 'الفلسفة والمنطق',
   gradeName: 'المرحلة الثانوية',
   academicYear: 'العام الدراسي 2026 / 2027',
-  appTitle: 'منصة امتحانات علم النفس',
-  subtitle: 'اختبارات شاملة على المنهج الدراسي',
-  logoText: 'PSY',
+  appTitle: 'منصة الامتحانات التعليمية',
+  subtitle: 'علم النفس · الفلسفة والمنطق — اختبارات المنهج الدراسي',
+  logoText: 'EDU',
   primaryColor: '#123B40',
   accentColor: '#C9A86A',
-  welcomeText: 'اختر الوحدة ثم اختر الدرس أو الامتحان الشامل.',
+  welcomeText: 'اختر المادة ثم ابدأ الامتحان.',
   requirePhone: true,
   adminPin: '1234'
 };
 
 const RESULTS_SHEET_NAME = 'النتائج';
 const SESSION_TTL_SECONDS = 21600; // 6 ساعات
+
+const SUBJECTS = [
+  { id: 'psychology', name: 'علم النفس', gradeName: 'المرحلة الثانوية', academicYear: 'العام الدراسي 2026 / 2027', color: '#123B40' },
+  { id: 'philosophy', name: 'الفلسفة والمنطق', gradeName: 'أولى ثانوي', academicYear: '2027', color: '#7a5c2e' }
+];
 
 /**
  * نقطة الدخول الوحيدة للتطبيق.
@@ -55,7 +61,7 @@ function doGet(e) {
 }
 
 /**
- * بيانات الواجهة العامة (الهوية + كتالوج الامتحانات) — بدون أي بيانات حساسة.
+ * بيانات الواجهة العامة (الهوية + المواد + الكتالوجات) — بدون أي بيانات حساسة.
  */
 function getAppData() {
   const s = getSettings_();
@@ -84,22 +90,71 @@ function getAppData() {
     accentColor: s.accentColor,
     welcomeText: s.welcomeText,
     requirePhone: s.requirePhone,
-    catalog: catalog
+    subjects: SUBJECTS,
+    catalog: catalog,
+    philoCatalog: getPhiloCatalog_()
   };
 }
 
-/**
- * فتح امتحان: يُخلط ترتيب الاختيارات على الخادم، ولا يُرسل مفتاح الإجابة أبدًا.
- * تُوقَّع الجلسة رقميًا حتى لا يمكن تزويرها، ولا تعتمد صحة التصحيح على أي ذاكرة مؤقتة.
- */
-function getExam(examId) {
-  if (!EXAMS[examId]) throw new Error('الامتحان غير موجود.');
+function getPhiloCatalog_() {
+  const sectionDefs = [
+    { name: 'الفلسفة', chapters: ['الفصل الأول: التفكير الإنساني', 'الفصل الثاني: الفلسفة وطبيعة الموقف الفلسفي'] },
+    { name: 'المنطق', chapters: ['الفصل الأول: مبادئ علم المنطق', 'الفصل الثاني: الاستدلال'] }
+  ];
+  const sections = [];
+  sectionDefs.forEach(function (sd) {
+    const sec = { name: sd.name, chapters: [] };
+    sd.chapters.forEach(function (chName) {
+      const exams = [];
+      Object.keys(PHILO_EXAMS).forEach(function (eid) {
+        const e = PHILO_EXAMS[eid];
+        if (e.type === 'training' && e.section === sd.name && e.chapter === chName) {
+          exams.push({ id: eid, title: e.title, count: 20, type: 'training', training: e.training, chapter: e.chapter, section: e.section });
+        }
+      });
+      exams.sort(function (a, b) {
+        return (Number(String(a.training).replace(/\D/g, '')) || 0) - (Number(String(b.training).replace(/\D/g, '')) || 0);
+      });
+      sec.chapters.push({ name: chName, exams: exams });
+    });
+    const comps = [];
+    Object.keys(PHILO_EXAMS).forEach(function (eid) {
+      const e = PHILO_EXAMS[eid];
+      if (e.type === 'comprehensive' && e.section === sd.name) {
+        comps.push({ id: eid, title: e.title, count: 20, type: 'comprehensive', section: e.section });
+      }
+    });
+    if (comps.length) sec.comprehensives = comps;
+    sections.push(sec);
+  });
+  const full = [];
+  Object.keys(PHILO_EXAMS).forEach(function (eid) {
+    const e = PHILO_EXAMS[eid];
+    if (e.type === 'comprehensive' && e.section === 'الفلسفة والمنطق') {
+      full.push({ id: eid, title: e.title, count: 20, type: 'comprehensive' });
+    }
+  });
+  return { sections: sections, fullComprehensive: full };
+}
 
+/**
+ * فتح امتحان (علم النفس أو الفلسفة والمنطق).
+ * تُخلط الاختيارات على الخادم، ولا يُرسل مفتاح الإجابة أبدًا.
+ */
+function getExam(subjectId, examId) {
+  // توافق خلفي: getExam(examId) تعني مادة علم النفس.
+  if (examId === undefined || examId === null) {
+    examId = subjectId;
+    subjectId = 'psychology';
+  }
+  if (subjectId === undefined || subjectId === null || subjectId === '') subjectId = 'psychology';
+  if (subjectId !== 'psychology' && subjectId !== 'philosophy') throw new Error('المادة غير معروفة.');
+
+  const raw = getRawQuestions_(subjectId, examId);
   const sessionId = Utilities.getUuid();
   const seed = randomSeed_();
-  const exam = EXAMS[examId];
 
-  const questions = exam.map(function (q, i) {
+  const questions = raw.map(function (q, i) {
     const order = shuffledOrder_(seed, i);
     return {
       n: i + 1,
@@ -110,37 +165,55 @@ function getExam(examId) {
     };
   });
 
-  const signature = signSession_(sessionId, examId, seed);
+  const signature = signSession_(sessionId, subjectId, examId, seed);
 
-  // تُستخدم الذاكرة المؤقتة فقط لمنع التسليم المكرر، وليس لصحة التصحيح.
   try {
     CacheService.getScriptCache().put('S:' + sessionId, JSON.stringify({
+      subjectId: subjectId,
       examId: examId,
       seed: String(seed),
       submitted: false,
       at: Date.now()
     }), SESSION_TTL_SECONDS);
-  } catch (e) { /* تجاهل: لا تؤثر على صحة التصحيح */ }
+  } catch (e) { /* تجاهل */ }
 
   return {
+    subjectId: subjectId,
     examId: examId,
     sessionId: sessionId,
     seed: seed,
     sig: signature,
-    total: exam.length,
+    total: raw.length,
     questions: questions
   };
 }
 
 /**
+ * الأسئلة الخام (النص + الاختيارات + الإجابة) لمادة وامتحان معينين — للاستخدام الخادمي فقط.
+ */
+function getRawQuestions_(subjectId, examId) {
+  if (subjectId === 'philosophy') {
+    const def = PHILO_EXAMS[examId];
+    if (!def) throw new Error('الامتحان غير موجود.');
+    return def.indices.map(function (i) {
+      const q = PHILO_BANK[i];
+      if (!q) throw new Error('بيانات الامتحان غير مكتملة.');
+      return { question: q.question, A: q.A, B: q.B, C: q.C, D: q.D, answer: q.correctAnswer };
+    });
+  }
+  if (!EXAMS[examId]) throw new Error('الامتحان غير موجود.');
+  return EXAMS[examId];
+}
+
+/**
  * تسليم الامتحان وتصحيحه بالكامل على الخادم.
- * يعيد حساب ترتيب الاختيارات من بذرة الجلسة، ويقارن الإجابة الصحيحة من Data.gs فقط.
  */
 function submitExam(payload) {
   if (!payload || typeof payload !== 'object') throw new Error('بيانات التسليم غير صحيحة.');
 
+  const subjectId = String(payload.subjectId || 'psychology');
+  if (subjectId !== 'psychology' && subjectId !== 'philosophy') throw new Error('المادة غير معروفة.');
   const examId = String(payload.examId || '');
-  if (!EXAMS[examId]) throw new Error('الامتحان غير موجود.');
 
   const name = String(payload.name || '').trim();
   const phone = String(payload.phone || '').trim();
@@ -152,7 +225,7 @@ function submitExam(payload) {
   const sessionId = String(payload.sessionId || '');
   const seed = Number(payload.seed);
   if (!sessionId || !isFinite(seed) || seed <= 0) throw new Error('جلسة الامتحان غير صالحة. أعد فتح الامتحان.');
-  if (String(payload.sig || '') !== signSession_(sessionId, examId, seed)) {
+  if (String(payload.sig || '') !== signSession_(sessionId, subjectId, examId, seed)) {
     throw new Error('جلسة الامتحان غير صالحة. أعد فتح الامتحان.');
   }
 
@@ -167,7 +240,7 @@ function submitExam(payload) {
     } catch (e) { /* تجاهل */ }
   }
 
-  const exam = EXAMS[examId];
+  const exam = getRawQuestions_(subjectId, examId);
   const answers = (payload.answers && typeof payload.answers === 'object') ? payload.answers : {};
   let score = 0;
   const detail = [];
@@ -183,21 +256,24 @@ function submitExam(payload) {
 
   const total = exam.length;
   const percentage = Math.round((score / total) * 1000) / 10;
-  const meta = CATALOG.find(function (x) { return x.id === examId; }) || {};
+  const meta = getExamMeta_(subjectId, examId);
 
-  saveResult_(payload, meta, score, total, percentage, detail);
+  saveResult_(payload, meta, score, total, percentage, detail, subjectId);
 
   const result = {
     score: score,
     total: total,
     percentage: percentage,
     examTitle: meta.title || examId,
-    unit: meta.unit || payload.unit || '',
-    examType: meta.type || ''
+    subject: meta.subject,
+    subjectId: subjectId,
+    unit: meta.unit,
+    examType: meta.examType
   };
 
   try {
     cache.put(sessionKey, JSON.stringify({
+      subjectId: subjectId,
       examId: examId,
       seed: String(seed),
       submitted: true,
@@ -208,37 +284,63 @@ function submitExam(payload) {
   return result;
 }
 
+function getExamMeta_(subjectId, examId) {
+  if (subjectId === 'philosophy') {
+    const def = PHILO_EXAMS[examId];
+    return {
+      subject: 'الفلسفة والمنطق',
+      unit: def.section,
+      examType: def.type === 'comprehensive' ? 'comprehensive' : 'training',
+      typeLabel: def.type === 'comprehensive' ? 'شامل' : 'تدريب',
+      title: def.title,
+      chapter: def.chapter || ''
+    };
+  }
+  const meta = CATALOG.find(function (x) { return x.id === examId; }) || {};
+  return {
+    subject: 'علم النفس',
+    unit: meta.unit || '',
+    examType: meta.type || '',
+    typeLabel: meta.type === 'comprehensive' ? 'شامل' : 'موضوع',
+    title: meta.title || examId,
+    chapter: ''
+  };
+}
+
 /* ============================== النتائج ============================== */
 
-function saveResult_(payload, meta, score, total, percentage, detail) {
+function saveResult_(payload, meta, score, total, percentage, detail, subjectId) {
   const sheet = getResultsSheet_();
+  const examLabel = meta.chapter
+    ? (meta.title + ' — ' + meta.chapter)
+    : meta.title;
   sheet.appendRow([
     new Date(),
     String(payload.name || '').trim(),
     String(payload.phone || '').trim(),
-    meta.unit || payload.unit || '',
-    meta.type === 'comprehensive' ? 'شامل' : 'موضوع',
-    meta.title || payload.examId,
+    meta.unit || '',
+    meta.typeLabel || '',
+    examLabel,
     total,
     score,
     percentage,
-    JSON.stringify(detail)
+    JSON.stringify(detail),
+    meta.subject || (subjectId === 'philosophy' ? 'الفلسفة والمنطق' : 'علم النفس')
   ]);
 }
 
 function ensureResultHeader_(sheet) {
   if (sheet.getLastRow() === 0) {
     sheet.appendRow([
-      'التاريخ والوقت', 'اسم الطالب', 'رقم الهاتف', 'الوحدة', 'نوع الامتحان',
-      'الامتحان', 'عدد الأسئلة', 'الدرجة', 'النسبة %', 'تفاصيل الإجابات'
+      'التاريخ والوقت', 'اسم الطالب', 'رقم الهاتف', 'الوحدة / القسم', 'نوع الامتحان',
+      'الامتحان', 'عدد الأسئلة', 'الدرجة', 'النسبة %', 'تفاصيل الإجابات', 'المادة'
     ]);
     sheet.setFrozenRows(1);
   }
 }
 
 /**
- * إرجاع ورقة النتائج المعيارية، مع إنشائها/إعادة تسميتها إذا لزم الأمر
- * (يُعالج اختلاف اسم الورقة الافتراضية مثل "Sheet1").
+ * إرجاع ورقة النتائج المعيارية، مع إنشائها/إعادة تسميتها إذا لزم الأمر.
  */
 function getResultsSheet_() {
   return getResultsSheetOf_(getResultsSpreadsheet_());
@@ -318,22 +420,17 @@ function saveTeacherSettings(pin, incoming) {
   return getPublicSettings_();
 }
 
-function getDashboardData(pin) {
-  assertAdmin_(pin);
+/**
+ * قراءة كل صفوف النتائج (خادميًا) مع عمود المادة.
+ */
+function readAllResults_() {
   const ss = getResultsSpreadsheet_();
   const sheet = getResultsSheetOf_(ss);
-  const link = ss.getUrl();
-
-  if (!sheet || sheet.getLastRow() < 2) {
-    return { link: link, rows: [], stats: { students: 0, attempts: 0, avg: 0, max: 0, last: '' } };
-  }
-
-  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 10).getValues();
-  const rows = values.map(function (r) {
+  if (!sheet || sheet.getLastRow() < 2) return [];
+  const values = sheet.getRange(2, 1, sheet.getLastRow() - 1, 11).getValues();
+  return values.map(function (r) {
     return {
-      date: r[0] instanceof Date
-        ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
-        : String(r[0] || ''),
+      date: r[0] instanceof Date ? Utilities.formatDate(r[0], Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm') : String(r[0] || ''),
       name: String(r[1] || ''),
       phone: String(r[2] || ''),
       unit: String(r[3] || ''),
@@ -341,9 +438,18 @@ function getDashboardData(pin) {
       exam: String(r[5] || ''),
       total: Number(r[6]) || 0,
       score: Number(r[7]) || 0,
-      percentage: Number(r[8]) || 0
+      percentage: Number(r[8]) || 0,
+      subject: String(r[10] || '') || 'علم النفس'
     };
   }).reverse();
+}
+
+function getDashboardData(pin, filter) {
+  assertAdmin_(pin);
+  const link = getResultsSpreadsheet_().getUrl();
+  const all = readAllResults_();
+  const subjectFilter = (filter && filter.subject) ? String(filter.subject) : '';
+  const rows = subjectFilter ? all.filter(function (r) { return r.subject === subjectFilter; }) : all;
 
   const attempts = rows.length;
   const students = new Set(rows.map(function (r) { return (r.name + '|' + r.phone).trim(); })).size;
@@ -353,9 +459,172 @@ function getDashboardData(pin) {
 
   return {
     link: link,
-    rows: rows.slice(0, 500),
+    rows: rows.slice(0, 1000),
     stats: { students: students, attempts: attempts, avg: avg, max: max, last: last }
   };
+}
+
+/**
+ * نظرة عامة متعددة المواد.
+ */
+function getAdminOverview(pin) {
+  assertAdmin_(pin);
+  const all = readAllResults_();
+
+  const psychRows = all.filter(function (r) { return r.subject === 'علم النفس'; });
+  const philoRows = all.filter(function (r) { return r.subject === 'الفلسفة والمنطق'; });
+
+  function statsOf(rows) {
+    const attempts = rows.length;
+    const students = new Set(rows.map(function (r) { return (r.name + '|' + r.phone).trim(); })).size;
+    const avg = attempts ? Math.round(rows.reduce(function (a, r) { return a + r.percentage; }, 0) / attempts * 10) / 10 : 0;
+    return { attempts: attempts, students: students, avg: avg };
+  }
+
+  const psychExamCount = Object.keys(EXAMS).length;
+  const psychQuestionCount = Object.keys(EXAMS).reduce(function (s, id) { return s + EXAMS[id].length; }, 0);
+
+  const philoTrainingCount = Object.keys(PHILO_EXAMS).filter(function (k) { return PHILO_EXAMS[k].type === 'training'; }).length;
+  const philoCompCount = Object.keys(PHILO_EXAMS).filter(function (k) { return PHILO_EXAMS[k].type === 'comprehensive'; }).length;
+  const philoChapters = PHILO_AUDIT ? (PHILO_AUDIT.chapters || 4) : 4;
+
+  return {
+    link: getResultsSpreadsheet_().getUrl(),
+    subjects: {
+      psychology: {
+        id: 'psychology',
+        name: 'علم النفس',
+        exams: psychExamCount,
+        questions: psychQuestionCount,
+        comprehensive: 6,
+        topicExams: 24,
+        verified: psychQuestionCount,
+        excluded: 0,
+        corrected: 0,
+        generated: 0,
+        stats: statsOf(psychRows)
+      },
+      philosophy: {
+        id: 'philosophy',
+        name: 'الفلسفة والمنطق',
+        sourceQuestions: PHILO_AUDIT ? PHILO_AUDIT.sourceCount : 563,
+        questions: PHILO_BANK.length,
+        verified: PHILO_BANK.length,
+        excluded: PHILO_AUDIT ? PHILO_AUDIT.quarantinedCount : 0,
+        corrected: PHILO_AUDIT ? PHILO_AUDIT.correctedKeys : 0,
+        generated: PHILO_AUDIT ? (PHILO_AUDIT.generatedQuestions || 0) : 0,
+        chapters: philoChapters,
+        trainings: philoTrainingCount,
+        exams: philoTrainingCount + philoCompCount,
+        comprehensive: philoCompCount,
+        stats: statsOf(philoRows)
+      }
+    }
+  };
+}
+
+/**
+ * بنك الأسئلة للمدير (مع مفتاح الإجابة — للمدير فقط).
+ */
+function getQuestionBank(pin, filter) {
+  assertAdmin_(pin);
+  const f = filter || {};
+  const subject = String(f.subject || 'philosophy');
+  const q = String(f.q || '').trim().toLowerCase();
+  const chapter = String(f.chapter || '');
+  const training = String(f.training || '');
+  const difficulty = String(f.difficulty || '');
+  const status = String(f.status || '');
+
+  let out = [];
+  if (subject === 'psychology') {
+    Object.keys(EXAMS).forEach(function (examId) {
+      const meta = CATALOG.find(function (x) { return x.id === examId; }) || {};
+      EXAMS[examId].forEach(function (qq, i) {
+        out.push({
+          id: examId + '-Q' + (i + 1),
+          subject: 'علم النفس',
+          section: 'الوحدة ' + (meta.unit || ''),
+          chapter: meta.title || examId,
+          training: meta.type === 'comprehensive' ? 'شامل' : ('الموضوع ' + (String(examId).match(/T(\d+)/) ? String(examId).match(/T(\d+)/)[1] : '')) ,
+          question: qq.question,
+          A: qq.A, B: qq.B, C: qq.C, D: qq.D,
+          correctAnswer: qq.answer,
+          difficulty: '',
+          source: 'بنك علم النفس',
+          verificationStatus: 'verified'
+        });
+      });
+    });
+  } else {
+    out = PHILO_BANK.map(function (qq) {
+      return {
+        id: qq.id,
+        subject: 'الفلسفة والمنطق',
+        section: qq.section,
+        chapter: qq.chapter,
+        training: qq.training,
+        question: qq.question,
+        A: qq.A, B: qq.B, C: qq.C, D: qq.D,
+        correctAnswer: qq.correctAnswer,
+        difficulty: qq.difficulty,
+        source: qq.source,
+        verificationStatus: qq.verificationStatus
+      };
+    });
+  }
+
+  if (chapter) out = out.filter(function (x) { return x.chapter === chapter; });
+  if (training) out = out.filter(function (x) { return x.training === training; });
+  if (difficulty) out = out.filter(function (x) { return x.difficulty === difficulty; });
+  if (status) out = out.filter(function (x) { return x.verificationStatus === status; });
+  if (q) {
+    out = out.filter(function (x) {
+      return (x.question + ' ' + x.chapter + ' ' + x.training).toLowerCase().indexOf(q) !== -1;
+    });
+  }
+
+  return { count: out.length, rows: out.slice(0, 500) };
+}
+
+/**
+ * هرم الامتحانات للمدير.
+ */
+function getExamHierarchy(pin, subject) {
+  assertAdmin_(pin);
+  const subj = String(subject || 'philosophy');
+  if (subj === 'psychology') {
+    return {
+      subject: 'علم النفس',
+      exams: CATALOG.map(function (c) {
+        return {
+          id: c.id, title: c.title, count: c.count,
+          type: c.type === 'comprehensive' ? 'comprehensive' : 'topic',
+          unit: c.unit, typeLabel: c.type === 'comprehensive' ? 'امتحان شامل' : 'موضوع'
+        };
+      })
+    };
+  }
+  const exams = Object.keys(PHILO_EXAMS).map(function (eid) {
+    const e = PHILO_EXAMS[eid];
+    const diffs = {};
+    e.indices.forEach(function (i) {
+      const q = PHILO_BANK[i];
+      const d = q.difficulty || 'medium';
+      diffs[d] = (diffs[d] || 0) + 1;
+    });
+    return {
+      id: eid, title: e.title, count: e.indices.length,
+      type: e.type, section: e.section, chapter: e.chapter, training: e.training,
+      difficulty: diffs
+    };
+  });
+  return { subject: 'الفلسفة والمنطق', exams: exams, audit: PHILO_AUDIT };
+}
+
+function getPhiloAudit(pin) {
+  assertAdmin_(pin);
+  return { audit: PHILO_AUDIT, quarantined: PHILO_QUARANTINED };
 }
 
 /* ============================== إعداد النظام ============================== */
@@ -365,7 +634,7 @@ function initializeSystem() {
   if (!props.getProperty('APP_SETTINGS')) {
     props.setProperty('APP_SETTINGS', JSON.stringify(DEFAULT_SETTINGS));
   }
-  getSecret_(); // توليد سر الجلسات إن لم يوجد
+  getSecret_();
   const ss = getResultsSpreadsheet_();
   getResultsSheetOf_(ss);
   Logger.log('تم تجهيز النظام. رابط النتائج: ' + ss.getUrl());
@@ -373,13 +642,13 @@ function initializeSystem() {
 }
 
 /**
- * فحص سلامة بنك الأسئلة: 30 امتحانًا / 840 سؤالًا.
+ * فحص سلامة بنك علم النفس: 30 امتحانًا / 840 سؤالًا.
  */
 function validateSystem() {
   const ids = Object.keys(EXAMS);
   const total = ids.reduce(function (sum, id) { return sum + EXAMS[id].length; }, 0);
-  if (ids.length !== 30) throw new Error('عدد الامتحانات = ' + ids.length + ' وليس 30.');
-  if (total !== 840) throw new Error('عدد الأسئلة = ' + total + ' وليس 840.');
+  if (ids.length !== 30) throw new Error('عدد امتحانات علم النفس = ' + ids.length + ' وليس 30.');
+  if (total !== 840) throw new Error('عدد أسئلة علم النفس = ' + total + ' وليس 840.');
 
   ids.forEach(function (id) {
     const n = EXAMS[id].length;
@@ -397,13 +666,51 @@ function validateSystem() {
   const catIds = CATALOG.map(function (c) { return c.id; });
   ids.forEach(function (id) {
     if (catIds.indexOf(id) === -1) throw new Error('الامتحان ' + id + ' غير موجود في الكتالوج.');
-    if (EXAMS[id].length !== (CATALOG.filter(function (c) { return c.id === id; })[0] || {}).count) {
-      throw new Error('عدد أسئلة ' + id + ' لا يطابق الكتالوج.');
-    }
+    const c = CATALOG.filter(function (x) { return x.id === id; })[0] || {};
+    if (EXAMS[id].length !== c.count) throw new Error('عدد أسئلة ' + id + ' لا يطابق الكتالوج.');
   });
 
-  Logger.log('نجاح التحقق: 30 امتحانًا / 840 سؤالًا.');
-  return 'نجاح التحقق: 30 امتحانًا / 840 سؤالًا.';
+  Logger.log('نجاح التحقق: علم النفس 30 امتحانًا / 840 سؤالًا.');
+  return 'نجاح التحقق: علم النفس 30 امتحانًا / 840 سؤالًا.';
+}
+
+/**
+ * فحص سلامة بنك الفلسفة والمنطق.
+ */
+function validatePhiloSystem() {
+  if (!PHILO_BANK || !PHILO_BANK.length) throw new Error('بنك الفلسفة والمنطق فارغ.');
+  if (PHILO_BANK.length !== 555) throw new Error('عدد أسئلة الفلسفة والمنطق = ' + PHILO_BANK.length + ' وليس 555.');
+
+  const ids = new Set();
+  PHILO_BANK.forEach(function (q, i) {
+    if (!q.id) throw new Error('سؤال بدون معرف (فهرس ' + i + ').');
+    if (ids.has(q.id)) throw new Error('معرف مكرر: ' + q.id);
+    ids.add(q.id);
+    ['question', 'A', 'B', 'C', 'D', 'correctAnswer'].forEach(function (k) {
+      if (!q[k]) throw new Error(q.id + ': الحقل ' + k + ' ناقص.');
+    });
+    if (['A', 'B', 'C', 'D'].indexOf(q.correctAnswer) === -1) throw new Error(q.id + ': مفتاح إجابة غير صحيح.');
+    if (q.verificationStatus !== 'verified') throw new Error(q.id + ': حالة تحقق غير نهائية.');
+  });
+
+  const examIds = Object.keys(PHILO_EXAMS);
+  const trainings = examIds.filter(function (k) { return PHILO_EXAMS[k].type === 'training'; });
+  const comps = examIds.filter(function (k) { return PHILO_EXAMS[k].type === 'comprehensive'; });
+  if (trainings.length !== 9) throw new Error('عدد امتحانات التدريب = ' + trainings.length + ' وليس 9.');
+  if (comps.length !== 3) throw new Error('عدد الامتحانات الشاملة = ' + comps.length + ' وليس 3.');
+
+  examIds.forEach(function (k) {
+    const e = PHILO_EXAMS[k];
+    if (e.indices.length !== 20) throw new Error(k + ': عدد الأسئلة = ' + e.indices.length + ' وليس 20.');
+    const uniq = new Set(e.indices);
+    if (uniq.size !== 20) throw new Error(k + ': تكرار أسئلة داخل الامتحان.');
+    e.indices.forEach(function (i) {
+      if (i < 0 || i >= PHILO_BANK.length) throw new Error(k + ': فهرس خارج النطاق.');
+    });
+  });
+
+  Logger.log('نجاح التحقق: الفلسفة والمنطق 555 سؤالًا / 12 امتحانًا.');
+  return 'نجاح التحقق: الفلسفة والمنطق 555 سؤالًا / 12 امتحانًا (9 تدريبات + 3 شاملة).';
 }
 
 /* ============================== الإعدادات ============================== */
@@ -451,9 +758,6 @@ function assertAdmin_(pin) {
 
 /* ============================== أدوات الجلسة والتوقيع ============================== */
 
-/**
- * سر مشترك لكل مشروع (يُولَّد مرة واحدة في Script Properties) لتوقيع الجلسات.
- */
 function getSecret_() {
   const props = PropertiesService.getScriptProperties();
   let secret = props.getProperty('SESSION_SECRET');
@@ -464,8 +768,8 @@ function getSecret_() {
   return secret;
 }
 
-function signSession_(sessionId, examId, seed) {
-  const value = sessionId + '|' + examId + '|' + String(seed);
+function signSession_(sessionId, subjectId, examId, seed) {
+  const value = sessionId + '|' + subjectId + '|' + examId + '|' + String(seed);
   return Utilities.base64Encode(Utilities.computeHmacSha256Signature(value, getSecret_()));
 }
 
@@ -474,8 +778,7 @@ function randomSeed_() {
 }
 
 /**
- * مولّد أرقام شبه عشوائي حتمي (mulberry32) — يُعيد نفس الترتيب لنفس البذرة
- * في كل تنفيذ خادم، فلا حاجة لتخزين الترتيب.
+ * مولّد أرقام شبه عشوائي حتمي (mulberry32).
  */
 function prng_(seed) {
   let a = seed >>> 0;
@@ -488,9 +791,6 @@ function prng_(seed) {
   };
 }
 
-/**
- * ترتيب حتمي لخيارات سؤال معين اعتمادًا على بذرة الجلسة ورقم السؤال.
- */
 function shuffledOrder_(seed, index) {
   const rng = prng_((seed ^ Math.imul(index + 1, 2654435761)) >>> 0);
   const arr = ['A', 'B', 'C', 'D'];
@@ -504,5 +804,6 @@ function shuffledOrder_(seed, index) {
 /* ============================== أدوات عامة ============================== */
 
 function stripOptionLabel_(text) {
-  return String(text || '').replace(/^\s*[أابجدهدABCDabcd]\s*[\)\].\-:：]\s*/u, '').trim();
+  // يزيل بادئات الحروف (أ/ب/ج/د أو A/B/C/D) سواء تبعتها أقواس/نقط أو مسافة فقط.
+  return String(text || '').replace(/^\s*[أابجدهدABCDabcd][\s\)\].\-:：]+\s*/, '').trim();
 }
