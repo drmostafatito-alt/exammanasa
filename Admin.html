@@ -235,9 +235,11 @@
   <div class="wrap">
     <div class="tabs" role="tablist">
       <button class="tab active" id="tab-overview" role="tab" onclick="showTab('overview')">نظرة عامة</button>
-      <button class="tab" id="tab-results" role="tab" onclick="showTab('results')">النتائج</button>
+      <button class="tab" id="tab-psych" role="tab" onclick="showTab('psych')">علم النفس</button>
+      <button class="tab" id="tab-philo" role="tab" onclick="showTab('philo')">الفلسفة والمنطق</button>
       <button class="tab" id="tab-bank" role="tab" onclick="showTab('bank')">بنك الأسئلة</button>
       <button class="tab" id="tab-exams" role="tab" onclick="showTab('exams')">الامتحانات</button>
+      <button class="tab" id="tab-results" role="tab" onclick="showTab('results')">النتائج</button>
       <button class="tab" id="tab-settings" role="tab" onclick="showTab('settings')">الإعدادات</button>
     </div>
 
@@ -250,6 +252,42 @@
         <div class="tablewrap" style="margin-top:12px"><table>
           <thead><tr><th>التاريخ</th><th>المادة</th><th>الطالب</th><th>الوحدة / القسم</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
           <tbody id="recentRows"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- Psychology subject panel -->
+    <section id="panel-psych" class="hidden">
+      <div class="card">
+        <h2>مادة علم النفس</h2>
+        <div class="sub">البنك الأصلي: 6 وحدات · 24 موضوعًا · 6 امتحانات شاملة — بدون أي تعديل</div>
+        <div class="stats" id="psychStats"></div>
+        <div class="subj-grid" id="psychExams" style="margin-top:14px"></div>
+        <hr class="divider">
+        <h2 style="font-size:16px">أحدث نتائج علم النفس</h2>
+        <div class="tablewrap" style="margin-top:10px"><table>
+          <thead><tr><th>التاريخ</th><th>الطالب</th><th>الوحدة</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+          <tbody id="psychRecent"></tbody>
+        </table></div>
+      </div>
+    </section>
+
+    <!-- Philosophy subject panel -->
+    <section id="panel-philo" class="hidden">
+      <div class="card">
+        <h2>مادة الفلسفة والمنطق</h2>
+        <div class="sub">أولى ثانوي 2027 — بنك مُتحقق منه بالكامل</div>
+        <div class="stats" id="philoStats"></div>
+        <div class="subj-grid" id="philoExams" style="margin-top:14px"></div>
+        <div class="card" style="margin-top:16px;background:var(--surface2)">
+          <h2 style="font-size:16px">سجل تدقيق بنك الفلسفة والمنطق</h2>
+          <div class="sub" id="philoAuditInfo"></div>
+        </div>
+        <hr class="divider">
+        <h2 style="font-size:16px">أحدث نتائج الفلسفة والمنطق</h2>
+        <div class="tablewrap" style="margin-top:10px"><table>
+          <thead><tr><th>التاريخ</th><th>الطالب</th><th>القسم</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+          <tbody id="philoRecent"></tbody>
         </table></div>
       </div>
     </section>
@@ -307,6 +345,10 @@
             <option value="easy">سهل</option>
             <option value="medium">متوسط</option>
             <option value="hard">صعب</option>
+          </select>
+          <select id="bankStatus" onchange="loadBank()">
+            <option value="">كل حالات التحقق</option>
+            <option value="verified">مُتحقق</option>
           </select>
           <input id="bankSearch" type="text" placeholder="ابحث في نص السؤال…" oninput="debounceSearch()">
         </div>
@@ -705,13 +747,29 @@
   function onBankSubjectChange(){
     const subj = $('bankSubject').value;
     const chSel = $('bankChapter');
+    const trSel = $('bankTraining');
+    const dSel = $('bankDifficulty');
+    const sSel = $('bankStatus');
     chSel.innerHTML = '<option value="">كل الفصول</option>';
-    if(subj === 'philosophy'){
-      ['الفصل الأول: التفكير الإنساني','الفصل الثاني: الفلسفة وطبيعة الموقف الفلسفي','الفصل الأول: مبادئ علم المنطق','الفصل الثاني: الاستدلال'].forEach(function(c){
-        const o = document.createElement('option'); o.value = c; o.textContent = c; chSel.appendChild(o);
-      });
-    }
-    loadBank();
+    trSel.innerHTML = '<option value="">كل التدريبات</option>';
+    dSel.innerHTML = '<option value="">كل المستويات</option><option value="easy">سهل</option><option value="medium">متوسط</option><option value="hard">صعب</option>';
+    sSel.innerHTML = '<option value="">كل حالات التحقق</option>';
+    google.script.run
+      .withSuccessHandler(function(opts){
+        (opts.chapters || []).forEach(function(c){
+          const o = document.createElement('option'); o.value = c; o.textContent = c; chSel.appendChild(o);
+        });
+        (opts.trainings || []).forEach(function(t){
+          const o = document.createElement('option'); o.value = t; o.textContent = t; trSel.appendChild(o);
+        });
+        (opts.statuses || []).forEach(function(st){
+          const o = document.createElement('option'); o.value = st;
+          o.textContent = st === 'verified' ? 'مُتحقق' : st; sSel.appendChild(o);
+        });
+        loadBank();
+      })
+      .withFailureHandler(function(e){ toast(friendly(e), 'err'); loadBank(); })
+      .getBankFilterOptions(PIN, subj);
   }
 
   let searchTimer = null;
@@ -727,6 +785,7 @@
       chapter: $('bankChapter').value,
       training: $('bankTraining').value,
       difficulty: $('bankDifficulty').value,
+      status: $('bankStatus').value,
       q: $('bankSearch').value
     };
     google.script.run
@@ -784,18 +843,24 @@
           const meta = [e.section, e.chapter, e.training].filter(Boolean).join(' · ');
           return '<div class="exam-card' + (isComp ? ' comp' : '') + '">' +
             '<h4>' + esc(e.title) + '</h4>' +
-            '<div class="em">' + esc(meta || (e.typeLabel || '')) + ' · ' + e.count + ' سؤال</div>' +
+            '<div class="em">' + esc(meta || (e.typeLabel || '')) + ' · ' + e.count + ' سؤال · ' + esc(e.status || 'نشط') + '</div>' +
             '<div class="ediffs">' + diffHtml + '</div>' +
           '</div>';
         }).join('');
         // audit box (philosophy only)
         if(d.audit){
           const a = d.audit;
+          const cats = a.quarantinedByCategory || {};
+          const catTxt = Object.keys(cats).map(function(k){
+            const lbl = k === 'malformed' ? 'معيب' : k === 'ambiguous' ? 'غامض' : 'غير قابل للتحقق';
+            return lbl + ': ' + cats[k];
+          }).join(' · ');
           $('auditBox').classList.remove('hidden');
           $('auditInfo').textContent =
             'المصدر: ' + a.sourceCount + ' سؤال · مُتحقق: ' + a.verifiedCount +
-            ' · صُحح: ' + a.correctedKeys + ' · استُبعد: ' + a.quarantinedCount +
-            ' · مُؤلَّف: ' + (a.generatedQuestions || 0) +
+            ' · صُحح: ' + a.correctedKeys + ' · قُبل كما هو: ' + a.acceptedKeys +
+            ' · استُبعد: ' + a.quarantinedCount + ' · مُؤلَّف: ' + (a.generatedQuestions || 0) +
+            (catTxt ? ' — تصنيف المستبعدة: ' + catTxt : '') +
             ' · توزيع المفاتيح: ' + Object.keys(a.keyDistribution).map(k => k + '=' + a.keyDistribution[k]).join('، ');
         } else {
           $('auditBox').classList.add('hidden');
@@ -807,15 +872,112 @@
 
   /* ---------- Tabs ---------- */
   function showTab(name){
-    ['overview','results','bank','exams','settings'].forEach(function(t){
+    ['overview','psych','philo','results','bank','exams','settings'].forEach(function(t){
       $('panel-' + t).classList.toggle('hidden', t !== name);
       $('tab-' + t).classList.toggle('active', t === name);
     });
     if(name === 'overview'){ loadOverview(); }
+    else if(name === 'psych'){ loadSubjectPanel('psychology'); }
+    else if(name === 'philo'){ loadSubjectPanel('philosophy'); }
     else if(name === 'results'){ loadDash(); }
     else if(name === 'bank'){ if(!BANK.length) onBankSubjectChange(); }
     else if(name === 'exams'){ loadHierarchy('philosophy'); }
     window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------- Subject panels (علم النفس / الفلسفة والمنطق) ---------- */
+  function loadSubjectPanel(subject){
+    showLoad('جاري التحميل…');
+    const isPsych = subject === 'psychology';
+    const subjName = isPsych ? 'علم النفس' : 'الفلسفة والمنطق';
+    google.script.run
+      .withSuccessHandler(function(ov){
+        hideLoad();
+        $('sheetLink').href = ov.link || '#';
+        const p = ov.subjects.psychology, f = ov.subjects.philosophy;
+        if(isPsych){
+          $('psychStats').innerHTML =
+            statCard('امتحان', p.exams) + statCard('سؤال', p.questions) +
+            statCard('محاولة', p.stats.attempts) + statCard('طالب', p.stats.students) +
+            statCard('متوسط', p.stats.avg + '%') + statCard('موضوعات', p.topicExams) +
+            statCard('شاملة', p.comprehensive) + statCard('أعلى نسبة', p.stats.max + '%');
+          loadHierarchyInto('psychology', 'psychExams');
+          renderSubjectRecent(subjName, 'psychRecent');
+        } else {
+          $('philoStats').innerHTML =
+            statCard('سؤال المصدر', f.sourceQuestions) + statCard('مُتحقق', f.questions) +
+            statCard('مفاتيح صُححت', f.corrected) + statCard('مستبعد', f.excluded) +
+            statCard('فصول', f.chapters) + statCard('تدريبات', f.trainings) +
+            statCard('شاملة', f.comprehensive) + statCard('محاولة', f.stats.attempts) +
+            statCard('متوسط', f.stats.avg + '%');
+          loadHierarchyInto('philosophy', 'philoExams');
+          renderSubjectRecent(subjName, 'philoRecent');
+          google.script.run.withSuccessHandler(function(d){
+            const a = d.audit || {};
+            const cats = a.quarantinedByCategory || {};
+            const catTxt = Object.keys(cats).map(function(k){
+              const lbl = k === 'malformed' ? 'معيب' : k === 'ambiguous' ? 'غامض' : 'غير قابل للتحقق';
+              return lbl + ': ' + cats[k];
+            }).join(' · ');
+            $('philoAuditInfo').textContent =
+              'المصدر: ' + a.sourceCount + ' · مُتحقق: ' + a.verifiedCount +
+              ' · صُحح: ' + a.correctedKeys + ' · قُبل كما هو: ' + a.acceptedKeys +
+              ' · استُبعد: ' + a.quarantinedCount + ' · مُؤلَّف: ' + (a.generatedQuestions || 0) +
+              (catTxt ? ' — تصنيف المستبعدة: ' + catTxt : '');
+          }).withFailureHandler(function(){})
+          .getPhiloAudit(PIN);
+        }
+      })
+      .withFailureHandler(function(e){ hideLoad(); toast(friendly(e), 'err'); })
+      .getAdminOverview(PIN);
+  }
+
+  function statCard(label, value){
+    return '<div class="stat c1"><div class="s-icon">' +
+      '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>' +
+      '</div><b>' + esc(value) + '</b><span>' + esc(label) + '</span></div>';
+  }
+
+  function loadHierarchyInto(subject, containerId){
+    google.script.run
+      .withSuccessHandler(function(d){
+        const exams = d.exams || [];
+        const box = $(containerId);
+        if(!exams.length){ box.innerHTML = '<div class="empty">لا توجد امتحانات.</div>'; return; }
+        box.innerHTML = exams.map(function(e){
+          const isComp = e.type === 'comprehensive';
+          const meta = [e.section, e.chapter, e.training].filter(Boolean).join(' · ');
+          return '<div class="exam-card' + (isComp ? ' comp' : '') + '">' +
+            '<h4>' + esc(e.title) + '</h4>' +
+            '<div class="em">' + esc(meta || (e.typeLabel || '')) + ' · ' + e.count + ' سؤال · ' + esc(e.status || 'نشط') + '</div>' +
+          '</div>';
+        }).join('');
+      })
+      .withFailureHandler(function(e){ toast(friendly(e), 'err'); })
+      .getExamHierarchy(PIN, subject);
+  }
+
+  function renderSubjectRecent(subject, containerId){
+    google.script.run
+      .withSuccessHandler(function(d){
+        const rows = (d.rows || []).slice(0, 8);
+        $(containerId).innerHTML = rows.length
+          ? rows.map(function(r){
+            const pctClass = r.percentage >= 75 ? 'hi' : r.percentage >= 50 ? 'mid' : 'low';
+            const unitLabel = r.unit && /^\d+$/.test(r.unit) ? 'وحدة ' + r.unit : r.unit;
+            return '<tr>' +
+              '<td>' + esc(r.date) + '</td>' +
+              '<td>' + esc(r.name) + '</td>' +
+              '<td>' + esc(unitLabel) + '</td>' +
+              '<td>' + esc(r.exam) + '</td>' +
+              '<td class="score-cell">' + r.score + ' / ' + r.total + '</td>' +
+              '<td><span class="pct-pill ' + pctClass + '">' + r.percentage + '%</span></td>' +
+            '</tr>';
+          }).join('')
+          : '<tr><td colspan="6"><div class="empty">لا توجد نتائج بعد.</div></td></tr>';
+      })
+      .withFailureHandler(function(e){ toast(friendly(e), 'err'); })
+      .getDashboardData(PIN, { subject: subject });
   }
 
   /* ---------- Helpers ---------- */

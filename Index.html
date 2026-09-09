@@ -415,6 +415,7 @@
       <div class="eyebrow">تم التسليم والتصحيح بنجاح</div>
       <h2 id="resultTitle"></h2>
       <div class="r-student" id="resultStudent"></div>
+      <div class="r-student" id="resultMeta" style="font-size:12.5px;opacity:.85"></div>
       <div class="score-big">
         <span class="pct" id="resultPct">0%</span>
         <span class="frac" id="resultFrac">0 / 0</span>
@@ -1036,6 +1037,14 @@
     $('resultTitle').textContent = r.examTitle || currentExam.title;
     const subjName = r.subjectId === 'philosophy' ? 'الفلسفة والمنطق' : 'علم النفس';
     $('resultStudent').textContent = subjName + ' · الطالب: ' + ($('name').value.trim() || '—');
+    let metaParts = [];
+    if(r.unit){
+      metaParts.push(/^\d+$/.test(String(r.unit)) ? 'الوحدة ' + r.unit : r.unit);
+    }
+    if(r.chapter) metaParts.push(r.chapter.split(':')[0]);
+    if(r.training && r.training !== 'شامل') metaParts.push(r.training);
+    if(r.dateTime) metaParts.push(r.dateTime);
+    $('resultMeta').textContent = metaParts.join(' · ');
     $('resultPct').textContent = r.percentage + '%';
     $('resultFrac').textContent = r.score + ' / ' + r.total;
     const perf = $('resultPerf');

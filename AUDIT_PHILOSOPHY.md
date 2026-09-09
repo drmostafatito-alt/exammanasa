@@ -13,14 +13,14 @@
 
 ## المستبعدة (Quarantine)
 
-- idx 549: defective: نيتشه 'يعشق الحقيقة لذاتها' = معرفة مطلوبة لذاتها, not among options
-- idx 553: malformed: option A is empty (extraction defect)
-- idx 559: defective: Confucian quote (بر الوالدين/التعليم) = الصين الشرق الأقصى, option missing from choices
-- idx 809: defective: no option pairs 'تعميق الوعي الفردي + حل المشكلات' (person changed career path)
-- idx 1855: ambiguous: multiple كلية سالبة options match الاستغراق (A/C/D)
-- idx 1957: ambiguous: multiple كلية سالبة options match (A/B/C)
-- idx 1963: ambiguous: two كلية سالبة options match الاستغراق (A/C)
-- idx 2224: defective: قياس بحدود طلاب/عرب/علماء — العيب الفعلي سلب المقدمة الصغرى، غير موجود ضمن الاختيارات
+- idx 549 [unverifiable]: نيتشه: الإجابة الصحيحة (معرفة مطلوبة لذاتها) غير موجودة ضمن الاختيارات
+- idx 553 [malformed]: malformed: option A is empty (extraction defect)
+- idx 559 [unverifiable]: اقتباس كونفوشيوسي (بر الوالدين/التعليم) = الصين، الخيار غير موجود ضمن الاختيارات
+- idx 809 [malformed]: defective: لا يوجد خيار يجمع (تعميق الوعي الفردي + حل المشكلات) معًا
+- idx 1855 [ambiguous]: ambiguous: أكثر من قضية كلية سالبة تطابق الاستغراق (A/C/D)
+- idx 1957 [ambiguous]: ambiguous: أكثر من قضية كلية سالبة تطابق الوصف (A/B/C)
+- idx 1963 [ambiguous]: ambiguous: خياران كلية سالبة متطابقان في الاستغراق (A/C)
+- idx 2224 [malformed]: defective: العيب الفعلي (سلب المقدمة الصغرى) غير موجود ضمن الاختيارات
 
 ## تصحيحات المفاتيح (idx: المقترح → النهائي)
 

@@ -268,7 +268,10 @@ function submitExam(payload) {
     subject: meta.subject,
     subjectId: subjectId,
     unit: meta.unit,
-    examType: meta.examType
+    chapter: meta.chapter || '',
+    training: meta.training || '',
+    examType: meta.examType,
+    dateTime: Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyy-MM-dd HH:mm')
   };
 
   try {
@@ -293,17 +296,19 @@ function getExamMeta_(subjectId, examId) {
       examType: def.type === 'comprehensive' ? 'comprehensive' : 'training',
       typeLabel: def.type === 'comprehensive' ? 'شامل' : 'تدريب',
       title: def.title,
-      chapter: def.chapter || ''
+      chapter: def.chapter || '',
+      training: def.type === 'comprehensive' ? 'شامل' : (def.training || '')
     };
   }
   const meta = CATALOG.find(function (x) { return x.id === examId; }) || {};
   return {
     subject: 'علم النفس',
-    unit: meta.unit || '',
+    unit: String(meta.unit || ''),
     examType: meta.type || '',
     typeLabel: meta.type === 'comprehensive' ? 'شامل' : 'موضوع',
     title: meta.title || examId,
-    chapter: ''
+    chapter: '',
+    training: meta.type === 'comprehensive' ? 'شامل' : (meta.title || '')
   };
 }
 
@@ -588,6 +593,35 @@ function getQuestionBank(pin, filter) {
 }
 
 /**
+ * خيارات الفلترة المتاحة لبنك الأسئلة (للإدارة فقط).
+ */
+function getBankFilterOptions(pin, subject) {
+  assertAdmin_(pin);
+  const subj = String(subject || 'philosophy');
+  if (subj === 'psychology') {
+    const chapters = [];
+    const seen = new Set();
+    CATALOG.forEach(function (c) {
+      const label = 'الوحدة ' + c.unit + ' · ' + c.title;
+      if (!seen.has(label)) { seen.add(label); chapters.push(label); }
+    });
+    return { chapters: chapters, trainings: [], difficulties: [], statuses: ['verified'] };
+  }
+  const chapters = [];
+  const trainings = [];
+  const difficulties = [];
+  const statuses = [];
+  const seenC = new Set(); const seenT = new Set(); const seenD = new Set(); const seenS = new Set();
+  PHILO_BANK.forEach(function (q) {
+    if (!seenC.has(q.chapter)) { seenC.add(q.chapter); chapters.push(q.chapter); }
+    if (!seenT.has(q.training)) { seenT.add(q.training); trainings.push(q.training); }
+    if (!seenD.has(q.difficulty)) { seenD.add(q.difficulty); difficulties.push(q.difficulty); }
+    if (!seenS.has(q.verificationStatus)) { seenS.add(q.verificationStatus); statuses.push(q.verificationStatus); }
+  });
+  return { chapters: chapters, trainings: trainings, difficulties: difficulties, statuses: statuses };
+}
+
+/**
  * هرم الامتحانات للمدير.
  */
 function getExamHierarchy(pin, subject) {
@@ -600,7 +634,8 @@ function getExamHierarchy(pin, subject) {
         return {
           id: c.id, title: c.title, count: c.count,
           type: c.type === 'comprehensive' ? 'comprehensive' : 'topic',
-          unit: c.unit, typeLabel: c.type === 'comprehensive' ? 'امتحان شامل' : 'موضوع'
+          unit: c.unit, typeLabel: c.type === 'comprehensive' ? 'امتحان شامل' : 'موضوع',
+          status: 'نشط'
         };
       })
     };
@@ -616,10 +651,10 @@ function getExamHierarchy(pin, subject) {
     return {
       id: eid, title: e.title, count: e.indices.length,
       type: e.type, section: e.section, chapter: e.chapter, training: e.training,
-      difficulty: diffs
+      difficulty: diffs, status: 'نشط'
     };
   });
-  return { subject: 'الفلسفة والمنطق', exams: exams, audit: PHILO_AUDIT };
+  return { subject: 'الفلسفة والمنطق', exams: exams, audit: PHILO_AUDIT, quarantined: PHILO_QUARANTINED };
 }
 
 function getPhiloAudit(pin) {
