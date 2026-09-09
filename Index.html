@@ -229,6 +229,12 @@
     .result .r-actions{display:flex;gap:10px;justify-content:center;margin-top:22px;flex-wrap:wrap}
 
     .footer{text-align:center;color:var(--muted);opacity:.85;font-size:12px;margin-top:30px}
+    .social-links{display:flex;gap:9px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+    .social-link{display:inline-flex;align-items:center;gap:7px;text-decoration:none;
+      background:var(--p-08);color:var(--p);border:1px solid var(--border);border-radius:99px;
+      padding:8px 16px;font-size:12.5px;font-weight:800;transition:.15s}
+    .social-link:hover{background:var(--p);color:#fff;border-color:var(--p);transform:translateY(-1px)}
+    .social-link svg{width:15px;height:15px}
 
     .overlay{position:fixed;inset:0;background:rgba(16,32,35,.42);backdrop-filter:blur(3px);z-index:90;
       display:grid;place-items:center;padding:20px}
@@ -429,7 +435,10 @@
     </div>
   </section>
 
-  <div id="footer" class="footer"></div>
+  <div id="footer" class="footer">
+    <div id="socialLinks" class="social-links hidden"></div>
+    <div id="footerText"></div>
+  </div>
 </main>
 
 <div id="confirmModal" class="overlay hidden" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
@@ -466,7 +475,7 @@
   let APP = null;
   let selectedSubject = null;   // 'psychology' | 'philosophy'
   let selectedUnit = null;      // psychology
-  let philoView = null;         // {level:'sections'} | {level:'chapters', section} | {level:'exams', section, chapter}
+  let philoView = null;         // {level:'terms'} | {level:'sections', term} | {level:'chapters', term, section} | {level:'exams', term, section, chapter}
   let currentExam = null;       // {subjectId, id, title, unit/section, chapter, type, count}
   let currentQuestions = [];
   let answers = {};
@@ -551,12 +560,42 @@
     $('heroTitle').textContent = APP.appTitle || 'منصة الامتحانات التعليمية';
     $('heroWelcome').textContent = APP.welcomeText || '';
     $('yearBadge').textContent = APP.academicYear || '';
-    $('footer').textContent = (APP.teacherName || '') + ' — ' + (APP.academicYear || '');
+    $('footerText').textContent = (APP.teacherName || '') + ' — ' + (APP.academicYear || '');
+    renderSocialLinks();
     if(!APP.requirePhone){
       $('phoneReq').classList.add('hidden');
       $('phoneHint').textContent = 'اختياري — يمكنك تركه فارغًا.';
     }
     renderChips();
+  }
+
+  const SOCIAL_ICONS = {
+    whatsapp: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5-1.3A10 10 0 1 0 12 2zm0 18a8 8 0 0 1-4.1-1.1l-.3-.2-3 .8.8-2.9-.2-.3A8 8 0 1 1 12 20zm4.4-5.9c-.2-.1-1.4-.7-1.6-.8s-.4-.1-.5.1-.6.8-.7 1-.3.2-.5.1a6.4 6.4 0 0 1-1.9-1.2 7.2 7.2 0 0 1-1.3-1.7c-.1-.2 0-.4.1-.5l.4-.5.3-.4a.5.5 0 0 0 0-.5c0-.1-.5-1.3-.7-1.8s-.4-.4-.5-.4h-.5a1 1 0 0 0-.7.3 2.9 2.9 0 0 0-.9 2.1 5 5 0 0 0 1 2.7 11.4 11.4 0 0 0 4.4 3.9 5 5 0 0 0 2.1.8 3.3 3.3 0 0 0 2.2-.8 2.6 2.6 0 0 0 .5-1.6c0-.2-.2-.3-.4-.4z"/></svg>',
+    facebook: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M13.5 21v-7h2.4l.4-3h-2.8V9.1c0-.9.3-1.5 1.6-1.5h1.3V5c-.3 0-1.1-.1-2-.1-2 0-3.4 1.2-3.4 3.5V11H8.5v3H11v7z"/></svg>',
+    tiktok: '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M16.6 3c.3 1.9 1.6 3.4 3.4 3.7v2.8c-1.3 0-2.5-.4-3.4-1.1v5.7c0 3.2-2.4 5.4-5.4 5.4a5.3 5.3 0 0 1-5.4-5.4c0-3.1 2.3-5.4 5.4-5.4.3 0 .7 0 1 .1v3c-2.1-.6-3.7.7-3.7 2.4 0 1.5 1.2 2.7 2.7 2.7s2.7-1.2 2.7-2.7V3z"/></svg>'
+  };
+
+  function renderSocialLinks(){
+    const box = $('socialLinks');
+    const links = (APP.socialLinks && typeof APP.socialLinks === 'object') ? APP.socialLinks : {};
+    const keys = ['whatsapp', 'facebook', 'tiktok'];
+    const items = keys
+      .map(k => Object.assign({ key: k }, links[k] || {}))
+      .filter(l => l.enabled && l.url && /^https?:\/\//i.test(l.url))
+      .sort((a, b) => ((a.order || 0) - (b.order || 0)));
+    if(!items.length){ box.classList.add('hidden'); box.innerHTML = ''; return; }
+    box.classList.remove('hidden');
+    box.innerHTML = '';
+    items.forEach(l => {
+      const a = document.createElement('a');
+      a.className = 'social-link';
+      a.href = l.url;
+      a.target = '_blank';
+      a.rel = 'noopener noreferrer';
+      a.setAttribute('aria-label', l.label || l.key);
+      a.innerHTML = (SOCIAL_ICONS[l.key] || '') + '<span>' + esc(l.label || l.key) + '</span>';
+      box.appendChild(a);
+    });
   }
 
   function renderChips(){
@@ -571,10 +610,13 @@
   }
 
   function philoExamCount(){
-    let n = (APP.philoCatalog.fullComprehensive || []).length;
-    (APP.philoCatalog.sections || []).forEach(sec => {
-      (sec.comprehensives || []).forEach(() => n++);
-      (sec.chapters || []).forEach(ch => n += (ch.exams || []).length);
+    let n = 0;
+    (APP.philoCatalog.terms || []).forEach(term => {
+      n += (term.fullComprehensive || []).length;
+      (term.sections || []).forEach(sec => {
+        (sec.comprehensives || []).forEach(() => n++);
+        (sec.chapters || []).forEach(ch => n += (ch.exams || []).length);
+      });
     });
     return n;
   }
@@ -705,9 +747,13 @@
     $('home').classList.add('hidden');
     $('psychPanel').classList.add('hidden');
     $('philoPanel').classList.remove('hidden');
-    philoView = { level: 'sections' };
+    philoView = { level: 'terms' };
     renderPhilo();
     scrollTop();
+  }
+
+  function philoTermOf(v){
+    return (APP.philoCatalog.terms || []).find(t => String(t.term) === String(v && v.term)) || null;
   }
 
   function renderPhilo(){
@@ -717,14 +763,42 @@
     const cat = APP.philoCatalog;
     const v = philoView;
 
-    if(v.level === 'sections'){
+    if(v.level === 'terms'){
       const card = document.createElement('div');
       card.className = 'card';
-      card.innerHTML = '<div class="card-head"><h2>الفلسفة والمنطق</h2><span class="hint">اختر القسم</span></div>';
+      card.innerHTML = '<div class="card-head"><h2>الفلسفة والمنطق</h2><span class="hint">اختر الترم الدراسي</span></div>';
       const grid = document.createElement('div');
       grid.className = 'subjects';
       grid.style.marginTop = '14px';
-      cat.sections.forEach(sec => {
+      (cat.terms || []).forEach(term => {
+        const trainCount = termCounts(term).trainings;
+        const compCount = termCounts(term).comprehensives;
+        const el = document.createElement('button');
+        el.type = 'button';
+        el.className = 'subject';
+        el.innerHTML =
+          '<div class="s-icon" style="background:var(--a-18);color:#7a5c2e">' + IC_SECTION + '</div>' +
+          '<h3>' + esc(term.label) + '</h3>' +
+          '<div class="s-meta">' + term.sections.length + ' قسم · ' +
+          termCounts(term).chapters + ' فصول · ' +
+          trainCount + ' تدريب' + (compCount ? ' · ' + compCount + ' امتحان شامل' : '') + '</div>' +
+          '<div class="s-go">تصفح <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></div>';
+        el.onclick = () => { philoView = { level: 'sections', term: term.term }; renderPhilo(); scrollTop(); };
+        grid.appendChild(el);
+      });
+      card.appendChild(grid);
+      body.appendChild(card);
+    }
+    else if(v.level === 'sections'){
+      const term = philoTermOf(v);
+      if(!term){ philoView = {level:'terms'}; renderPhilo(); return; }
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = '<div class="card-head"><h2>' + esc(term.label) + '</h2><span class="hint">اختر القسم</span></div>';
+      const grid = document.createElement('div');
+      grid.className = 'subjects';
+      grid.style.marginTop = '14px';
+      term.sections.forEach(sec => {
         const el = document.createElement('button');
         el.type = 'button';
         el.className = 'subject';
@@ -734,26 +808,27 @@
           sec.chapters.reduce((s,ch) => s + ch.exams.length, 0) + ' تدريبات · ' +
           (sec.comprehensives||[]).length + ' امتحان شامل</div>' +
           '<div class="s-go">تصفح <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></div>';
-        el.onclick = () => { philoView = { level:'chapters', section: sec.name }; renderPhilo(); scrollTop(); };
+        el.onclick = () => { philoView = { level:'chapters', term: term.term, section: sec.name }; renderPhilo(); scrollTop(); };
         grid.appendChild(el);
       });
       card.appendChild(grid);
       body.appendChild(card);
 
       // subject-wide comprehensive
-      if(cat.fullComprehensive && cat.fullComprehensive.length){
+      if(term.fullComprehensive && term.fullComprehensive.length){
         const cc = document.createElement('div');
         cc.className = 'card';
         cc.innerHTML = '<div class="card-head"><h2>الامتحان الشامل للمادة</h2><span class="hint">يشمل الفلسفة والمنطق معًا</span></div>';
-        cat.fullComprehensive.forEach(comp => {
+        term.fullComprehensive.forEach(comp => {
           cc.appendChild(examRow(comp, 'الفلسفة والمنطق', 'امتحان شامل لجميع فصول المادة'));
         });
         body.appendChild(cc);
       }
     }
     else if(v.level === 'chapters'){
-      const sec = cat.sections.find(s => s.name === v.section);
-      if(!sec){ philoView = {level:'sections'}; renderPhilo(); return; }
+      const term = philoTermOf(v);
+      const sec = term && term.sections.find(s => s.name === v.section);
+      if(!sec){ philoView = {level:'sections', term: v.term}; renderPhilo(); return; }
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = '<div class="card-head"><h2>' + esc(sec.name) + '</h2><span class="hint">اختر الفصل</span></div>';
@@ -767,7 +842,7 @@
         el.innerHTML = '<h3>' + esc(ch.name) + '</h3>' +
           '<p>' + ch.exams.length + ' تدريبات · ' + ch.exams.length + ' امتحان</p>' +
           '<span class="c-count">' + ch.exams.length + ' امتحان</span>';
-        el.onclick = () => { philoView = { level:'exams', section: sec.name, chapter: ch.name }; renderPhilo(); scrollTop(); };
+        el.onclick = () => { philoView = { level:'exams', term: term.term, section: sec.name, chapter: ch.name }; renderPhilo(); scrollTop(); };
         grid.appendChild(el);
       });
       card.appendChild(grid);
@@ -784,9 +859,10 @@
       }
     }
     else if(v.level === 'exams'){
-      const sec = cat.sections.find(s => s.name === v.section);
+      const term = philoTermOf(v);
+      const sec = term && term.sections.find(s => s.name === v.section);
       const ch = sec && sec.chapters.find(c => c.name === v.chapter);
-      if(!ch){ philoView = {level:'chapters', section: v.section}; renderPhilo(); return; }
+      if(!ch){ philoView = {level:'chapters', term: v.term, section: v.section}; renderPhilo(); return; }
       const card = document.createElement('div');
       card.className = 'card';
       card.innerHTML = '<div class="card-head"><h2>' + esc(ch.name) + '</h2><span class="hint">كل تدريب = امتحان من 20 سؤالًا</span></div>';
@@ -801,8 +877,20 @@
     }
   }
 
+  function termCounts(term){
+    let trainings = 0, comprehensives = 0, chapters = 0;
+    (term.sections || []).forEach(sec => {
+      chapters += (sec.chapters || []).length;
+      (sec.comprehensives || []).forEach(() => comprehensives++);
+      (sec.chapters || []).forEach(ch => trainings += (ch.exams || []).length);
+    });
+    comprehensives += (term.fullComprehensive || []).length;
+    return { trainings: trainings, comprehensives: comprehensives, chapters: chapters };
+  }
+
   function examRow(ex, sectionName, subLabel){
     const isComp = ex.type === 'comprehensive';
+    const term = philoView ? philoView.term : null;
     const el = document.createElement('div');
     el.className = 'exam' + (isComp ? ' comp' : '');
     el.innerHTML =
@@ -811,7 +899,7 @@
       '<div class="e-side"><span class="badge">' + ex.count + ' سؤال</span>' +
       '<button class="btn ' + (isComp ? 'btn-gold' : 'btn-primary') + '" type="button">' + (isComp ? 'ابدأ الشامل' : 'دخول') + '</button></div>';
     el.querySelector('button').onclick = () => openExam({
-      subjectId: 'philosophy', id: ex.id, title: ex.title,
+      subjectId: 'philosophy', id: ex.id, title: ex.title, term: term,
       section: ex.section || sectionName, chapter: ex.chapter || (philoView && philoView.chapter) || '',
       type: ex.type, count: ex.count
     });
@@ -823,11 +911,17 @@
     let html = '<button type="button" onclick="backToSubjects()">المواد</button>';
     const v = philoView;
     if(v){
-      if(v.level !== 'sections'){
-        html += '<span class="sep">←</span><button type="button" onclick="philoView={level:\'sections\'};renderPhilo()">الفلسفة والمنطق</button>';
+      if(v.level !== 'terms'){
+        html += '<span class="sep">←</span><button type="button" onclick="philoView={level:\'terms\'};renderPhilo()">الفلسفة والمنطق</button>';
+      }
+      if(v.term !== undefined && v.term !== null){
+        const term = philoTermOf(v);
+        if(v.level !== 'sections'){
+          html += '<span class="sep">←</span><button type="button" onclick="philoView={level:\'sections\',term:' + v.term + '};renderPhilo()">' + esc(term ? term.label : 'الترم') + '</button>';
+        }
       }
       if(v.level === 'chapters' || v.level === 'exams'){
-        html += '<span class="sep">←</span><button type="button" onclick="philoView={level:\'chapters\',section:\'' + esc(v.section) + '\'};renderPhilo()">' + esc(v.section) + '</button>';
+        html += '<span class="sep">←</span><button type="button" onclick="philoView={level:\'chapters\',term:' + v.term + ',\'section\':\'' + esc(v.section) + '\'};renderPhilo()">' + esc(v.section) + '</button>';
       }
       if(v.level === 'exams'){
         html += '<span class="sep">←</span><span>' + esc(v.chapter) + '</span>';
@@ -879,7 +973,10 @@
 
   function contextLabel(meta){
     if(meta.subjectId === 'philosophy'){
-      const parts = [meta.section];
+      const parts = [];
+      if(meta.term === 1) parts.push('الترم الأول');
+      else if(meta.term === 2) parts.push('الترم الثاني');
+      if(meta.section) parts.push(meta.section);
       if(meta.chapter && meta.chapter !== 'المادة كاملة' && meta.chapter !== 'جميع الفصول') parts.push(meta.chapter.split(':')[0]);
       if(meta.type === 'comprehensive') parts.push('الامتحان الشامل');
       else parts.push('تدريب');
@@ -1038,6 +1135,7 @@
     const subjName = r.subjectId === 'philosophy' ? 'الفلسفة والمنطق' : 'علم النفس';
     $('resultStudent').textContent = subjName + ' · الطالب: ' + ($('name').value.trim() || '—');
     let metaParts = [];
+    if(r.termLabel) metaParts.push(r.termLabel);
     if(r.unit){
       metaParts.push(/^\d+$/.test(String(r.unit)) ? 'الوحدة ' + r.unit : r.unit);
     }
