@@ -833,7 +833,7 @@
         el.innerHTML = '<div class="s-icon" style="background:var(--a-18);color:#7a5c2e">' + IC_SECTION + '</div>' +
           '<h3>' + esc(sec.name) + '</h3>' +
           '<div class="s-meta">' + sec.chapters.length + ' فصول · ' +
-          sec.chapters.reduce((s,ch) => s + ch.exams.length, 0) + ' تدريبات · ' +
+          distinctTrainingsInSec(sec) + ' تدريبات · ' +
           (sec.comprehensives||[]).length + ' امتحان شامل</div>' +
           '<div class="s-go">تصفح <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg></div>';
         el.onclick = () => { philoView = { level:'chapters', term: term.term, section: sec.name }; renderPhilo(); scrollTop(); };
@@ -868,7 +868,7 @@
         el.type = 'button';
         el.className = 'chapter';
         el.innerHTML = '<h3>' + esc(ch.name) + '</h3>' +
-          '<p>' + ch.exams.length + ' تدريبات · ' + ch.exams.length + ' امتحان</p>' +
+          '<p>' + distinctTrainingsInCh(ch) + ' تدريبات · ' + ch.exams.length + ' امتحان</p>' +
           '<span class="c-count">' + ch.exams.length + ' امتحان</span>';
         el.onclick = () => { philoView = { level:'exams', term: term.term, section: sec.name, chapter: ch.name }; renderPhilo(); scrollTop(); };
         grid.appendChild(el);
@@ -893,12 +893,12 @@
       if(!ch){ philoView = {level:'chapters', term: v.term, section: v.section}; renderPhilo(); return; }
       const card = document.createElement('div');
       card.className = 'card';
-      card.innerHTML = '<div class="card-head"><h2>' + esc(ch.name) + '</h2><span class="hint">كل تدريب = امتحان من 20 سؤالًا</span></div>';
+      card.innerHTML = '<div class="card-head"><h2>' + esc(ch.name) + '</h2><span class="hint">لكل تدريب نموذج واحد أو أكثر — كل نموذج 20 سؤالًا</span></div>';
       const list = document.createElement('div');
       list.className = 'exams';
       list.style.marginTop = '14px';
       ch.exams.forEach(ex => {
-        list.appendChild(examRow(ex, sec.name, 'تدريب · 20 سؤالًا'));
+        list.appendChild(examRow(ex, sec.name, esc(ex.training || 'تدريب') + ' · 20 سؤالًا'));
       });
       card.appendChild(list);
       body.appendChild(card);
@@ -906,14 +906,29 @@
   }
 
   function termCounts(term){
-    let trainings = 0, comprehensives = 0, chapters = 0;
+    let comprehensives = 0, chapters = 0;
+    const trains = new Set();
     (term.sections || []).forEach(sec => {
       chapters += (sec.chapters || []).length;
       (sec.comprehensives || []).forEach(() => comprehensives++);
-      (sec.chapters || []).forEach(ch => trainings += (ch.exams || []).length);
+      (sec.chapters || []).forEach(ch => {
+        (ch.exams || []).forEach(e => { if(e.type !== 'comprehensive' && e.training) trains.add(sec.name + '|' + ch.name + '|' + e.training); });
+      });
     });
     comprehensives += (term.fullComprehensive || []).length;
-    return { trainings: trainings, comprehensives: comprehensives, chapters: chapters };
+    return { trainings: trains.size, comprehensives: comprehensives, chapters: chapters };
+  }
+  function distinctTrainingsInSec(sec){
+    const s = new Set();
+    (sec.chapters || []).forEach(ch => {
+      (ch.exams || []).forEach(e => { if(e.type !== 'comprehensive' && e.training) s.add(ch.name + '|' + e.training); });
+    });
+    return s.size;
+  }
+  function distinctTrainingsInCh(ch){
+    const s = new Set();
+    (ch.exams || []).forEach(e => { if(e.type !== 'comprehensive' && e.training) s.add(e.training); });
+    return s.size;
   }
 
   function examRow(ex, sectionName, subLabel){
