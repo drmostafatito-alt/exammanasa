@@ -1,0 +1,17 @@
+{
+  "name": "exammanasa-platform",
+  "version": "1.0.0",
+  "private": true,
+  "description": "منصة الامتحانات التعليمية — Cloudflare Worker (خطة مجانية)",
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev --port 8787",
+    "deploy": "wrangler deploy",
+    "build:banks": "node ../tools/build-banks.mjs",
+    "validate": "node ../tools/validate-banks.mjs",
+    "test": "node tests/run-all.mjs"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}

@@ -1140,3 +1140,68 @@ function stripOptionLabel_(text) {
   // يزيل بادئات الحروف (أ/ب/ج/د أو A/B/C/D) سواء تبعتها أقواس/نقط أو مسافة فقط.
   return String(text || '').replace(/^\s*[أابجدهدABCDabcd][\s\)\].\-:：]+\s*/, '').trim();
 }
+
+/* ==================================================================
+ * تكامل منصة Cloudflare (إضافة جديدة — لا تمس أي وظيفة قائمة)
+ * ==================================================================
+ * يستقبل نتائج امتحانات منصة Cloudflare (exammanasa-platform) ويضيفها
+ * إلى جدول النتائج نفسه المستخدم حاليًا، مع التحقق من سر مشترك.
+ *
+ * الإعداد (مرة واحدة):
+ *   1) من إعدادات المشروع: أضف خاصية نصية باسم PLATFORM_RESULTS_SECRET
+ *      وقيمتها سرًا عشوائيًا طويلاً (نفس القيمة في wrangler secret
+ *      GAS_RESULTS_SECRET).
+ *   2) أعد نشر تطبيق الويب (Deploy > Manage deployments > Edit > New
+ *      deployment) بنفس الإعدادات: Execute as Me / Anyone.
+ */
+
+var PLATFORM_RESULT_COLUMNS = 13;
+
+function doPost(e) {
+  try {
+    var body = JSON.parse((e && e.postData && e.postData.contents) || '{}');
+    if (body.action !== 'appendResult') {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'إجراء غير معروف.' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var props = PropertiesService.getScriptProperties();
+    var expected = props.getProperty('PLATFORM_RESULTS_SECRET');
+    if (!expected || String(body.secret || '') !== expected) {
+      return ContentService.createTextOutput(JSON.stringify({ error: 'سر غير صحيح.' }))
+        .setMimeType(ContentService.MimeType.JSON);
+    }
+    var r = body.result || {};
+    var sheet = getResultsSheet_();
+    ensureTeacherColumn_(sheet);
+    sheet.appendRow([
+      new Date(r.date || new Date().toISOString()),
+      String(r.name || '').trim(),
+      String(r.phone || '').trim(),
+      String(r.unitOrSection || '').trim(),
+      String(r.examType || '').trim(),
+      String(r.examLabel || '').trim(),
+      Number(r.total) || 0,
+      Number(r.score) || 0,
+      Number(r.percentage) || 0,
+      String(r.detailsJson || '[]'),
+      String(r.subject || '').trim(),
+      r.term === 2 ? 'الترم الثاني' : (r.term === 1 ? 'الترم الأول' : ''),
+      String(r.teacherSlug || '').trim()
+    ]);
+    return ContentService.createTextOutput(JSON.stringify({ ok: true }))
+      .setMimeType(ContentService.MimeType.JSON);
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ error: String(err && err.message || err) }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+
+/** ترحيل توافقي: إضافة عمود «المعلم» (13) إذا لم يكن موجودًا — دون مساس بالبيانات القائمة. */
+function ensureTeacherColumn_(sheet) {
+  try {
+    var header = sheet.getRange(1, 1, 1, Math.max(sheet.getLastColumn(), 1)).getValues()[0] || [];
+    if (String(header[12] || '').trim() === '') {
+      sheet.getRange(1, PLATFORM_RESULT_COLUMNS).setValue('المعلم');
+    }
+  } catch (e) { /* تجاهل */ }
+}
