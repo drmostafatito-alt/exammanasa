@@ -126,7 +126,7 @@
     html += subjectCard('psychology', 'علم النفس', cat.psychology, '🧠',
       '٦ وحدات · ٢٤ موضوعًا · ٣١ امتحانًا — الصف الثاني الثانوي');
     html += subjectCard('philosophy', 'الفلسفة والمنطق', cat.philosophy, '📚',
-      'الترم الأول والثاني · ٤٤ امتحانًا — الصف الأول الثانوي');
+      'الترم الأول والثاني · ٥٢ امتحانًا — الصف الأول الثانوي');
     html += '</div>';
     app.innerHTML = html;
   }
@@ -202,23 +202,18 @@
             }
             html2 += lessonItem(l.examIds[0], l.no, l.title, e.count + ' سؤالًا' + (l.examIds.length > 1 ? ' · ' + l.examIds.length + ' نماذج' : ''), false, variants);
           });
-          if (u.comprehensiveExamId) {
-            var ce = S.exams[u.comprehensiveExamId];
-            html2 += lessonItem(u.comprehensiveExamId, '★', ce.title, ce.count + ' سؤالًا', true);
-          }
           html2 += '</div></div>';
         });
+        if (u.comprehensiveExamId) {
+          var ce = S.exams[u.comprehensiveExamId];
+          html2 += '<div class="grid" style="gap:9px;margin-top:10px">' +
+            lessonItem(u.comprehensiveExamId, '★', ce.title, ce.count + ' سؤالًا · شامل الوحدة', true) + '</div>';
+        }
       });
       if (term.termComprehensiveExamId) {
         var tc = S.exams[term.termComprehensiveExamId];
         html2 += '<div class="grid" style="gap:9px;margin-top:16px">' +
           lessonItem(term.termComprehensiveExamId, '★', tc.title, tc.count + ' سؤالًا · ' + term.label + ' كاملًا', true) + '</div>';
-      }
-      if (S.term === 2) {
-        html2 += '<div class="card" style="margin-top:20px;border-style:dashed">' +
-          '<div style="font-weight:800;font-size:.9rem">ملاحظة عن منهج الترم الثاني</div>' +
-          '<div class="desc" style="margin-top:6px;font-size:.8rem">يتضمن منهج الترم الثاني أيضًا وحدة «المنطق: الاستدلال والمنهج العلمي»؛ ' +
-          'لم تُضف امتحاناتها بعد لعدم توفر كتاب الشرح الرسمي للترم الثاني للتحقق من البنية والمفاتيح.</div></div>';
       }
       app.innerHTML = html2;
     } else {

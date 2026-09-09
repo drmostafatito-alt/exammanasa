@@ -151,7 +151,7 @@ try {
   {
     const r = await jfetch('/api/catalog');
     const examCount = Object.keys(r.data.exams).length;
-    ok('75 امتحانًا', examCount === 75, 'got ' + examCount);
+    ok('83 امتحانًا', examCount === 83, 'got ' + examCount);
     ok('لا مفاتيح إجابة في الكتالوج', !r.text.includes('"answer"'));
     ok('لا قوائم أسئلة في الكتالوج', !r.text.includes('questionIds'));
     ok('لا نصوص أسئلة في الكتالوج', !BANKS.examDefs || !r.text.includes(Object.values(BANKS.questions)[0].text.slice(0, 30)));
@@ -206,8 +206,8 @@ try {
     ok('رفض قيم إجابة خارج النطاق', badVal.status === 400);
   }
 
-  /* ============ 6. perfect-score round-trip: ALL 75 exams ============ */
-  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (75)');
+  /* ============ 6. perfect-score round-trip: ALL 83 exams ============ */
+  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (83)');
   {
     const examIds = Object.keys(BANKS.examDefs);
     let allOk = true, badOnes = [];
@@ -221,7 +221,7 @@ try {
         allOk = false; badOnes.push(`${examId}:${s.status}/${s.data && s.data.score}/${r.data.exam.count}`);
       }
     }
-    ok('75/75 امتحانًا: الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk, badOnes.join(', '));
+    ok('83/83 امتحانًا: الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk, badOnes.join(', '));
   }
 
   /* ============ 7. zero-score + review ============ */
@@ -321,11 +321,13 @@ try {
     ok('تصدير CSV مع BOM عربي (0xEF 0xBB 0xBF)',
       csvResp.status === 200 && csvBytes[0] === 0xEF && csvBytes[1] === 0xBB && csvBytes[2] === 0xBF && csvText.includes('اسم الطالب'));
     const overview = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
-    ok('نظرة عامة: 75 امتحانًا / 1347 سؤالًا + توثيق التصحيحات',
-      overview.data.exams === 75 && overview.data.questions === 1347 &&
+    ok('نظرة عامة: 83 امتحانًا / 1549 سؤالًا + توثيق التصحيحات',
+      overview.data.exams === 83 && overview.data.questions === 1549 &&
       overview.data.audit.psychology.corrections.length === 8);
     const qs = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('البيئية'), { headers: { Cookie: cookie } });
     ok('بنك الأسئلة: بحث + مفاتيح للمسؤول فقط', qs.status === 200 && qs.data.questions.length > 0 && qs.data.questions[0].answer);
+    const qsLogic = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('بيكون'), { headers: { Cookie: cookie } });
+    ok('بنك أسئلة المنطق ت2: البحث يجد أسئلة بيكون', qsLogic.status === 200 && qsLogic.data.questions.length >= 20);
     const qsPublic = await jfetch('/api/admin/questions');
     ok('بنك الأسئلة محمي بدون جلسة', qsPublic.status === 401);
   }

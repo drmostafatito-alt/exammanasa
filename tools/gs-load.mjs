@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export const REPO_ROOT = path.resolve(__dirname, '..');
 
-export function loadGsData(files = ['Data.gs', 'PhiloData.gs', 'PhiloTerm2Data.gs']) {
+export function loadGsData(files = ['Data.gs', 'PhiloData.gs', 'PhiloTerm2Data.gs', 'PhiloTerm2LogicData.gs']) {
   const ctx = { console };
   vm.createContext(ctx);
   for (const f of files) {
@@ -20,7 +20,8 @@ export function loadGsData(files = ['Data.gs', 'PhiloData.gs', 'PhiloTerm2Data.g
   const names = [
     'EXAMS', 'CATALOG',
     'PHILO_SUBJECT', 'PHILO_BANK', 'PHILO_EXAMS', 'PHILO_AUDIT', 'PHILO_QUARANTINED',
-    'PHILO_T2_BANK', 'PHILO_T2_EXAMS', 'PHILO_T2_AUDIT', 'PHILO_T2_QUARANTINED'
+    'PHILO_T2_BANK', 'PHILO_T2_EXAMS', 'PHILO_T2_AUDIT', 'PHILO_T2_QUARANTINED',
+    'PHILO_T2_LOGIC_BANK', 'PHILO_T2_LOGIC_EXAMS', 'PHILO_T2_LOGIC_AUDIT', 'PHILO_T2_LOGIC_QUARANTINED'
   ];
   vm.runInContext('globalThis.__out = {' + names.join(',') + '};', ctx);
   return ctx.__out;

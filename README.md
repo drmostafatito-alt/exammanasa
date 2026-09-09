@@ -12,7 +12,7 @@
 | [`REBUILD_REPORT.md`](REBUILD_REPORT.md) | تقرير التسليم النهائي (٢٥ بندًا) |
 | [`AUDIT_REPOSITORY.md`](AUDIT_REPOSITORY.md) | تدقيق الكود والبيانات الأصلي |
 | [`AUDIT_EDUCATIONAL_V2.md`](AUDIT_EDUCATIONAL_V2.md) | تدقيق المحتوى مقابل المصادر الرسمية (التصحيحات الموثقة) |
-| [`AUDIT_PHILOSOPHY.md`](AUDIT_PHILOSOPHY.md) / [`AUDIT_PHILOSOPHY_TERM2.md`](AUDIT_PHILOSOPHY_TERM2.md) | تدقيق مفاتيح الفلسفة (ت1/ت2) |
+| [`AUDIT_PHILOSOPHY.md`](AUDIT_PHILOSOPHY.md) / [`AUDIT_PHILOSOPHY_TERM2.md · AUDIT_PHILOSOPHY_TERM2_LOGIC.md`](AUDIT_PHILOSOPHY_TERM2.md · AUDIT_PHILOSOPHY_TERM2_LOGIC.md) | تدقيق مفاتيح الفلسفة (ت1/ت2) |
 | [`cloudflare/README.md`](cloudflare/README.md) | دليل نشر Cloudflare خطوة بخطوة |
 
 ## المحتوى

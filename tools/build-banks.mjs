@@ -275,7 +275,7 @@ const T1_UNITS = [
 
 const T2_UNITS = [
   {
-    no: 1, title: 'الفلسفة', section: 'الفلسفة',
+    no: 1, title: 'الوحدة الأولى: الفلسفة', section: 'الفلسفة',
     chapters: [
       {
         no: 1, title: 'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية',
@@ -284,15 +284,9 @@ const T2_UNITS = [
           { title: 'الفلسفة البيئية', training: 'تدريب 1' },
           { title: 'الأخلاق البيوطبية', training: 'تدريب 2' }
         ]
-      }
-    ],
-    comprehensiveId: null, comprehensiveTitle: null
-  },
-  {
-    no: 2, title: 'الأخلاق المهنية والقيم', section: 'الفلسفة',
-    chapters: [
+      },
       {
-        no: 1, title: 'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد',
+        no: 2, title: 'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد',
         bankChapter: 'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد',
         lessons: [
           { title: 'الأخلاق المهنية', training: 'تدريب 1' },
@@ -301,6 +295,31 @@ const T2_UNITS = [
       }
     ],
     comprehensiveId: null, comprehensiveTitle: null
+  },
+  {
+    no: 2, title: 'الوحدة الثانية: المنطق', section: 'المنطق',
+    chapters: [
+      {
+        no: 1, title: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي',
+        bankChapter: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي',
+        lessons: [
+          { title: 'الاستقراء وتطبيقه في العلوم الطبيعية', training: 'تدريب 1' },
+          { title: 'الجانب السلبي والإيجابي عند بيكون', training: 'تدريب 2' },
+          { title: 'خطوات المنهج الاستقرائي التجريبي وشروطه', training: 'تدريب 3' },
+          { title: 'الاستقراء العلمي الحديث والمعاصر', training: 'تدريب 4' }
+        ]
+      },
+      {
+        no: 2, title: 'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية',
+        bankChapter: 'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية',
+        lessons: [
+          { title: 'النسق الاستنباطي والقضايا الرياضية', training: 'تدريب 1' },
+          { title: 'المنطق الرمزي والأساس المنطقي للحاسوب', training: 'تدريب 2' },
+          { title: 'المنطق والذكاء الاصطناعي', training: 'تدريب 3' }
+        ]
+      }
+    ],
+    comprehensiveId: 'T2L-COMP', comprehensiveTitle: 'الامتحان الشامل — وحدة المنطق (الترم الثاني)'
   }
 ];
 
@@ -308,7 +327,7 @@ function buildPhilosophyTerm(termNo, bank, examsObj, unitDefs, termComprehensive
   bank.forEach(q => {
     addQuestion(q.id, q, {
       subject: 'الفلسفة والمنطق', subjectId: 'philosophy', term: termNo,
-      unit: '', chapter: q.chapter, training: q.training,
+      unit: '', section: q.section || '', chapter: q.chapter, training: q.training,
       difficulty: q.difficulty || '', source: q.source || '',
       verificationStatus: q.verificationStatus || 'verified',
       authorCreated: !!q.authorCreated,
@@ -387,25 +406,51 @@ function buildPhilosophyTerm(termNo, bank, examsObj, unitDefs, termComprehensive
 }
 
 function buildT2TermComprehensive() {
-  // NEW: Term-2 comprehensive — 20 questions, 5 per training (positions 0/12/24/36/48
-  // of each training's bank-ordered question list). Verified existing questions only.
-  const trainings = [
+  // Term-2 comprehensive — 40 questions covering the FULL term:
+  //   20 فلسفة questions: 5 per training (positions 0/12/24/36/48 of each
+  //     training's bank-ordered list).
+  //   20 منطق questions: proportional to training sizes (3/3/3/3/2/3/3), picked
+  //     at midpoints round((j+0.5)*n/k) — deliberately different positions from
+  //     T2L-COMP's endpoint spread so the two exams do not overlap wholesale.
+  // Verified existing questions only.
+  const philoTrainings = [
     { section: 'الفلسفة', chapter: 'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية', training: 'تدريب 1' },
     { section: 'الفلسفة', chapter: 'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية', training: 'تدريب 2' },
     { section: 'الفلسفة', chapter: 'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', training: 'تدريب 1' },
     { section: 'الفلسفة', chapter: 'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', training: 'تدريب 2' }
   ];
+  const logicTrainings = [
+    { section: 'المنطق', chapter: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي', training: 'تدريب 1', k: 3 },
+    { section: 'المنطق', chapter: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي', training: 'تدريب 2', k: 3 },
+    { section: 'المنطق', chapter: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي', training: 'تدريب 3', k: 3 },
+    { section: 'المنطق', chapter: 'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي', training: 'تدريب 4', k: 3 },
+    { section: 'المنطق', chapter: 'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية', training: 'تدريب 1', k: 2 },
+    { section: 'المنطق', chapter: 'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية', training: 'تدريب 2', k: 3 },
+    { section: 'المنطق', chapter: 'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية', training: 'تدريب 3', k: 3 }
+  ];
   const ids = [];
-  trainings.forEach(t => {
+  philoTrainings.forEach(t => {
     const list = D.PHILO_T2_BANK.filter(q => q.section === t.section && q.chapter === t.chapter && q.training === t.training);
     if (list.length < 50) throw new Error('T2 training too small: ' + t.chapter + ' ' + t.training + ' = ' + list.length);
     [0, 12, 24, 36, 48].forEach(p => ids.push(list[p].id));
   });
-  if (new Set(ids).size !== 20) throw new Error('T2-TERM-COMP duplicates');
+  logicTrainings.forEach(t => {
+    const list = D.PHILO_T2_LOGIC_BANK.filter(q => q.section === t.section && q.chapter === t.chapter && q.training === t.training);
+    if (list.length < t.k) throw new Error('T2 logic training too small: ' + t.chapter + ' ' + t.training + ' = ' + list.length);
+    const used = new Set();
+    for (let j = 0; j < t.k; j++) {
+      let p = Math.round((j + 0.5) * list.length / t.k);
+      if (p > list.length - 1) p = list.length - 1;
+      while (used.has(p)) p = (p + 1) % list.length;
+      used.add(p);
+      ids.push(list[p].id);
+    }
+  });
+  if (new Set(ids).size !== 40) throw new Error('T2-TERM-COMP duplicates');
   exams['T2-TERM-COMP'] = {
     id: 'T2-TERM-COMP', subjectId: 'philosophy', term: 2,
-    type: 'term-comprehensive', count: 20,
-    title: 'الامتحان الشامل — الترم الثاني',
+    type: 'term-comprehensive', count: 40,
+    title: 'الامتحان الشامل — الترم الثاني (الفلسفة والمنطق)',
     unitTitle: '', variant: 1, questionIds: ids
   };
   return 'T2-TERM-COMP';
@@ -419,7 +464,18 @@ catalog.philosophy.terms.push(
   buildPhilosophyTerm(1, D.PHILO_BANK, D.PHILO_EXAMS, T1_UNITS,
     { id: 'PHLO-COMP', title: 'الامتحان الشامل — الترم الأول (الفلسفة والمنطق)' })
 );
-const t2 = buildPhilosophyTerm(2, D.PHILO_T2_BANK, D.PHILO_T2_EXAMS, T2_UNITS, null);
+
+// T2 combines two .gs sources: the فلسفة bank and the NEW منطق bank
+// (PhiloTerm2LogicData.gs). The logic exams' `indices` are relative to their own
+// bank, so they are offset by the فلسفة bank length to live in one combined array.
+const T2_BANK = D.PHILO_T2_BANK.concat(D.PHILO_T2_LOGIC_BANK);
+const T2_LOGIC_OFFSET = D.PHILO_T2_BANK.length;
+const T2_EXAMS = Object.assign({}, D.PHILO_T2_EXAMS);
+Object.entries(D.PHILO_T2_LOGIC_EXAMS).forEach(([id, e]) => {
+  T2_EXAMS[id] = Object.assign({}, e, { indices: e.indices.map(i => i + T2_LOGIC_OFFSET) });
+});
+
+const t2 = buildPhilosophyTerm(2, T2_BANK, T2_EXAMS, T2_UNITS, null);
 t2.termComprehensiveExamId = buildT2TermComprehensive();
 catalog.philosophy.terms.push(t2);
 
@@ -445,11 +501,12 @@ function keyDist(ids) {
 }
 
 const philoT1Ids = D.PHILO_BANK.map(q => q.id);
-const philoT2Ids = D.PHILO_T2_BANK.map(q => q.id);
+const philoT2Ids = D.PHILO_T2_BANK.concat(D.PHILO_T2_LOGIC_BANK).map(q => q.id);
+const philoT2LogicIds = D.PHILO_T2_LOGIC_BANK.map(q => q.id);
 const psychIds = Object.keys(questions).filter(id => id.startsWith('PSY-'));
 
 const banks = {
-  version: 3,
+  version: 4,
   generatedAt: new Date().toISOString(),
   catalog,
   exams: publicExams,
@@ -493,17 +550,27 @@ const banks = {
       authored: D.PHILO_T2_BANK.filter(q => q.authorCreated).length,
       excluded: D.PHILO_T2_AUDIT.quarantinedCount,
       corrected: D.PHILO_T2_AUDIT.correctedKeys,
-      keyDistribution: keyDist(philoT2Ids)
+      keyDistribution: keyDist(D.PHILO_T2_BANK.map(q => q.id))
+    },
+    philosophyTerm2Logic: {
+      source: 'كتاب الامتحان فلسفة الترم التاني 2026 — أقسام المنطق (مُتحقق يدويًا — AUDIT_PHILOSOPHY_TERM2_LOGIC.md)',
+      questions: D.PHILO_T2_LOGIC_BANK.length,
+      verified: D.PHILO_T2_LOGIC_BANK.filter(q => !q.authorCreated).length,
+      authored: D.PHILO_T2_LOGIC_BANK.filter(q => q.authorCreated).length,
+      excluded: D.PHILO_T2_LOGIC_AUDIT.quarantined,
+      quarantinedDetails: D.PHILO_T2_LOGIC_QUARANTINED.map(q => q.id + ': ' + q.reason),
+      keyDistribution: keyDist(philoT2LogicIds)
     }
   },
   notes: {
     newExams: [
       'PSY-FULL-COMP: امتحان شامل لمنهج علم النفس كاملًا (60 سؤالًا) — 10 أسئلة لكل وحدة موزعة بالتناوب على موضوعات الوحدة (3/3/2/2) بمواقع متباعدة ثابتة؛ أسئلة موثقة قائمة فقط، دون أي سؤال جديد.',
-      'T2-TERM-COMP: امتحان شامل لترم الفلسفة الثاني (20 سؤالًا) — 5 أسئلة لكل تدريب (المواضع 0/12/24/36/48 من قائمة أسئلة التدريب بترتيب البنك)؛ أسئلة موثقة قائمة فقط.'
+      'T2-TERM-COMP: امتحان شامل للترم الثاني كاملًا (40 سؤالًا) — 20 سؤال فلسفة (5 لكل تدريب بالمواضع 0/12/24/36/48) + 20 سؤال منطق بنسب أحجام التدريبات (3/3/3/3/2/3/3) بمواضع منتصف مختلفة عن امتحان شامل الوحدة؛ أسئلة موثقة قائمة فقط.',
+      'T2L-* (8 امتحانات): وحدة المنطق للترم الثاني — 7 امتحانات تدريبات (20 سؤالًا لكل تدريب بتوزيع متساوٍ على ترتيب بنك التدريب) + امتحان شامل الوحدة T2L-COMP (20 سؤالًا بنسبة أحجام التدريبات). المصدر: كتاب الامتحان — أقسام المنطق، مع 6 أسئلة مستبعدة موثقة الأسباب و5 أسئلة مؤلفة من المنهج لاستكمال تدريب النسق.'
     ],
-    curriculumAlignment: 'هيكل الفلسفة (الوحدات/الفصول) مطابق لكتاب الشرح الرسمي لوزارة التربية والتعليم (أولى ثانوي)؛ الترم الثاني وفق المطابقة الموثقة في AUDIT_PHILOSOPHY_TERM2.md.',
+    curriculumAlignment: 'هيكل الفلسفة (الوحدات/الفصول) مطابق لكتاب الشرح الرسمي لوزارة التربية والتعليم (أولى ثانوي)؛ فلسفة الترم الثاني وفق المطابقة الموثقة في AUDIT_PHILOSOPHY_TERM2.md، ومنطق الترم الثاني وفق عناوين فصول وتدريبات كتاب الأسئلة الرسمي (موثقة في AUDIT_PHILOSOPHY_TERM2_LOGIC.md).',
     knownIssue: 'U2-T1 يحتوي 6 أسئلة مكررة داخل الامتحان (موروثة من المصدر المحمي Data.gs وحُفظت كما هي بعد توحيد مفاتيحها المتناقضة) — موثقة في AUDIT_EDUCATIONAL_V2.md.',
-    contentGap: 'كتاب أسئلة الترم الثاني المقدم يتضمن أسئلة وحدة المنطق للترم الثاني (الاستقراء والمنهج التجريبي عند بيكون، المنهج العلمي المعاصر، قضايا الرياضيات) غير الممثلة في البنك الحالي؛ إضافتها تتطلب كتاب الشرح الرسمي للترم الثاني (غير متوفر في مجلد المصادر) للتحقق من البنية والمفاتيح.'
+    contentGap: 'أُغلقت فجوة منطق الترم الثاني (سبتمبر 2026): أُضيفت وحدة المنطق كاملة (203 سؤالًا مستخرجًا من كتاب الأسئلة، 197 موثقة + 5 مؤلفة + 6 مستبعدة موثقة) — راجع AUDIT_PHILOSOPHY_TERM2_LOGIC.md. الاختبارات الشهرية في كتاب المصدر استُبعدت عمدًا لتجنب تكرار أسئلة التدريبات.'
   }
 };
 

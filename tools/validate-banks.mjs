@@ -77,7 +77,7 @@ console.log('\n[B] Completeness vs .gs sources');
   else fail('psychology row coverage ' + matched + '/' + rows);
 
   // philosophy T1 + T2
-  for (const [name, bank] of [['T1', D.PHILO_BANK], ['T2', D.PHILO_T2_BANK]]) {
+  for (const [name, bank] of [['T1', D.PHILO_BANK], ['T2', D.PHILO_T2_BANK], ['T2-LOGIC', D.PHILO_T2_LOGIC_BANK]]) {
     let m = 0;
     for (const q of bank) {
       const nq = B.questions[q.id];
@@ -92,7 +92,7 @@ console.log('\n[B] Completeness vs .gs sources');
   }
 
   // exam count parity with legacy + new
-  const legacyCount = Object.keys(D.EXAMS).length + Object.keys(D.PHILO_EXAMS).length + Object.keys(D.PHILO_T2_EXAMS).length;
+  const legacyCount = Object.keys(D.EXAMS).length + Object.keys(D.PHILO_EXAMS).length + Object.keys(D.PHILO_T2_EXAMS).length + Object.keys(D.PHILO_T2_LOGIC_EXAMS).length;
   const newCount = Object.keys(B.examDefs).length;
   if (newCount === legacyCount + 2) ok('exams: ' + legacyCount + ' legacy + 2 new = ' + newCount);
   else fail('exam count mismatch: legacy ' + legacyCount + ', bank ' + newCount);
@@ -189,16 +189,60 @@ console.log('\n[D] Structure & curriculum mapping');
     if (balanced) ok('PSY-FULL-COMP: 60 questions, 10 per unit across all 6 units, no duplicates');
     else fail('PSY-FULL-COMP unbalanced: ' + JSON.stringify(perUnit));
   }
-  // T2-TERM-COMP balance
+  // T2-TERM-COMP balance (full term: 20 فلسفة + 20 منطق)
   {
     const ids = B.examDefs['T2-TERM-COMP'];
     const perTraining = {};
     ids.forEach(qid => { const m = B.questions[qid].meta; perTraining[m.chapter + ' ' + m.training] = (perTraining[m.chapter + ' ' + m.training] || 0) + 1; });
     const keys = Object.keys(perTraining);
-    const balanced = keys.length === 4 && keys.every(k => perTraining[k] === 5) && new Set(ids).size === 20;
-    if (balanced) ok('T2-TERM-COMP: 20 questions, 5 per training across all 4 T2 trainings, no duplicates');
+    const expect = {
+      'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية تدريب 1': 5,
+      'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية تدريب 2': 5,
+      'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد تدريب 1': 5,
+      'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد تدريب 2': 5,
+      'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي تدريب 1': 3,
+      'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي تدريب 2': 3,
+      'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي تدريب 3': 3,
+      'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي تدريب 4': 3,
+      'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية تدريب 1': 2,
+      'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية تدريب 2': 3,
+      'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية تدريب 3': 3
+    };
+    const balanced = ids.length === 40 && new Set(ids).size === 40 &&
+      keys.length === 11 && keys.every(k => perTraining[k] === expect[k]);
+    if (balanced) ok('T2-TERM-COMP: 40 questions covering the full term (20 فلسفة + 20 منطق, per-training balance verified, no duplicates)');
     else fail('T2-TERM-COMP unbalanced: ' + JSON.stringify(perTraining));
   }
+
+  // T2L-COMP balance (منطق unit: 20Q proportional 3/3/3/3/2/3/3)
+  {
+    const ids = B.examDefs['T2L-COMP'];
+    if (!ids || ids.length !== 20 || new Set(ids).size !== 20) fail('T2L-COMP missing/duplicated');
+    else {
+      const sec = new Set(ids.map(qid => B.questions[qid].meta.section));
+      if (sec.size === 1 && sec.has('المنطق')) ok('T2L-COMP: 20 unique questions, all from وحدة المنطق');
+      else fail('T2L-COMP contains non-logic questions');
+    }
+  }
+
+  // official T2 structure (units/chapters) present
+  const t2 = B.catalog.philosophy.terms[1];
+  const expectT2Units = ['الوحدة الأولى: الفلسفة', 'الوحدة الثانية: المنطق'];
+  const expectT2Chapters = [
+    'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية',
+    'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد',
+    'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي',
+    'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية'
+  ];
+  const gotT2Units = t2.units.map(u => u.title);
+  const gotT2Chapters = t2.units.flatMap(u => u.chapters.map(c => c.title));
+  const logicLessons = t2.units[1].chapters.reduce((n, c) => n + c.lessons.length, 0);
+  if (JSON.stringify(gotT2Units) === JSON.stringify(expectT2Units) &&
+      JSON.stringify(gotT2Chapters) === JSON.stringify(expectT2Chapters) &&
+      logicLessons === 7 && t2.units[1].comprehensiveExamId === 'T2L-COMP')
+    ok('T2 units/chapters/lessons match the source book structure (2 فلسفة chapters + 2 منطق chapters, 7 logic lessons, unit comprehensive present)');
+  else fail('T2 structure mismatch: ' + JSON.stringify({ gotT2Units, gotT2Chapters, logicLessons: t2.units[1] && t2.units[1].lessons.length }));
+
 
   // official unit/chapter names (T1) present
   const t1 = B.catalog.philosophy.terms[0];
@@ -212,7 +256,7 @@ console.log('\n[D] Structure & curriculum mapping');
   else fail('T1 structure mismatch: ' + JSON.stringify({ gotUnits, gotChapters }));
 
   // every T1/T2 legacy exam id preserved
-  const legacyIds = [...Object.keys(D.PHILO_EXAMS), ...Object.keys(D.PHILO_T2_EXAMS), ...Object.keys(D.EXAMS)];
+  const legacyIds = [...Object.keys(D.PHILO_EXAMS), ...Object.keys(D.PHILO_T2_EXAMS), ...Object.keys(D.PHILO_T2_LOGIC_EXAMS), ...Object.keys(D.EXAMS)];
   const missing = legacyIds.filter(id => !B.exams[id]);
   if (!missing.length) ok('all ' + legacyIds.length + ' legacy exam ids preserved');
   else fail('legacy exam ids lost: ' + missing.join(', '));
