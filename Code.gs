@@ -15,12 +15,13 @@ const DEFAULT_SETTINGS = {
   gradeName: 'المرحلة الثانوية',
   academicYear: 'العام الدراسي 2026 / 2027',
   appTitle: 'منصة الامتحانات التعليمية',
-  subtitle: 'علم النفس · الفلسفة والمنطق — اختبارات المنهج الدراسي',
+  subtitle: 'الفلسفة والمنطق · علم النفس — اختبارات المنهج الدراسي',
   logoText: 'EDU',
   primaryColor: '#123B40',
   accentColor: '#C9A86A',
   welcomeText: 'اختر المادة ثم ابدأ الامتحان.',
   requirePhone: true,
+  teacherImageId: '',
   adminPin: '1234',
   socialLinks: {
     whatsapp: { enabled: false, url: '', label: 'واتساب', order: 1 },
@@ -33,8 +34,8 @@ const RESULTS_SHEET_NAME = 'النتائج';
 const SESSION_TTL_SECONDS = 21600; // 6 ساعات
 
 const SUBJECTS = [
-  { id: 'psychology', name: 'علم النفس', gradeName: 'المرحلة الثانوية', academicYear: 'العام الدراسي 2026 / 2027', color: '#123B40' },
-  { id: 'philosophy', name: 'الفلسفة والمنطق', gradeName: 'أولى ثانوي', academicYear: '2027', color: '#7a5c2e' }
+  { id: 'philosophy', name: 'الفلسفة والمنطق', gradeName: 'الصف الأول الثانوي', academicYear: 'العام الدراسي 2026 / 2027', color: '#123B40' },
+  { id: 'psychology', name: 'علم النفس', gradeName: 'الصف الثاني الثانوي', academicYear: 'العام الدراسي 2026 / 2027', color: '#7a5c2e' }
 ];
 
 /**
@@ -95,6 +96,7 @@ function getAppData() {
     accentColor: s.accentColor,
     welcomeText: s.welcomeText,
     requirePhone: s.requirePhone,
+    teacherImage: !!String(s.teacherImageId || '').trim(),
     socialLinks: sanitizeSocialLinks_(s.socialLinks),
     subjects: SUBJECTS,
     catalog: catalog,
@@ -269,6 +271,18 @@ function submitExam(payload) {
 
   const exam = getRawQuestions_(subjectId, examId);
   const answers = (payload.answers && typeof payload.answers === 'object') ? payload.answers : {};
+
+  // التحقق من اكتمال الإجابات على الخادم (لا نثق في علم "completed" المرسل من العميل).
+  let missingCount = 0;
+  exam.forEach(function (q, i) {
+    const v = answers[String(i + 1)];
+    const text = (v === undefined || v === null) ? '' : String(v).trim();
+    if (!/^[0-3]$/.test(text)) missingCount++;
+  });
+  if (missingCount > 0) {
+    throw new Error('لم تُجب على جميع الأسئلة — المتبقي ' + missingCount + ' سؤالًا. أكمل الإجابة على كل الأسئلة ثم سلّم الامتحان.');
+  }
+
   let score = 0;
   const detail = [];
 
@@ -569,10 +583,12 @@ function philoTermStats_(audit, bank, examsObj) {
   const keys = Object.keys(examsObj);
   const trainings = keys.filter(function (k) { return examsObj[k].type === 'training'; }).length;
   const comps = keys.filter(function (k) { return examsObj[k].type === 'comprehensive'; }).length;
+  const authored = bank.filter(function (q) { return q.authorCreated; }).length;
   return {
     sourceQuestions: audit ? audit.sourceCount : bank.length,
     questions: bank.length,
-    verified: bank.length,
+    verified: bank.length - authored,
+    authored: authored,
     excluded: audit ? audit.quarantinedCount : 0,
     corrected: audit ? audit.correctedKeys : 0,
     generated: audit ? (audit.generatedQuestions || 0) : 0,
@@ -652,7 +668,8 @@ function mapPhiloBankToAdmin_(bank, term) {
       correctAnswer: qq.correctAnswer,
       difficulty: qq.difficulty,
       source: qq.source,
-      verificationStatus: qq.verificationStatus
+      verificationStatus: qq.verificationStatus,
+      authorCreated: !!qq.authorCreated
     };
   });
 }
@@ -805,7 +822,12 @@ function validateSystem() {
  */
 function validatePhiloSystem() {
   if (!PHILO_BANK || !PHILO_BANK.length) throw new Error('بنك الفلسفة والمنطق فارغ.');
-  if (PHILO_BANK.length !== 555) throw new Error('عدد أسئلة الفلسفة والمنطق = ' + PHILO_BANK.length + ' وليس 555.');
+
+  const authored = [];
+  const verified = [];
+  PHILO_BANK.forEach(function (q) { (q.authorCreated ? authored : verified).push(q); });
+  if (verified.length !== 555) throw new Error('عدد الأسئلة المُتحقق منها (ت1) = ' + verified.length + ' وليس 555.');
+  if (authored.length !== 64) throw new Error('عدد الأسئلة المؤلَّفة (ت1) = ' + authored.length + ' وليس 64.');
 
   const ids = new Set();
   PHILO_BANK.forEach(function (q, i) {
@@ -817,13 +839,17 @@ function validatePhiloSystem() {
     });
     if (['A', 'B', 'C', 'D'].indexOf(q.correctAnswer) === -1) throw new Error(q.id + ': مفتاح إجابة غير صحيح.');
     if (q.verificationStatus !== 'verified') throw new Error(q.id + ': حالة تحقق غير نهائية.');
+    if (q.authorCreated) {
+      if (String(q.source).indexOf('مؤلَّف') === -1) throw new Error(q.id + ': سؤال مؤلَّف بدون وسم المصدر.');
+      if (q.term !== undefined && q.term !== 1) throw new Error(q.id + ': ترم خاطئ لسؤال مؤلَّف.');
+    }
   });
 
   const examIds = Object.keys(PHILO_EXAMS);
   const trainings = examIds.filter(function (k) { return PHILO_EXAMS[k].type === 'training'; });
   const comps = examIds.filter(function (k) { return PHILO_EXAMS[k].type === 'comprehensive'; });
-  if (trainings.length !== 9) throw new Error('عدد امتحانات التدريب = ' + trainings.length + ' وليس 9.');
-  if (comps.length !== 3) throw new Error('عدد الامتحانات الشاملة = ' + comps.length + ' وليس 3.');
+  if (trainings.length !== 28) throw new Error('عدد امتحانات التدريب (ت1) = ' + trainings.length + ' وليس 28.');
+  if (comps.length !== 3) throw new Error('عدد الامتحانات الشاملة (ت1) = ' + comps.length + ' وليس 3.');
 
   examIds.forEach(function (k) {
     const e = PHILO_EXAMS[k];
@@ -835,8 +861,25 @@ function validatePhiloSystem() {
     });
   });
 
-  Logger.log('نجاح التحقق: الفلسفة والمنطق 555 سؤالًا / 12 امتحانًا.');
-  return 'نجاح التحقق: الفلسفة والمنطق 555 سؤالًا / 12 امتحانًا (9 تدريبات + 3 شاملة).';
+  // عدم تداخل أسئلة نماذج التدريب الواحد (اختيارات منفصلة)
+  const byTraining = {};
+  trainings.forEach(function (k) {
+    const e = PHILO_EXAMS[k];
+    const key = e.section + '|' + e.chapter + '|' + e.training;
+    (byTraining[key] = byTraining[key] || []).push(k);
+  });
+  Object.keys(byTraining).forEach(function (key) {
+    const seen = new Set();
+    byTraining[key].forEach(function (k) {
+      PHILO_EXAMS[k].indices.forEach(function (i) {
+        if (seen.has(i)) throw new Error(key + ': تداخل أسئلة بين نماذج التدريب.');
+        seen.add(i);
+      });
+    });
+  });
+
+  Logger.log('نجاح التحقق: الفلسفة والمنطق ت1 — 555 مُتحقق + 64 مؤلَّف / 31 امتحانًا.');
+  return 'نجاح التحقق: الفلسفة والمنطق ت1 — 555 مُتحقق + 64 مؤلَّف / 31 امتحانًا (28 تدريب + 3 شاملة).';
 }
 
 /**
@@ -844,7 +887,12 @@ function validatePhiloSystem() {
  */
 function validatePhiloTerm2System() {
   if (!PHILO_T2_BANK || !PHILO_T2_BANK.length) throw new Error('بنك الفلسفة ت2 فارغ.');
-  if (PHILO_T2_BANK.length !== 234) throw new Error('عدد أسئلة الفلسفة ت2 = ' + PHILO_T2_BANK.length + ' وليس 234.');
+
+  const authored = [];
+  const verified = [];
+  PHILO_T2_BANK.forEach(function (q) { (q.authorCreated ? authored : verified).push(q); });
+  if (verified.length !== 234) throw new Error('عدد الأسئلة المُتحقق منها (ت2) = ' + verified.length + ' وليس 234.');
+  if (authored.length !== 20) throw new Error('عدد الأسئلة المؤلَّفة (ت2) = ' + authored.length + ' وليس 20.');
 
   const ids = new Set();
   PHILO_T2_BANK.forEach(function (q, i) {
@@ -857,15 +905,15 @@ function validatePhiloTerm2System() {
     if (['A', 'B', 'C', 'D'].indexOf(q.correctAnswer) === -1) throw new Error(q.id + ': مفتاح إجابة غير صحيح.');
     if (q.verificationStatus !== 'verified') throw new Error(q.id + ': حالة تحقق غير نهائية.');
     if (q.term !== 2) throw new Error(q.id + ': الترم غير صحيح.');
-    if (q.authorCreated) throw new Error(q.id + ': سؤال مؤلَّف غير مسموح به.');
     if (['أولى ثانوي'].indexOf(q.grade) === -1) throw new Error(q.id + ': صف غير صحيح.');
+    if (q.authorCreated && String(q.source).indexOf('مؤلَّف') === -1) throw new Error(q.id + ': سؤال مؤلَّف بدون وسم المصدر.');
   });
 
   const examIds = Object.keys(PHILO_T2_EXAMS);
   const trainings = examIds.filter(function (k) { return PHILO_T2_EXAMS[k].type === 'training'; });
   const comps = examIds.filter(function (k) { return PHILO_T2_EXAMS[k].type === 'comprehensive'; });
-  if (trainings.length !== 4) throw new Error('عدد امتحانات تدريب ت2 = ' + trainings.length + ' وليس 4.');
-  if (comps.length !== 0) throw new Error('يجب ألا توجد امتحانات شاملة في الترم الثاني (4 تدريبات فقط).');
+  if (trainings.length !== 12) throw new Error('عدد امتحانات تدريب ت2 = ' + trainings.length + ' وليس 12.');
+  if (comps.length !== 0) throw new Error('يجب ألا توجد امتحانات شاملة في الترم الثاني (12 نموذج تدريب فقط).');
 
   examIds.forEach(function (k) {
     const e = PHILO_T2_EXAMS[k];
@@ -878,11 +926,29 @@ function validatePhiloTerm2System() {
     });
   });
 
+  // عدم تداخل أسئلة نماذج التدريب الواحد
+  const byTraining = {};
+  trainings.forEach(function (k) {
+    const e = PHILO_T2_EXAMS[k];
+    const key = e.section + '|' + e.chapter + '|' + e.training;
+    (byTraining[key] = byTraining[key] || []).push(k);
+  });
+  Object.keys(byTraining).forEach(function (key) {
+    const seen = new Set();
+    byTraining[key].forEach(function (k) {
+      PHILO_T2_EXAMS[k].indices.forEach(function (i) {
+        if (seen.has(i)) throw new Error(key + ': تداخل أسئلة بين نماذج التدريب.');
+        seen.add(i);
+      });
+    });
+  });
+
   if (PHILO_T2_AUDIT && PHILO_T2_AUDIT.sourceCount !== 235) throw new Error('تدقيق ت2: المصدر يجب أن يكون 235.');
   if (PHILO_T2_AUDIT && PHILO_T2_AUDIT.verifiedCount !== 234) throw new Error('تدقيق ت2: المُتحقق يجب أن يكون 234.');
+  if (PHILO_T2_AUDIT && PHILO_T2_AUDIT.authorCreatedCount !== 20) throw new Error('تدقيق ت2: المؤلَّف يجب أن يكون 20.');
 
-  Logger.log('نجاح التحقق: الفلسفة والمنطق ت2 — 234 سؤالًا / 4 امتحانات.');
-  return 'نجاح التحقق: الفلسفة والمنطق ت2 — 234 سؤالًا / 4 امتحانات (4 تدريبات).';
+  Logger.log('نجاح التحقق: الفلسفة والمنطق ت2 — 234 مُتحقق + 20 مؤلَّف / 12 امتحانًا.');
+  return 'نجاح التحقق: الفلسفة والمنطق ت2 — 234 مُتحقق + 20 مؤلَّف / 12 امتحانًا (4 تدريبات × 3 نماذج).';
 }
 
 /* ============================== الإعدادات ============================== */
@@ -908,7 +974,78 @@ function getPublicSettings_() {
   const out = {};
   Object.keys(s).forEach(function (k) { if (k !== 'adminPin') out[k] = s[k]; });
   out.socialLinks = sanitizeSocialLinks_(s.socialLinks);
+  out.teacherImage = !!String(s.teacherImageId || '').trim();
   return out;
+}
+
+/* ============================== صورة المدرس (Drive) ============================== */
+
+const TEACHER_IMAGE_MAX_BYTES = 2 * 1024 * 1024; // 2 ميجابايت كحد أقصى
+const TEACHER_IMAGE_MIMES_ = { 'image/jpeg': true, 'image/png': true, 'image/webp': true };
+
+/**
+ * إرجاع صورة المدرس كـ data URL (متاح للطلاب — لا يكشف أي إعدادات حساسة).
+ * تُقرأ من Drive عبر معرّف الملف المحفوظ في إعدادات المنصة.
+ */
+function getTeacherImage() {
+  const s = getSettings_();
+  const id = String(s.teacherImageId || '').trim();
+  if (!id) return null;
+  try {
+    const blob = DriveApp.getFileById(id).getBlob();
+    const bytes = blob.getBytes();
+    if (!bytes || !bytes.length) return null;
+    if (bytes.length > TEACHER_IMAGE_MAX_BYTES * 2) return null;
+    const mime = String(blob.getContentType() || 'image/jpeg');
+    return 'data:' + (TEACHER_IMAGE_MIMES_[mime] ? mime : 'image/jpeg') + ';base64,' + Utilities.base64Encode(bytes);
+  } catch (e) {
+    return null;
+  }
+}
+
+/**
+ * رفع/استبدال صورة المدرس: تُحفظ في Google Drive ويُخزَّن معرّف الملف في الإعدادات.
+ */
+function uploadTeacherImage(pin, payload) {
+  assertAdmin_(pin);
+  const p = payload || {};
+  const dataUrl = String(p.dataUrl || '');
+  const m = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/.exec(dataUrl);
+  if (!m) throw new Error('صورة غير صالحة — يلزم صورة JPEG أو PNG أو WebP.');
+  const mime = m[1];
+  const b64 = m[2];
+  if (b64.length > Math.ceil(TEACHER_IMAGE_MAX_BYTES * 4 / 3)) {
+    throw new Error('حجم الصورة كبير جدًا — الحد الأقصى 2 ميجابايت.');
+  }
+  let bytes = null;
+  try { bytes = Utilities.base64Decode(b64); } catch (e) { /* تجاهل */ }
+  if (!bytes || !bytes.length) throw new Error('صورة فارغة أو تالفة.');
+
+  const s = getSettings_();
+  if (String(s.teacherImageId || '').trim()) {
+    try { DriveApp.getFileById(s.teacherImageId).setTrashed(true); } catch (e) { /* تجاهل */ }
+  }
+
+  const blob = Utilities.newBlob(bytes, mime, 'teacher-image-' + Date.now() + '.' + mime.split('/')[1]);
+  const file = DriveApp.createFile(blob);
+  const next = Object.assign({}, s, { teacherImageId: file.getId() });
+  PropertiesService.getScriptProperties().setProperty('APP_SETTINGS', JSON.stringify(next));
+  return { ok: true, teacherImage: true };
+}
+
+/**
+ * حذف صورة المدرس (من Drive ومن الإعدادات) والعودة للصورة الرمزية الافتراضية.
+ */
+function deleteTeacherImage(pin) {
+  assertAdmin_(pin);
+  const s = getSettings_();
+  const id = String(s.teacherImageId || '').trim();
+  if (id) {
+    try { DriveApp.getFileById(id).setTrashed(true); } catch (e) { /* تجاهل */ }
+  }
+  const next = Object.assign({}, s, { teacherImageId: '' });
+  PropertiesService.getScriptProperties().setProperty('APP_SETTINGS', JSON.stringify(next));
+  return { ok: true, teacherImage: false };
 }
 
 /**

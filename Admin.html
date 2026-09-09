@@ -121,6 +121,13 @@
       padding:14px;display:grid;grid-template-columns:auto 1fr 1.4fr 70px;gap:12px;align-items:end}
     @media (max-width:860px){ .social-row{grid-template-columns:1fr 1fr} }
 
+    .img-preview{background:var(--surface2);border:1px solid var(--border);border-radius:50%;
+      overflow:hidden;display:grid;place-items:center;flex:0 0 auto}
+    .img-preview img{width:100%;height:100%;object-fit:cover;display:block}
+    .img-field input[type=file]{width:100%;padding:10px;border:1.5px dashed var(--border);border-radius:var(--r-md);
+      background:var(--surface2);font-size:13px;color:var(--muted)}
+    .img-field input[type=file]:focus-visible{outline:3px solid var(--a);outline-offset:2px}
+
     .brand-preview{display:flex;align-items:center;gap:12px;margin-top:16px;padding:14px;border-radius:var(--r-md);
       background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(0,0,0,.24)), var(--p);color:#fff}
     .brand-preview .bp-logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:900;
@@ -430,6 +437,22 @@
           </div>
         </div>
         <hr class="divider">
+        <h2 style="font-size:16px">صورة المدرس (تظهر في رأس صفحة الطلاب)</h2>
+        <div class="sub">اختيارية — عند عدم وجود صورة يظهر شعار المنصة الافتراضي. تُحفظ الصورة في Google Drive ويُخزَّن معرّف الملف في إعدادات المنصة.</div>
+        <div style="margin-top:14px;display:flex;gap:16px;flex-wrap:wrap;align-items:center">
+          <div class="img-preview" id="imgPreviewBox" style="width:88px;height:88px" aria-hidden="true">
+            <span id="imgPreviewText" style="color:var(--muted);font-weight:800;font-size:12.5px">بدون صورة</span>
+          </div>
+          <div class="img-field" style="flex:1;min-width:230px">
+            <input type="file" id="teacherImgFile" accept="image/png,image/jpeg,image/webp" aria-label="اختيار صورة المدرس">
+            <div class="hint" style="margin-top:7px">JPEG أو PNG أو WebP — بحد أقصى 2 ميجابايت. الصورة تُعرض بحجم دائري صغير.</div>
+            <div style="margin-top:10px;display:flex;gap:8px;flex-wrap:wrap">
+              <button class="btn btn-gold" id="imgUploadBtn" onclick="uploadTeacherImage()">حفظ / استبدال الصورة</button>
+              <button class="btn btn-outline" id="imgDeleteBtn" onclick="deleteTeacherImage()" style="display:none">حذف الصورة</button>
+            </div>
+          </div>
+        </div>
+        <hr class="divider">
         <h2 style="font-size:16px">روابط التواصل الاجتماعي (تظهر في أسفل صفحة الطلاب)</h2>
         <div class="sub">تُعرض للطلاب الروابط المُفعّلة فقط، بترتيب تحدده. الروابط غير الصالحة أو الفارغة لا تظهر.</div>
         <div id="socialSettings" style="margin-top:14px;display:grid;gap:12px"></div>
@@ -536,7 +559,75 @@
     $('navLogo').textContent = s.logoText || 'EDU';
     $('siteLink').href = location.href.split('?')[0];
     renderSocialSettings(s.socialLinks);
+    initTeacherImage(!!s.teacherImage);
     updatePreview();
+  }
+
+  /* ---------- Teacher profile image ---------- */
+  function initTeacherImage(hasImage){
+    const box = $('imgPreviewBox');
+    const txt = $('imgPreviewText');
+    const del = $('imgDeleteBtn');
+    box.querySelectorAll('img').forEach(n => n.remove());
+    if(txt) txt.style.display = hasImage ? 'none' : '';
+    if(del) del.style.display = hasImage ? '' : 'none';
+    if(hasImage){
+      google.script.run
+        .withSuccessHandler(function(dataUrl){
+          if(!dataUrl) return;
+          const im = document.createElement('img');
+          im.src = dataUrl;
+          im.alt = 'صورة المدرس';
+          box.appendChild(im);
+          if(txt) txt.style.display = 'none';
+        })
+        .getTeacherImage();
+    }
+  }
+
+  function uploadTeacherImage(){
+    const fileInput = $('teacherImgFile');
+    const file = fileInput && fileInput.files && fileInput.files[0];
+    if(!file){ toast('اختر ملف صورة أولًا', 'err'); return; }
+    if(!/^image\/(jpeg|png|webp)$/.test(file.type)){
+      toast('صيغة غير مدعومة — يلزم JPEG أو PNG أو WebP', 'err'); return;
+    }
+    if(file.size > 2 * 1024 * 1024){
+      toast('حجم الصورة كبير — الحد الأقصى 2 ميجابايت', 'err'); return;
+    }
+    const btn = $('imgUploadBtn');
+    btn.disabled = true; btn.textContent = 'جارِ الرفع…';
+    const reader = new FileReader();
+    reader.onload = function(){
+      google.script.run
+        .withSuccessHandler(function(r){
+          btn.disabled = false; btn.textContent = 'حفظ / استبدال الصورة';
+          fileInput.value = '';
+          toast('تم حفظ الصورة بنجاح', 'ok');
+          initTeacherImage(!!(r && r.teacherImage));
+        })
+        .withFailureHandler(function(err){
+          btn.disabled = false; btn.textContent = 'حفظ / استبدال الصورة';
+          toast(friendly(err), 'err');
+        })
+        .uploadTeacherImage(PIN, { dataUrl: String(reader.result || '') });
+    };
+    reader.onerror = function(){ btn.disabled = false; btn.textContent = 'حفظ / استبدال الصورة'; toast('تعذّرت قراءة الملف', 'err'); };
+    reader.readAsDataURL(file);
+  }
+
+  function deleteTeacherImage(){
+    const del = $('imgDeleteBtn');
+    del.disabled = true;
+    google.script.run
+      .withSuccessHandler(function(){
+        del.disabled = false;
+        $('teacherImgFile').value = '';
+        toast('تم حذف الصورة — سيظهر الشعار الافتراضي', 'ok');
+        initTeacherImage(false);
+      })
+      .withFailureHandler(function(err){ del.disabled = false; toast(friendly(err), 'err'); })
+      .deleteTeacherImage(PIN);
   }
 
   /* ---------- Social media settings ---------- */
@@ -676,7 +767,7 @@
     const t2 = f.term2 || {};
     $('subjCards').innerHTML =
       '<div class="subj-card s-psych">' +
-        '<div class="s-head"><div class="s-ico">' + icons.psych + '</div><div><h3>علم النفس</h3><div class="s-grade">المرحلة الثانوية</div></div></div>' +
+        '<div class="s-head"><div class="s-ico">' + icons.psych + '</div><div><h3>علم النفس</h3><div class="s-grade">الصف الثاني الثانوي</div></div></div>' +
         '<div class="mini-stats">' +
           '<div class="mini-stat"><b>' + p.exams + '</b><span>امتحان</span></div>' +
           '<div class="mini-stat"><b>' + p.questions + '</b><span>سؤال</span></div>' +
@@ -691,16 +782,17 @@
         '</div>' +
       '</div>' +
       '<div class="subj-card s-philo">' +
-        '<div class="s-head"><div class="s-ico">' + icons.philo + '</div><div><h3>الفلسفة والمنطق</h3><div class="s-grade">أولى ثانوي 2027 · ترمين</div></div></div>' +
+        '<div class="s-head"><div class="s-ico">' + icons.philo + '</div><div><h3>الفلسفة والمنطق</h3><div class="s-grade">الصف الأول الثانوي · ترمين</div></div></div>' +
         '<div class="mini-stats">' +
           '<div class="mini-stat"><b>' + (t1.exams + t2.exams) + '</b><span>امتحان</span></div>' +
-          '<div class="mini-stat"><b>' + (t1.questions + t2.questions) + '</b><span>سؤال مُتحقق</span></div>' +
+          '<div class="mini-stat"><b>' + (t1.verified + t2.verified) + '</b><span>سؤال مُتحقق</span></div>' +
+          '<div class="mini-stat"><b>' + (t1.authored + t2.authored) + '</b><span>سؤال مؤلَّف</span></div>' +
           '<div class="mini-stat"><b>' + f.stats.attempts + '</b><span>محاولة</span></div>' +
           '<div class="mini-stat"><b>' + f.stats.avg + '%</b><span>متوسط</span></div>' +
         '</div>' +
         '<div class="data-row">' +
-          '<span class="data-tag">ت١: <b>' + t1.questions + '</b> سؤال · <b>' + t1.exams + '</b> امتحان · استُبعد <b>' + t1.excluded + '</b></span>' +
-          '<span class="data-tag">ت٢: <b>' + t2.questions + '</b> سؤال · <b>' + t2.exams + '</b> امتحان · استُبعد <b>' + t2.excluded + '</b></span>' +
+          '<span class="data-tag">ت١: <b>' + t1.verified + '</b> مُتحقق + <b>' + t1.authored + '</b> مؤلَّف · <b>' + t1.exams + '</b> امتحان · استُبعد <b>' + t1.excluded + '</b></span>' +
+          '<span class="data-tag">ت٢: <b>' + t2.verified + '</b> مُتحقق + <b>' + t2.authored + '</b> مؤلَّف · <b>' + t2.exams + '</b> امتحان · استُبعد <b>' + t2.excluded + '</b></span>' +
           '<span class="data-tag">صُحح: ت١ <b>' + t1.corrected + '</b> · ت٢ <b>' + t2.corrected + '</b></span>' +
         '</div>' +
       '</div>';
@@ -989,7 +1081,8 @@
         } else {
           const t1 = f.term1 || {}, t2 = f.term2 || {};
           $('philoStats').innerHTML =
-            statCard('مُتحقق ت١', t1.questions) + statCard('مُتحقق ت٢', t2.questions) +
+            statCard('مُتحقق ت١', t1.verified) + statCard('مُتحقق ت٢', t2.verified) +
+            statCard('مؤلَّف ت١', t1.authored) + statCard('مؤلَّف ت٢', t2.authored) +
             statCard('مفاتيح صُححت ت١', t1.corrected) + statCard('مفاتيح صُححت ت٢', t2.corrected) +
             statCard('مستبعد ت١', t1.excluded) + statCard('مستبعد ت٢', t2.excluded) +
             statCard('امتحانات ت١', t1.exams) + statCard('امتحانات ت٢', t2.exams) +
