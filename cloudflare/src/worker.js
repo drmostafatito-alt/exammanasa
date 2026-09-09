@@ -116,7 +116,7 @@ const DEFAULT_TEACHERS = [{
   bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: اختبر نفسك، اعرف درجتك فورًا، وراجع إجاباتك بعد كل امتحان.',
   photo: '',
   socialLinks: { whatsapp: '', facebook: '', tiktok: '' },
-  colors: { primary: '#0E7A5F', accent: '#C99A2E' },
+  colors: { primary: '#1E56C8', accent: '#C99A2E' },
   requirePhone: true,
   enabled: true,
   isDefault: true,

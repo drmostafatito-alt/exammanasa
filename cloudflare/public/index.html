@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <meta name="theme-color" content="#F4F7F9">
-  <meta name="description" content="منصة الامتحانات الإلكترونية لد. مصطفى تيتو — اختبارات الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي، بتصحيح فوري ومراجعة الإجابات">
+  <meta name="theme-color" content="#F5F7FD">
+  <meta name="description" content="منصة الامتحانات الإلكترونية لد. مصطفى تيتو — اختبر نفسك وقيّم مستواك في الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: امتحانات منظمة حسب الوحدات والموضوعات، درجتك فورًا، ومراجعة كاملة لإجاباتك.">
   <title>منصة الامتحانات — د. مصطفى تيتو</title>
   <link rel="icon" href="/favicon.svg" type="image/svg+xml">
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -14,16 +14,21 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="wrap">
+    <div class="wrap topbar-row">
       <div class="brand">
         <div class="logo" id="brandLogo">م‌ت</div>
-        <div>
-          <h1 id="brandName">منصة الامتحانات</h1>
-          <div class="sub" id="brandSub">الفلسفة والمنطق · علم النفس</div>
+        <div class="brand-txt">
+          <div class="bname" id="brandName">د. مصطفى تيتو</div>
+          <div class="sub" id="brandSub">مدرس الفلسفة والمنطق وعلم النفس</div>
         </div>
       </div>
-      <div class="spacer"></div>
-      <span class="chip" id="yearChip">٢٠٢٦ / ٢٠٢٧</span>
+      <nav class="mainnav" aria-label="التنقل الرئيسي">
+        <button type="button" onclick="navTo('top')">الرئيسية</button>
+        <button type="button" onclick="navTo('subjects')">الامتحانات</button>
+        <button type="button" onclick="navTo('about')">عن المنصة</button>
+        <button type="button" onclick="navTo('contact')" id="navContact" class="hidden" hidden>تواصل معنا</button>
+      </nav>
+      <div class="socials" id="topSocials"></div>
     </div>
   </header>
 
@@ -31,7 +36,11 @@
     <div style="text-align:center;padding:70px 0"><div class="spin"></div></div>
   </main>
 
-  <footer class="site wrap">منصة الامتحانات الإلكترونية — <b>د. مصطفى تيتو</b> · جميع الحقوق محفوظة © ٢٠٢٦</footer>
+  <footer class="site wrap">
+    <div class="foot-brand">منصة الامتحانات الإلكترونية — <b>د. مصطفى تيتو</b></div>
+    <div class="foot-sub">الفلسفة والمنطق — الصف الأول الثانوي · علم النفس — الصف الثاني الثانوي</div>
+    <div class="foot-copy">جميع الحقوق محفوظة © ٢٠٢٦</div>
+  </footer>
 
   <script src="/app.js"></script>
 </body>
