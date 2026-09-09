@@ -1,7 +1,641 @@
 <!DOCTYPE html>
-<html lang="ar" dir="rtl"><head><base target="_top"><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>لوحة تحكم المنصة</title>
-<style>
-:root{--p:#123B40;--a:#C9A86A;--bg:#f4f7f6;--ink:#172326;--muted:#6b7a7d;--line:#e3eae8}*{box-sizing:border-box}body{margin:0;font-family:Tahoma,Arial,sans-serif;background:var(--bg);color:var(--ink)}.wrap{max-width:1100px;margin:auto;padding:28px 16px 60px}.head{background:linear-gradient(135deg,var(--p),#0b2b30);color:#fff;border-radius:26px;padding:28px;margin-bottom:18px}.head h1{margin:0 0 7px}.head p{margin:0;opacity:.75}.card{background:#fff;border:1px solid var(--line);border-radius:20px;padding:22px;margin-top:15px;box-shadow:0 16px 45px rgba(18,59,64,.08)}.grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}label{display:block;font-weight:800;font-size:13px;margin-bottom:7px}input{width:100%;padding:12px;border:1px solid #d5dfdd;border-radius:12px;font-size:14px}button{border:0;border-radius:12px;padding:12px 17px;font-weight:800;cursor:pointer}.primary{background:var(--p);color:#fff}.gold{background:var(--a);color:#fff}.muted{color:var(--muted);font-size:12px;line-height:1.8}.login{max-width:430px;margin:70px auto}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:15px}.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.stat{padding:18px;border:1px solid var(--line);border-radius:16px}.stat b{display:block;font-size:28px;color:var(--p);margin-top:5px}.tablewrap{overflow:auto;margin-top:15px}table{width:100%;border-collapse:collapse;min-width:850px}th,td{padding:10px;border-bottom:1px solid #edf1f0;text-align:right;font-size:12px}th{color:var(--p);background:#f6f8f7}a{color:var(--p);font-weight:800}@media(max-width:700px){.grid,.stats{grid-template-columns:1fr}}
-.hidden{display:none!important}.status{margin-top:12px;font-size:12px;color:var(--muted)}.danger{color:#a33}</style></head><body><main class="wrap"><div id="login" class="card login"><h2>لوحة تحكم المدرس</h2><p class="muted">أدخل رمز لوحة التحكم. الرمز الافتراضي في النسخة الأولى: 1234 ويمكن تغييره بعد الدخول.</p><input id="pin" type="password" placeholder="رمز الدخول"><div class="actions"><button class="primary" onclick="login()">دخول</button></div></div><div id="app" class="hidden"><div class="head"><h1 id="appTitle">لوحة تحكم المنصة</h1><p id="appSub">إدارة الهوية والنتائج بدون تعديل البرمجة</p></div><div class="card"><h2>بيانات المنصة</h2><div class="grid"><div><label>اسم المدرس</label><input id="teacherName"></div><div><label>اسم المادة</label><input id="subjectName"></div><div><label>الصف / المرحلة</label><input id="gradeName"></div><div><label>العام الدراسي</label><input id="academicYear"></div><div><label>اسم المنصة</label><input id="appTitleInput"></div><div><label>العنوان الفرعي</label><input id="subtitle"></div><div><label>اختصار الشعار</label><input id="logoText"></div><div><label>النص الترحيبي</label><input id="welcomeText"></div><div><label>اللون الأساسي</label><input id="primaryColor" placeholder="#123B40"></div><div><label>لون التمييز</label><input id="accentColor" placeholder="#C9A86A"></div><div><label>PIN جديد (اختياري)</label><input id="newAdminPin" type="password" placeholder="اتركه فارغًا لعدم التغيير"></div></div><div class="actions"><button class="gold" onclick="save()">حفظ التعديلات</button><a id="siteLink" target="_blank" style="padding:12px">فتح المنصة</a></div><p class="muted">بعد الحفظ، افتح رابط المنصة في نافذة جديدة. لا تحتاج لتعديل أي كود لتغيير اسم المدرس أو اسم المنصة أو الألوان.</p></div><div class="card"><h2>النتائج</h2><div id="stats" class="stats"></div><div class="actions"><a id="resultsLink" target="_blank">فتح Google Sheet للنتائج</a><button class="primary" onclick="loadDash()">تحديث النتائج</button></div><div class="tablewrap"><table><thead><tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الوحدة</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead><tbody id="rows"></tbody></table></div></div></div></main><script>
-let PIN='',SET=null;function $(x){return document.getElementById(x)}function login(){PIN=$('pin').value.trim();google.script.run.withSuccessHandler(s=>{SET=s;$('login').classList.add('hidden');$('app').classList.remove('hidden');fill(s);loadDash()}).withFailureHandler(e=>alert(e.message||e)).getTeacherSettings(PIN)}function fill(s){$('teacherName').value=s.teacherName;$('subjectName').value=s.subjectName;$('gradeName').value=s.gradeName;$('academicYear').value=s.academicYear;$('appTitleInput').value=s.appTitle;$('subtitle').value=s.subtitle;$('logoText').value=s.logoText;$('welcomeText').value=s.welcomeText;$('primaryColor').value=s.primaryColor;$('accentColor').value=s.accentColor;$('appTitle').textContent=s.appTitle;$('siteLink').href=location.href.split('?')[0];}function save(){const x={teacherName:$('teacherName').value,subjectName:$('subjectName').value,gradeName:$('gradeName').value,academicYear:$('academicYear').value,appTitle:$('appTitleInput').value,subtitle:$('subtitle').value,logoText:$('logoText').value,welcomeText:$('welcomeText').value,primaryColor:$('primaryColor').value,accentColor:$('accentColor').value,newAdminPin:$('newAdminPin').value};google.script.run.withSuccessHandler(s=>{SET=s;fill(s);$('newAdminPin').value='';alert('تم حفظ التعديلات بنجاح.')}).withFailureHandler(e=>alert(e.message||e)).saveTeacherSettings(PIN,x)}function loadDash(){google.script.run.withSuccessHandler(d=>{ $('resultsLink').href=d.link;$('stats').innerHTML='<div class="stat">الطلاب المختلفون<b>'+d.stats.students+'</b></div><div class="stat">إجمالي المحاولات<b>'+d.stats.attempts+'</b></div><div class="stat">متوسط الدرجات<b>'+d.stats.avg+'%</b></div>';$('rows').innerHTML=d.rows.map(r=>'<tr><td>'+esc(r.date)+'</td><td>'+esc(r.name)+'</td><td>'+esc(r.phone)+'</td><td>'+esc(r.unit)+'</td><td>'+esc(r.exam)+'</td><td>'+r.score+' / '+r.total+'</td><td>'+r.percentage+'%</td></tr>').join('')}).withFailureHandler(e=>alert(e.message||e)).getDashboardData(PIN)}function esc(s){return String(s??'').replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'}[m]))}
-</script></body></html>
+<html lang="ar" dir="rtl">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>لوحة تحكم المنصة</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    :root{
+      --p:#123B40; --a:#C9A86A; --bg:#eef3f1; --surface:#ffffff; --surface2:#f7faf9;
+      --text:#14282b; --muted:#5f7174; --border:#dde6e3;
+      --success:#227a56; --warning:#a06a12; --error:#c23b2e;
+      --p-07:rgb(238,241,242); --p-08:rgb(236,239,240); --p-09:rgb(234,237,238); --p-10:rgb(231,235,236);
+      --p-12:rgb(227,231,232); --p-14:rgb(222,228,228); --p-35:rgb(172,186,188); --p-40:rgb(160,177,179);
+      --a-07:rgb(251,249,245); --a-09:rgb(250,247,242); --a-13:rgb(248,244,236); --a-16:rgb(246,241,231);
+      --a-18:rgb(245,239,228); --a-30:rgb(239,229,210); --a-40:rgb(233,220,195); --a-55:rgb(225,207,173); --a-60:rgb(223,203,166);
+      --a-deep:rgb(131,109,69); --a-ring:rgba(201,168,106,.22);
+      --p-shadow:rgba(18,59,64,.3); --a-shadow:rgba(201,168,106,.35);
+      --p-glow:rgba(18,59,64,.12); --a-glow:rgba(201,168,106,.16);
+      --success-soft:rgb(226,238,233); --warning-soft:rgb(242,234,222); --error-soft:rgb(249,235,234);
+      --r-lg:22px; --r-md:16px; --r-sm:12px;
+      --shadow-sm:0 1px 2px rgba(18,59,64,.05),0 2px 10px rgba(18,59,64,.06);
+      --shadow-md:0 12px 34px rgba(18,59,64,.12);
+      --font:'Tajawal',Tahoma,'Segoe UI',Arial,sans-serif;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family:var(--font);color:var(--text);background:
+      radial-gradient(1000px 460px at 90% -10%, var(--a-glow), transparent 60%), var(--bg);
+      min-height:100vh;line-height:1.7}
+    :focus-visible{outline:3px solid var(--a);outline-offset:2px;border-radius:6px}
+    button,input,select,textarea{font-family:inherit}
+    button{cursor:pointer}
+
+    .topbar{background:linear-gradient(135deg, rgba(255,255,255,.05), rgba(0,0,0,.26)), var(--p);color:#fff;box-shadow:var(--shadow-sm)}
+    .topbar-in{max-width:1180px;margin:auto;padding:15px 20px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+    .logo{width:44px;height:44px;flex:0 0 44px;border-radius:13px;display:grid;place-items:center;font-weight:900;font-size:13px;
+      background:linear-gradient(135deg, rgba(255,255,255,.18), rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.25)}
+    .t-brand strong{display:block;font-size:16px;font-weight:800}
+    .t-brand span{display:block;font-size:12px;opacity:.72}
+    .topbar .t-actions{margin-inline-start:auto;display:flex;gap:9px;align-items:center;flex-wrap:wrap}
+    .link-btn{color:#fff;text-decoration:none;font-weight:700;font-size:13px;padding:9px 14px;border-radius:12px;
+      background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);transition:.15s}
+    .link-btn:hover{background:rgba(255,255,255,.2)}
+
+    .wrap{max-width:1180px;margin:auto;padding:24px 18px 80px}
+
+    /* Login */
+    .login-wrap{max-width:430px;margin:8vh auto 0}
+    .login-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-md);padding:32px;text-align:center}
+    .login-card .l-logo{width:64px;height:64px;margin:0 auto 16px;border-radius:20px;display:grid;place-items:center;font-weight:900;font-size:20px;
+      background:var(--p);color:#fff;box-shadow:var(--shadow-md)}
+    .login-card h1{margin:0 0 6px;font-size:21px;color:var(--p);font-weight:900}
+    .login-card p{margin:0 0 20px;color:var(--muted);font-size:13.5px}
+    .login-card input{width:100%;padding:14px 16px;border:1.5px solid var(--border);border-radius:var(--r-md);font-size:16px;
+      text-align:center;letter-spacing:6px;outline:0;background:var(--surface2)}
+    .login-card input:focus{border-color:var(--a);box-shadow:0 0 0 4px var(--a-ring)}
+    .login-err{color:var(--error);font-size:13px;font-weight:700;margin-top:12px;min-height:20px}
+
+    /* Cards & tabs */
+    .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);box-shadow:var(--shadow-sm);padding:22px;margin-top:16px}
+    .card h2{margin:0;color:var(--p);font-size:19px;font-weight:900}
+    .card .sub{color:var(--muted);font-size:12.5px;margin-top:3px}
+
+    .tabs{display:flex;gap:6px;background:var(--p-07);border:1px solid var(--border);
+      padding:5px;border-radius:14px;width:max-content;max-width:100%;overflow-x:auto;margin-top:20px}
+    .tab{border:0;background:transparent;color:var(--muted);font-weight:800;font-size:13.5px;padding:10px 18px;border-radius:10px;transition:.15s;white-space:nowrap}
+    .tab.active{background:var(--p);color:#fff;box-shadow:var(--shadow-sm)}
+    .tab:not(.active):hover{background:var(--p-09);color:var(--p)}
+
+    /* Stats */
+    .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:13px;margin-top:16px}
+    .stat{background:var(--surface);border:1px solid var(--border);border-radius:var(--r-lg);padding:18px;box-shadow:var(--shadow-sm)}
+    .stat .s-icon{width:36px;height:36px;border-radius:11px;display:grid;place-items:center;margin-bottom:10px}
+    .stat .s-icon svg{width:19px;height:19px}
+    .stat b{display:block;font-size:26px;color:var(--p);font-weight:900;line-height:1.2}
+    .stat span{font-size:12px;color:var(--muted);font-weight:700}
+    .stat.c1 .s-icon{background:var(--p-12);color:var(--p)}
+    .stat.c2 .s-icon{background:var(--a-18);color:#8a6d28}
+    .stat.c3 .s-icon{background:var(--success-soft);color:var(--success)}
+    .stat.c4 .s-icon{background:var(--warning-soft);color:var(--warning)}
+
+    /* Form */
+    .grid2{display:grid;grid-template-columns:1fr 1fr;gap:15px}
+    .field label{display:block;font-size:12.5px;font-weight:800;margin-bottom:6px}
+    .field input[type=text],.field input[type=password],.field textarea{
+      width:100%;padding:11px 13px;border:1.5px solid var(--border);border-radius:var(--r-md);font-size:14px;outline:0;background:var(--surface2);transition:.15s}
+    .field input:focus,.field textarea:focus{border-color:var(--a);background:#fff;box-shadow:0 0 0 4px var(--a-ring)}
+    .field textarea{resize:vertical;min-height:74px}
+    .field .hint{font-size:11px;color:var(--muted);margin-top:4px}
+    .color-row{display:flex;gap:8px;align-items:center}
+    .color-row input[type=color]{width:46px;height:42px;border:1.5px solid var(--border);border-radius:10px;background:#fff;padding:3px;cursor:pointer}
+    .color-row input[type=text]{flex:1}
+
+    .switch{display:flex;align-items:center;gap:10px;cursor:pointer;user-select:none}
+    .switch input{position:absolute;opacity:0;width:0;height:0}
+    .switch .track{width:46px;height:26px;background:#cdd8d5;border-radius:99px;position:relative;transition:.18s;flex:0 0 46px}
+    .switch .track::after{content:"";position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;transition:.18s;box-shadow:0 1px 3px rgba(0,0,0,.25)}
+    .switch input:checked + .track{background:var(--success)}
+    .switch input:checked + .track::after{transform:translateX(-20px)}
+    .switch input:focus-visible + .track{outline:3px solid var(--a);outline-offset:2px}
+    .switch .s-label{font-weight:800;font-size:13.5px}
+
+    .brand-preview{display:flex;align-items:center;gap:12px;margin-top:16px;padding:14px;border-radius:var(--r-md);
+      background:linear-gradient(135deg, rgba(255,255,255,.06), rgba(0,0,0,.24)), var(--p);color:#fff}
+    .brand-preview .bp-logo{width:40px;height:40px;border-radius:12px;display:grid;place-items:center;font-weight:900;
+      background:rgba(255,255,255,.16);border:1px solid rgba(255,255,255,.25)}
+    .brand-preview strong{font-size:14px}
+    .brand-preview span{font-size:11.5px;opacity:.75}
+    .brand-preview .bp-accent{margin-inline-start:auto;width:34px;height:34px;border-radius:10px;background:var(--a)}
+
+    /* Buttons */
+    .btn{border:0;border-radius:var(--r-md);padding:11px 18px;font-size:13.5px;font-weight:800;transition:.15s;display:inline-flex;align-items:center;gap:8px}
+    .btn:disabled{opacity:.55;cursor:not-allowed}
+    .btn-primary{background:var(--p);color:#fff}
+    .btn-primary:hover:not(:disabled){filter:brightness(1.1)}
+    .btn-gold{background:var(--a);color:#fff}
+    .btn-gold:hover:not(:disabled){filter:brightness(1.06)}
+    .btn-ghost{background:var(--p-08);color:var(--p)}
+    .btn-ghost:hover:not(:disabled){background:var(--p-14)}
+    .btn-outline{background:#fff;color:var(--p);border:1.5px solid var(--border)}
+    .btn-outline:hover:not(:disabled){border-color:var(--p)}
+
+    /* Table */
+    .toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0 12px}
+    .toolbar input,.toolbar select{padding:10px 13px;border:1.5px solid var(--border);border-radius:12px;font-size:13.5px;outline:0;background:#fff}
+    .toolbar input:focus,.toolbar select:focus{border-color:var(--a)}
+    .toolbar input{min-width:200px;flex:1}
+    .tablewrap{overflow:auto;border:1px solid var(--border);border-radius:var(--r-md)}
+    table{width:100%;border-collapse:collapse;min-width:780px;font-size:13px}
+    th,td{padding:11px 12px;border-bottom:1px solid var(--border);text-align:right;vertical-align:middle}
+    th{background:var(--surface2);color:var(--p);font-weight:800;font-size:12px;position:sticky;top:0;white-space:nowrap}
+    tr:last-child td{border-bottom:0}
+    tr:hover td{background:var(--surface2)}
+    .score-cell{font-weight:900;color:var(--p);white-space:nowrap}
+    .pct-pill{display:inline-block;padding:3px 10px;border-radius:99px;font-weight:800;font-size:12px}
+    .pct-pill.hi{background:var(--success-soft);color:var(--success)}
+    .pct-pill.mid{background:var(--warning-soft);color:var(--warning)}
+    .pct-pill.low{background:var(--error-soft);color:var(--error)}
+    .empty{padding:40px;text-align:center;color:var(--muted);font-size:14px}
+    .empty svg{width:40px;height:40px;color:var(--border);margin-bottom:10px}
+
+    /* Toast */
+    .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--text);color:#fff;
+      padding:13px 20px;border-radius:14px;z-index:120;box-shadow:var(--shadow-md);max-width:92vw;text-align:center;
+      font-size:14px;font-weight:700;opacity:0;transition:.25s;pointer-events:none}
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+    .toast.ok{background:var(--success)}
+    .toast.err{background:var(--error)}
+
+    .loading{position:fixed;inset:0;background:rgba(238,243,241,.85);backdrop-filter:blur(3px);z-index:100;display:grid;place-items:center}
+    .loadbox{background:var(--surface);padding:26px 32px;border-radius:var(--r-lg);box-shadow:var(--shadow-md);text-align:center}
+    .spin{width:38px;height:38px;border:4px solid var(--p-12);border-top-color:var(--p);border-radius:50%;animation:sp .8s linear infinite;margin:0 auto 12px}
+    @keyframes sp{to{transform:rotate(360deg)}}
+    .loadbox strong{color:var(--p)}
+
+    .hidden{display:none!important}
+    .divider{border:0;border-top:1px solid var(--border);margin:18px 0}
+
+    @media (max-width:900px){ .stats{grid-template-columns:1fr 1fr} }
+    @media (max-width:620px){
+      .grid2,.stats{grid-template-columns:1fr}
+      .topbar-in{padding:12px 14px}
+      .topbar .t-actions{margin-inline-start:0}
+      .login-wrap{margin-top:4vh}
+    }
+    @media (prefers-reduced-motion:reduce){ *{animation:none!important;transition:none!important} }
+  </style>
+</head>
+<body>
+
+<div id="loading" class="loading hidden">
+  <div class="loadbox"><div class="spin"></div><strong id="loadText">جاري التحميل…</strong></div>
+</div>
+
+<!-- ===================== LOGIN ===================== -->
+<div class="wrap login-wrap" id="login">
+  <div class="login-card">
+    <div class="l-logo">PSY</div>
+    <h1>لوحة تحكم المدرس</h1>
+    <p>أدخل رمز لوحة التحكم للمتابعة. الرمز الافتراضي للنسخة الجديدة هو <b>1234</b> ويمكنك تغييره من الإعدادات بعد الدخول.</p>
+    <input id="pin" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" aria-label="رمز الدخول">
+    <div class="login-err" id="loginErr" role="alert"></div>
+    <button class="btn btn-primary" style="width:100%;justify-content:center;padding:14px" onclick="login()">دخول</button>
+  </div>
+</div>
+
+<!-- ===================== APP ===================== -->
+<div id="app" class="hidden">
+  <header class="topbar">
+    <div class="topbar-in">
+      <div class="logo" id="navLogo">PSY</div>
+      <div class="t-brand">
+        <strong id="navTitle">لوحة تحكم المنصة</strong>
+        <span id="navSub">إدارة الهوية والإعدادات والنتائج</span>
+      </div>
+      <div class="t-actions">
+        <a class="link-btn" id="siteLink" target="_blank" rel="noopener">↗ فتح منصة الطلاب</a>
+        <a class="link-btn" id="sheetLink" target="_blank" rel="noopener">↗ ملف النتائج</a>
+        <button class="link-btn" onclick="logout()">تسجيل الخروج</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="wrap">
+    <div class="tabs" role="tablist">
+      <button class="tab active" id="tab-overview" role="tab" onclick="showTab('overview')">نظرة عامة</button>
+      <button class="tab" id="tab-settings" role="tab" onclick="showTab('settings')">إعدادات المنصة</button>
+      <button class="tab" id="tab-results" role="tab" onclick="showTab('results')">النتائج</button>
+    </div>
+
+    <!-- Overview -->
+    <section id="panel-overview">
+      <div class="stats" id="stats"></div>
+      <div class="card">
+        <h2>أحدث النتائج</h2>
+        <div class="sub">آخر ما تم تسجيله من محاولات الطلاب</div>
+        <div class="tablewrap" style="margin-top:12px"><table>
+          <thead><tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الوحدة</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+          <tbody id="recentRows"></tbody>
+        </table></div>
+        <div style="margin-top:14px;text-align:center">
+          <button class="btn btn-outline" onclick="showTab('results')">عرض كل النتائج</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Settings -->
+    <section id="panel-settings" class="hidden">
+      <div class="card">
+        <h2>بيانات المنصة والهوية</h2>
+        <div class="sub">تظهر هذه البيانات للطلاب ويمكن تعديلها دون لمس أي كود</div>
+        <div class="grid2" style="margin-top:16px">
+          <div class="field"><label for="teacherName">اسم المدرس</label><input id="teacherName" type="text"></div>
+          <div class="field"><label for="subjectName">المادة الدراسية</label><input id="subjectName" type="text"></div>
+          <div class="field"><label for="gradeName">الصف / المرحلة</label><input id="gradeName" type="text"></div>
+          <div class="field"><label for="academicYear">العام الدراسي</label><input id="academicYear" type="text"></div>
+          <div class="field"><label for="appTitleInput">اسم المنصة (العنوان الرئيسي)</label><input id="appTitleInput" type="text"></div>
+          <div class="field"><label for="subtitle">العنوان الفرعي</label><input id="subtitle" type="text"></div>
+          <div class="field"><label for="logoText">اختصار الشعار</label><input id="logoText" type="text" maxlength="4"><div class="hint">حرفان إلى أربعة أحرف تظهر في مربع الشعار</div></div>
+          <div class="field"><label for="welcomeText">النص الترحيبي</label><textarea id="welcomeText"></textarea></div>
+        </div>
+
+        <hr class="divider">
+
+        <h2 style="font-size:16px">الألوان والهوية البصرية</h2>
+        <div class="grid2" style="margin-top:14px">
+          <div class="field"><label>اللون الأساسي</label>
+            <div class="color-row"><input type="color" id="primaryColorPicker" value="#123B40"><input id="primaryColor" type="text" placeholder="#123B40"></div>
+          </div>
+          <div class="field"><label>لون التمييز</label>
+            <div class="color-row"><input type="color" id="accentColorPicker" value="#C9A86A"><input id="accentColor" type="text" placeholder="#C9A86A"></div>
+          </div>
+        </div>
+        <div class="brand-preview" id="brandPreview">
+          <div class="bp-logo" id="bpLogo">PSY</div>
+          <div><strong id="bpTitle">اسم المنصة</strong><br><span id="bpSub">العنوان الفرعي</span></div>
+          <div class="bp-accent"></div>
+        </div>
+
+        <hr class="divider">
+
+        <div class="grid2">
+          <div class="field">
+            <label>اشتراط رقم الهاتف من الطالب</label>
+            <label class="switch">
+              <input type="checkbox" id="requirePhone" checked>
+              <span class="track"></span>
+              <span class="s-label" id="requirePhoneLabel">مطلوب</span>
+            </label>
+            <div class="hint">عند الإيقاف يمكن للطالب الدخول بدون رقم هاتف</div>
+          </div>
+          <div class="field">
+            <label for="newAdminPin">رمز لوحة التحكم الجديد (اختياري)</label>
+            <input id="newAdminPin" type="password" placeholder="اتركه فارغًا لعدم التغيير" autocomplete="new-password">
+            <div class="hint">الرمز الحالي لا يظهر هنا حفاظًا على الخصوصية</div>
+          </div>
+        </div>
+
+        <div style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap;align-items:center">
+          <button class="btn btn-gold" id="saveBtn" onclick="save()">حفظ جميع التعديلات</button>
+          <span id="saveStatus" style="font-size:12.5px;color:var(--muted)"></span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Results -->
+    <section id="panel-results" class="hidden">
+      <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+          <div>
+            <h2>سجل النتائج</h2>
+            <div class="sub" id="resultsCount"></div>
+          </div>
+          <div style="display:flex;gap:9px;flex-wrap:wrap">
+            <button class="btn btn-outline" onclick="exportCsv()">⬇ تصدير CSV</button>
+            <button class="btn btn-primary" onclick="loadDash()">↻ تحديث</button>
+          </div>
+        </div>
+        <div class="toolbar">
+          <input id="filterSearch" type="text" placeholder="ابحث باسم الطالب أو الهاتف أو الامتحان…" oninput="applyFilters()">
+          <select id="filterType" onchange="applyFilters()">
+            <option value="">كل الأنواع</option>
+            <option value="topic">موضوع</option>
+            <option value="comprehensive">شامل</option>
+          </select>
+          <select id="filterUnit" onchange="applyFilters()">
+            <option value="">كل الوحدات</option>
+            <option value="1">الوحدة 1</option>
+            <option value="2">الوحدة 2</option>
+            <option value="3">الوحدة 3</option>
+            <option value="4">الوحدة 4</option>
+            <option value="5">الوحدة 5</option>
+            <option value="6">الوحدة 6</option>
+          </select>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead><tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الوحدة</th><th>النوع</th><th>الامتحان</th><th>الدرجة</th><th>النسبة</th></tr></thead>
+            <tbody id="rows"></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+  </div>
+</div>
+
+<div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+<script>
+  'use strict';
+  let PIN = '';
+  let SET = null;
+  let ROWS = [];
+
+  const $ = id => document.getElementById(id);
+
+  /* ---------- Theme helpers ---------- */
+  function hexToRgb(h) {
+    h = String(h || '').replace('#', '');
+    if (h.length !== 6) return null;
+    const n = parseInt(h, 16);
+    if (isNaN(n)) return null;
+    return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+  }
+  function tintColor(hex, pct) { const c = hexToRgb(hex); if (!c) return ''; const f = pct / 100;
+    return 'rgb(' + Math.round(c.r * f + 255 * (1 - f)) + ',' + Math.round(c.g * f + 255 * (1 - f)) + ',' + Math.round(c.b * f + 255 * (1 - f)) + ')'; }
+  function shadeColor(hex, pct) { const c = hexToRgb(hex); if (!c) return ''; const f = 1 - pct / 100;
+    return 'rgb(' + Math.round(c.r * f) + ',' + Math.round(c.g * f) + ',' + Math.round(c.b * f) + ')'; }
+  function rgbaColor(hex, a) { const c = hexToRgb(hex); if (!c) return '';
+    return 'rgba(' + c.r + ',' + c.g + ',' + c.b + ',' + a + ')'; }
+  function applyTheme(p, a) {
+    const st = document.documentElement.style;
+    if (/^#[0-9a-fA-F]{6}$/.test(p || '')) {
+      st.setProperty('--p', p);
+      [['--p-07', 7], ['--p-08', 8], ['--p-09', 9], ['--p-10', 10], ['--p-12', 12], ['--p-14', 14], ['--p-35', 35], ['--p-40', 40]]
+        .forEach(t => st.setProperty(t[0], tintColor(p, t[1])));
+      st.setProperty('--p-shadow', rgbaColor(p, .3));
+      st.setProperty('--p-glow', rgbaColor(p, .12));
+    }
+    if (/^#[0-9a-fA-F]{6}$/.test(a || '')) {
+      st.setProperty('--a', a);
+      [['--a-07', 7], ['--a-09', 9], ['--a-13', 13], ['--a-16', 16], ['--a-18', 18], ['--a-30', 30], ['--a-40', 40], ['--a-55', 55], ['--a-60', 60]]
+        .forEach(t => st.setProperty(t[0], tintColor(a, t[1])));
+      st.setProperty('--a-deep', shadeColor(a, 35));
+      st.setProperty('--a-ring', rgbaColor(a, .22));
+      st.setProperty('--a-shadow', rgbaColor(a, .35));
+      st.setProperty('--a-glow', rgbaColor(a, .16));
+    }
+  }
+
+  /* ---------- Login ---------- */
+  function serverReady() {
+    return !!(window.google && window.google.script && window.google.script.run);
+  }
+
+  function login() {
+    if (!serverReady()) { $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.'; return; }
+    PIN = $('pin').value.trim();
+    if (!PIN) { $('loginErr').textContent = 'أدخل رمز الدخول.'; return; }
+    $('loginErr').textContent = '';
+    showLoad('جاري التحقق…');
+    google.script.run
+      .withSuccessHandler(function (s) {
+        SET = s;
+        hideLoad();
+        $('login').classList.add('hidden');
+        $('app').classList.remove('hidden');
+        fill(s);
+        loadDash();
+      })
+      .withFailureHandler(function (e) {
+        hideLoad();
+        $('loginErr').textContent = friendly(e);
+        $('pin').select();
+      })
+      .getTeacherSettings(PIN);
+  }
+
+  function logout() {
+    PIN = '';
+    $('pin').value = '';
+    $('app').classList.add('hidden');
+    $('login').classList.remove('hidden');
+    $('pin').focus();
+  }
+
+  document.addEventListener('keydown', function (ev) {
+    if (!$('login').classList.contains('hidden') && ev.key === 'Enter') login();
+  });
+
+  /* ---------- Fill ---------- */
+  function fill(s) {
+    $('teacherName').value = s.teacherName || '';
+    $('subjectName').value = s.subjectName || '';
+    $('gradeName').value = s.gradeName || '';
+    $('academicYear').value = s.academicYear || '';
+    $('appTitleInput').value = s.appTitle || '';
+    $('subtitle').value = s.subtitle || '';
+    $('logoText').value = s.logoText || '';
+    $('welcomeText').value = s.welcomeText || '';
+    $('primaryColor').value = s.primaryColor || '#123B40';
+    $('accentColor').value = s.accentColor || '#C9A86A';
+    $('primaryColorPicker').value = /^#[0-9a-fA-F]{6}$/.test(s.primaryColor) ? s.primaryColor : '#123B40';
+    $('accentColorPicker').value = /^#[0-9a-fA-F]{6}$/.test(s.accentColor) ? s.accentColor : '#C9A86A';
+    $('requirePhone').checked = !!s.requirePhone;
+    $('requirePhoneLabel').textContent = s.requirePhone ? 'مطلوب' : 'غير مطلوب';
+    $('newAdminPin').value = '';
+    $('navTitle').textContent = s.appTitle || 'لوحة تحكم المنصة';
+    $('navLogo').textContent = s.logoText || 'PSY';
+    $('siteLink').href = location.href.split('?')[0];
+    updatePreview();
+  }
+
+  /* ---------- Brand preview ---------- */
+  function updatePreview() {
+    const p = $('primaryColor').value;
+    const a = $('accentColor').value;
+    applyTheme(p, a);
+    $('bpLogo').textContent = $('logoText').value || 'PSY';
+    $('bpTitle').textContent = $('appTitleInput').value || 'اسم المنصة';
+    $('bpSub').textContent = $('subtitle').value || 'العنوان الفرعي';
+  }
+  ['logoText', 'appTitleInput', 'subtitle'].forEach(id => document.addEventListener('input', function (ev) {
+    if (ev.target && ev.target.id === id) updatePreview();
+  }));
+  $('primaryColorPicker').addEventListener('input', function () { $('primaryColor').value = this.value; updatePreview(); });
+  $('accentColorPicker').addEventListener('input', function () { $('accentColor').value = this.value; updatePreview(); });
+  $('primaryColor').addEventListener('input', updatePreview);
+  $('accentColor').addEventListener('input', updatePreview);
+  $('requirePhone').addEventListener('change', function () { $('requirePhoneLabel').textContent = this.checked ? 'مطلوب' : 'غير مطلوب'; });
+
+  /* ---------- Save ---------- */
+  function save() {
+    const btn = $('saveBtn');
+    btn.disabled = true;
+    $('saveStatus').textContent = 'جاري الحفظ…';
+    const payload = {
+      teacherName: $('teacherName').value,
+      subjectName: $('subjectName').value,
+      gradeName: $('gradeName').value,
+      academicYear: $('academicYear').value,
+      appTitle: $('appTitleInput').value,
+      subtitle: $('subtitle').value,
+      logoText: $('logoText').value,
+      welcomeText: $('welcomeText').value,
+      primaryColor: $('primaryColor').value.trim(),
+      accentColor: $('accentColor').value.trim(),
+      requirePhone: $('requirePhone').checked,
+      newAdminPin: $('newAdminPin').value
+    };
+    google.script.run
+      .withSuccessHandler(function (s) {
+        SET = s;
+        btn.disabled = false;
+        $('saveStatus').textContent = '';
+        $('newAdminPin').value = '';
+        fill(s);
+        toast('تم حفظ التعديلات بنجاح.', 'ok');
+      })
+      .withFailureHandler(function (e) {
+        btn.disabled = false;
+        $('saveStatus').textContent = '';
+        toast(friendly(e), 'err');
+      })
+      .saveTeacherSettings(PIN, payload);
+  }
+
+  /* ---------- Dashboard ---------- */
+  function loadDash() {
+    showLoad('جاري تحميل النتائج…');
+    google.script.run
+      .withSuccessHandler(function (d) {
+        hideLoad();
+        ROWS = d.rows || [];
+        const st = d.stats || {};
+        $('sheetLink').href = d.link || '#';
+        renderStats(st);
+        renderRecent();
+        renderAll();
+      })
+      .withFailureHandler(function (e) {
+        hideLoad();
+        toast(friendly(e), 'err');
+      })
+      .getDashboardData(PIN);
+  }
+
+  function renderStats(st) {
+    const icons = {
+      c1: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9.5" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.9M16 3.1a4 4 0 0 1 0 7.8"/></svg>',
+      c2: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>',
+      c3: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18"/><path d="M7 14l3-4 3 3 4-6"/></svg>',
+      c4: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.9 6.3 6.9.8-5.1 4.7 1.4 6.8L12 17.3 5.9 20.6l1.4-6.8L2.2 9.1l6.9-.8z"/></svg>'
+    };
+    $('stats').innerHTML =
+      '<div class="stat c1"><div class="s-icon">' + icons.c1 + '</div><b>' + st.students + '</b><span>طالب مختلف</span></div>' +
+      '<div class="stat c2"><div class="s-icon">' + icons.c2 + '</div><b>' + st.attempts + '</b><span>محاولة مسجلة</span></div>' +
+      '<div class="stat c3"><div class="s-icon">' + icons.c3 + '</div><b>' + st.avg + '%</b><span>متوسط النسبة</span></div>' +
+      '<div class="stat c4"><div class="s-icon">' + icons.c4 + '</div><b>' + st.max + '%</b><span>أعلى نسبة</span></div>';
+  }
+
+  function renderRecent() {
+    const rows = ROWS.slice(0, 8);
+    $('recentRows').innerHTML = rows.length
+      ? rows.map(rowHtml).join('')
+      : '<tr><td colspan="7"><div class="empty">لا توجد نتائج بعد.</div></td></tr>';
+  }
+
+  function renderAll() {
+    const filtered = filteredRows();
+    $('resultsCount').textContent = 'إجمالي المحاولات المعروضة: ' + filtered.length + (ROWS.length > 500 ? ' (أحدث 500)' : '');
+    $('rows').innerHTML = filtered.length
+      ? filtered.map(rowHtml).join('')
+      : '<tr><td colspan="8"><div class="empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-4.3-4.3M17 11a6 6 0 1 1-12 0 6 6 0 0 1 12 0z"/></svg><br>لا توجد نتائج مطابقة.</div></td></tr>';
+  }
+
+  function rowHtml(r) {
+    const pctClass = r.percentage >= 75 ? 'hi' : r.percentage >= 50 ? 'mid' : 'low';
+    const unitLabel = r.unit && /^\d+$/.test(r.unit) ? 'وحدة ' + r.unit : r.unit;
+    const typeLabel = r.type === 'comprehensive' ? 'شامل' : r.type === 'topic' ? 'موضوع' : r.type;
+    return '<tr>' +
+      '<td>' + esc(r.date) + '</td>' +
+      '<td>' + esc(r.name) + '</td>' +
+      '<td dir="ltr" style="text-align:right">' + esc(r.phone) + '</td>' +
+      '<td>' + esc(unitLabel) + '</td>' +
+      '<td>' + esc(typeLabel) + '</td>' +
+      '<td>' + esc(r.exam) + '</td>' +
+      '<td class="score-cell">' + r.score + ' / ' + r.total + '</td>' +
+      '<td><span class="pct-pill ' + pctClass + '">' + r.percentage + '%</span></td>' +
+      '</tr>';
+  }
+
+  function filteredRows() {
+    const q = $('filterSearch').value.trim().toLowerCase();
+    const type = $('filterType').value;
+    const unit = $('filterUnit').value;
+    return ROWS.filter(function (r) {
+      if (type && (type === 'topic' ? r.type === 'comprehensive' : r.type !== 'comprehensive')) return false;
+      if (unit && String(r.unit) !== String(unit)) return false;
+      if (q) {
+        const hay = (r.name + ' ' + r.phone + ' ' + r.exam + ' ' + r.unit).toLowerCase();
+        if (hay.indexOf(q) === -1) return false;
+      }
+      return true;
+    });
+  }
+
+  function applyFilters() { renderAll(); }
+
+  /* ---------- CSV export ---------- */
+  function exportCsv() {
+    const rows = filteredRows();
+    if (!rows.length) { toast('لا توجد نتائج للتصدير.', 'err'); return; }
+    const header = ['التاريخ', 'الطالب', 'الهاتف', 'الوحدة', 'النوع', 'الامتحان', 'الدرجة', 'النسبة'];
+    const lines = [header.join(',')];
+    rows.forEach(function (r) {
+      lines.push([
+        '"' + (r.date || '') + '"',
+        '"' + (r.name || '') + '"',
+        '"' + (r.phone || '') + '"',
+        '"' + (r.unit || '') + '"',
+        '"' + (r.type || '') + '"',
+        '"' + (r.exam || '') + '"',
+        r.score + '/' + r.total,
+        r.percentage + '%'
+      ].join(','));
+    });
+    const blob = new Blob(['\uFEFF' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8;' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = 'النتائج.csv';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(function () { URL.revokeObjectURL(a.href); }, 1500);
+  }
+
+  /* ---------- Tabs ---------- */
+  function showTab(name) {
+    ['overview', 'settings', 'results'].forEach(function (t) {
+      $('panel-' + t).classList.toggle('hidden', t !== name);
+      $('tab-' + t).classList.toggle('active', t === name);
+    });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  /* ---------- Helpers ---------- */
+  function showLoad(t) { $('loadText').textContent = t || 'جاري التحميل…'; $('loading').classList.remove('hidden'); }
+  function hideLoad() { $('loading').classList.add('hidden'); }
+
+  let toastTimer = null;
+  function toast(msg, kind) {
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show ' + (kind || '');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function () { t.classList.remove('show'); }, 3400);
+  }
+
+  function friendly(e) {
+    const m = (e && e.message) ? String(e.message) : '';
+    if (/[\u0600-\u06FF]/.test(m)) return m;
+    return 'حدث خطأ غير متوقع. حاول مرة أخرى.';
+  }
+
+  function esc(s) {
+    return String(s == null ? '' : s).replace(/[&<>"']/g, function (m) {
+      return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+    });
+  }
+
+  window.addEventListener('load', function () {
+    $('pin').focus();
+    if (!serverReady()) $('loginErr').textContent = 'تعذر الاتصال بالخادم. افتح اللوحة من رابط التطبيق المنشور.';
+  });
+</script>
+</body>
+</html>
