@@ -8,13 +8,20 @@
  * الاستخدام: node tools/ui-qa.mjs [http://127.0.0.1:8787]
  * (يحتاج تشغيل `wrangler dev` مسبقًا، و jsdom مثبتًا في /tmp/qa)
  */
-import { JSDOM } from '/tmp/qa/node_modules/jsdom/lib/api.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+// jsdom: من devDependencies في cloudflare/ (npm install) أو من /tmp/qa كبديل قديم
+const JSDOM_CANDIDATES = [
+  path.join(ROOT, 'cloudflare', 'node_modules', 'jsdom', 'lib', 'api.js'),
+  '/tmp/qa/node_modules/jsdom/lib/api.js'
+];
+const jsdomPath = JSDOM_CANDIDATES.find(p => fs.existsSync(p));
+if (!jsdomPath) { console.error('jsdom غير مثبت — شغّل: cd cloudflare && npm install'); process.exit(2); }
+const { JSDOM } = await import(pathToFileURL(jsdomPath).href);
 const PUB = path.join(ROOT, 'cloudflare', 'public');
 const BASE = process.argv[2] || 'http://127.0.0.1:8787';
 

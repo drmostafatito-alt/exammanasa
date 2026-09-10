@@ -13,6 +13,7 @@
     "qa": "node ../tools/ui-qa.mjs"
   },
   "devDependencies": {
+    "jsdom": "^26.1.0",
     "wrangler": "^4.0.0"
   }
 }

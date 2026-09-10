@@ -42,6 +42,9 @@ function json(data, status = 200, headers = {}) {
   });
 }
 const fail = (message, status = 400) => json({ error: message }, status);
+/* Errors that are safe to show to the client (Arabic, no internals). Anything else → generic. */
+class ApiError extends Error { constructor(message, status = 400) { super(message); this.status = status; } }
+const bad = (message, status = 400) => new ApiError(message, status);
 
 /* ---- phone normalization (Egyptian mobiles; server-side identity) ----
  * Accepts Arabic-Indic/Persian digits, spaces/dashes, +20/0020 prefixes.
@@ -104,8 +107,7 @@ async function pbkdf2(password, salt, iterations = 120000) {
 const randomHex = (n = 16) => hex(crypto.getRandomValues(new Uint8Array(n)));
 
 /* ---- exam session token: payload.HMAC ---- */
-function makeToken(payload, secret) { return b64url(JSON.stringify(payload)) + '.' + b64url(String.fromCharCode(...new Uint8Array(32))).slice(0, 0); }
-// (token = base64url(payload) + '.' + base64url(hmac))
+// token = base64url(payload) + '.' + base64url(hmac)
 async function signToken(payload, secret) {
   const body = b64url(JSON.stringify(payload));
   const sig = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, body))));
@@ -143,7 +145,7 @@ const DEFAULT_TEACHERS = [{
 }];
 
 async function kvGet(env, key) {
-  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
   const v = await env.PLATFORM_KV.get(key);
   return v === null ? null : v;
 }
@@ -153,7 +155,7 @@ async function kvGetJson(env, key) {
   try { return JSON.parse(v); } catch { return null; }
 }
 async function kvPut(env, key, value, ttlSeconds) {
-  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
   const opts = ttlSeconds ? { expirationTtl: Math.max(60, ttlSeconds) } : undefined;
   await env.PLATFORM_KV.put(key, value, opts);
 }
@@ -176,8 +178,11 @@ async function getSessionSecret(env) {
 /* ============================ request parsing ============================ */
 async function readJson(request, maxBytes = 128 * 1024) {
   const buf = await request.arrayBuffer();
-  if (buf.byteLength > maxBytes) throw new Error('حجم الطلب كبير جدًا.');
-  try { return JSON.parse(new TextDecoder().decode(buf)); } catch { throw new Error('بيانات غير صالحة.'); }
+  if (buf.byteLength > maxBytes) throw bad('حجم الطلب كبير جدًا.', 413);
+  let data;
+  try { data = JSON.parse(new TextDecoder().decode(buf)); } catch { throw bad('بيانات غير صالحة.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw bad('بيانات غير صالحة.');
+  return data;
 }
 
 /* ============================ public API ============================ */
@@ -671,7 +676,7 @@ async function handleAdmin(request, env, ctx, pathname) {
 
 function sanitizeTeacher(body, existing) {
   const name = String(body.name || '').trim();
-  if (!name || name.length > 80) throw new Error('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
+  if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
   if (!slug && body.name) {
@@ -679,23 +684,23 @@ function sanitizeTeacher(body, existing) {
     // Arabic names produce no latin slug — fall back to a short random one
     if (!/^[a-z0-9-]{2,30}$/.test(slug)) slug = 't' + randomHex(4);
   }
-  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw new Error('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
-  if (RESERVED_SLUGS.has(slug)) throw new Error('هذا الرابط محجوز.');
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw bad('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
+  if (RESERVED_SLUGS.has(slug)) throw bad('هذا الرابط محجوز.');
   const social = {};
   for (const k of ['whatsapp', 'facebook', 'tiktok']) {
     const v = String(body.socialLinks?.[k] || '').trim();
-    if (v && !/^https?:\/\//i.test(v)) throw new Error('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+    if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
     social[k] = v;
   }
   let phone = String(body.phone || '').trim();
   if (phone) {
     const np = normalizePhone(phone);
     phone = isValidEgMobile(np) ? np : phone.replace(/[\s\-.()]/g, '');
-    if (!/^[0-9+]{4,25}$/.test(phone)) throw new Error('رقم هاتف المعلم غير صالح.');
+    if (!/^[0-9+]{4,25}$/.test(phone)) throw bad('رقم هاتف المعلم غير صالح.');
   }
   let photo = String(body.photo || existing?.photo || '');
-  if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw new Error('صورة غير صالحة.');
-  if (photo && photo.length > 2.5 * 1024 * 1024) throw new Error('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
+  if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
+  if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
   // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
   // أي قيم colors قادمة من الطلب تُتجاهل ولا تُخزَّن.
   return {
@@ -775,8 +780,9 @@ export default {
         try {
           return securityHeaders(await handleApi(request, env, ctx, pathname));
         } catch (e) {
-          const msg = e && e.message ? e.message : 'خطأ غير متوقع.';
-          return securityHeaders(fail(msg, 400));
+          // Only ApiError messages reach the client; anything else is an internal fault → generic text, no details.
+          if (e instanceof ApiError) return securityHeaders(fail(e.message, e.status));
+          return securityHeaders(fail('خطأ غير متوقع في الخادم. حاول مرة أخرى.', 500));
         }
       }
 
