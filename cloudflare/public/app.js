@@ -1,4 +1,4 @@
-/* منصة الامتحانات — د. مصطفى تيتو — تطبيق الطالب (SPA خفيف بدون أي أطر)
+/* منصة الامتحانات — تطبيق الطالب (SPA خفيف بدون أي أطر)
  * وضع فاتح فقط (أزرق + ذهبي) — لا مفاتيح إجابة في هذا الملف: التصحيح يتم على
  * الخادم فقط، وترتيب الخيارات يُخلط على الخادم لكل جلسة.
  * المسار: الرئيسية ← بيانات الطالب ← الصف ← المادة/الترم ← الوحدة ← الموضوع ← الامتحان ← النتيجة */
@@ -89,19 +89,22 @@
 
   function renderBrand() {
     var t = S.teacher;
-    document.title = t ? (t.name + ' — منصة الامتحانات') : 'منصة الامتحانات — د. مصطفى تيتو';
+    // الهوية ديناميكية بالكامل من بيانات المعلم الحالي — الغلاف الثابت محايد
+    // (لا اسم معلم ثابت في title/meta/الهوية/footer إطلاقًا)
+    document.title = t ? (t.name + ' — منصة الامتحانات') : 'منصة الامتحانات';
+    var metaDesc = document.querySelector('meta[name="description"]');
+    if (metaDesc) metaDesc.setAttribute('content', t
+      ? (t.name + ' — منصة الامتحانات الإلكترونية: اختبر نفسك وقيّم مستواك في الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي.')
+      : 'منصة الامتحانات الإلكترونية — اختبر نفسك وقيّم مستواك في الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: امتحانات منظمة حسب الوحدات والموضوعات، درجتك فورًا، ومراجعة كاملة لإجاباتك.');
     $('brandName').textContent = t ? t.name : 'منصة الامتحانات';
     $('brandSub').textContent = t ? (t.specialty || 'اختبارات المنهج الرسمي') : 'الفلسفة والمنطق · علم النفس';
     var logo = $('brandLogo');
     if (t && t.photo) logo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
-    else logo.textContent = monogramOf(t ? t.name : 'م ت');
-    // ألوان المعلم (من الإعدادات الفعلية) فوق الهوية الزرقاء/الذهبية الافتراضية
-    if (t && t.colors && /^#[0-9a-fA-F]{6}$/.test(t.colors.primary || '')) {
-      document.documentElement.style.setProperty('--primary', t.colors.primary);
-    }
-    if (t && t.colors && /^#[0-9a-fA-F]{6}$/.test(t.colors.accent || '')) {
-      document.documentElement.style.setProperty('--gold', t.colors.accent);
-    }
+    else logo.textContent = monogramOf(t ? t.name : 'منصة الامتحانات');
+    var footBrand = document.getElementById('footBrand');
+    if (footBrand) footBrand.innerHTML = t
+      ? ('منصة الامتحانات الإلكترونية — <b>' + esc(t.name) + '</b>')
+      : 'منصة الامتحانات الإلكترونية';
     // أيقونات التواصل في الشريط العلوي — روابط فعلية فقط (لا أيقونات وهمية)
     var links = socialLinksOf(t);
     $('topSocials').innerHTML = links.map(function (l) {

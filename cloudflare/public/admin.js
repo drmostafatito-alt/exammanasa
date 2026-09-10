@@ -222,7 +222,7 @@
   function editTeacher(id) {
     var t = id ? A.teachers.filter(function (x) { return x.id === id; })[0] : null;
     var isNew = !t;
-    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, colors: { primary: '#0E7A5F', accent: '#C99A2E' }, requirePhone: true, enabled: true };
+    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, requirePhone: true, enabled: true };
     var overlay = document.createElement('div');
     overlay.className = 'modal-bg';
     overlay.innerHTML =
@@ -238,9 +238,6 @@
       '<input id="tWhats" placeholder="واتساب https://…" dir="ltr" value="' + esc(t.socialLinks.whatsapp || '') + '" style="margin-bottom:6px">' +
       '<input id="tFb" placeholder="فيسبوك https://…" dir="ltr" value="' + esc(t.socialLinks.facebook || '') + '" style="margin-bottom:6px">' +
       '<input id="tTt" placeholder="تيك توك https://…" dir="ltr" value="' + esc(t.socialLinks.tiktok || '') + '"></div>' +
-      '<div class="field"><label>الألوان</label><div style="display:flex;gap:12px">' +
-      '<span>أساسي <input type="color" id="tPrimary" value="' + esc(t.colors.primary) + '"></span>' +
-      '<span>مميز <input type="color" id="tAccent" value="' + esc(t.colors.accent) + '"></span></div></div>' +
       '<div class="field"><label>الصورة</label><input type="file" id="tPhoto" accept="image/*">' +
       '<div id="tPhotoPrev" style="margin-top:8px">' + (t.photo ? '<img src="' + esc(t.photo) + '" style="width:64px;height:64px;border-radius:12px;object-fit:cover">' : '') + '</div></div>' +
       '<div style="display:flex;gap:18px;align-items:center;margin:10px 0">' +
@@ -285,7 +282,6 @@
       specialty: $('tSpecialty').value.trim(),
       bio: $('tBio').value.trim(),
       socialLinks: { whatsapp: $('tWhats').value.trim(), facebook: $('tFb').value.trim(), tiktok: $('tTt').value.trim() },
-      colors: { primary: $('tPrimary').value, accent: $('tAccent').value },
       photo: A.pendingPhoto || undefined,
       requirePhone: $('tReqPhone').checked,
       enabled: $('tEnabled').checked
