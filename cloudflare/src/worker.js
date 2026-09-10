@@ -116,7 +116,6 @@ const DEFAULT_TEACHERS = [{
   bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: اختبر نفسك، اعرف درجتك فورًا، وراجع إجاباتك بعد كل امتحان.',
   photo: '',
   socialLinks: { whatsapp: '', facebook: '', tiktok: '' },
-  colors: { primary: '#1E56C8', accent: '#C99A2E' },
   requirePhone: true,
   enabled: true,
   isDefault: true,
@@ -176,7 +175,7 @@ async function publicCatalog(env) {
 function teacherPublic(t) {
   return {
     slug: t.slug, name: t.name, specialty: t.specialty || '', bio: t.bio || '', photo: t.photo || '',
-    socialLinks: t.socialLinks || {}, colors: t.colors || {},
+    socialLinks: t.socialLinks || {},
     requirePhone: !!t.requirePhone
   };
 }
@@ -611,17 +610,14 @@ function sanitizeTeacher(body, existing) {
   let photo = String(body.photo || existing?.photo || '');
   if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw new Error('صورة غير صالحة.');
   if (photo && photo.length > 2.5 * 1024 * 1024) throw new Error('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
-  const colors = {
-    primary: /^#[0-9a-fA-F]{6}$/.test(body.colors?.primary || '') ? body.colors.primary : (existing?.colors?.primary || '#123B40'),
-    accent: /^#[0-9a-fA-F]{6}$/.test(body.colors?.accent || '') ? body.colors.accent : (existing?.colors?.accent || '#C9A86A')
-  };
+  // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
+  // أي قيم colors قادمة من الطلب تُتجاهل ولا تُخزَّن.
   return {
     slug, name, phone,
     specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
     bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
     socialLinks: social,
-    colors,
     requirePhone: body.requirePhone !== false,
     enabled: body.enabled !== false
   };
