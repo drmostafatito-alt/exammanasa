@@ -408,20 +408,31 @@
     var first = S.exams[lesson.examIds[0]];
     if (!first) return '';
     var isTraining = first.type === 'training' || !!first.training;
-    var meta = (isTraining ? 'امتحان تدريبي' : 'امتحان الموضوع') + ' · ' + first.count + ' سؤالًا · اختيار من متعدد' +
-      (lesson.examIds.length > 1 ? ' · ' + lesson.examIds.length + ' نماذج' : '');
-    var variants = '';
+    var meta = (isTraining ? 'امتحان تدريبي' : 'امتحان الموضوع') + ' · اختيار من متعدد' +
+      (lesson.examIds.length > 1 ? ' · ' + lesson.examIds.length + ' نماذج مستقلة' : '');
+    /* نماذج الامتحان — خيارات امتحانات مستقلة واضحة (كل نموذج امتحان كامل بذاته) */
+    var models = '';
     if (lesson.examIds.length > 1) {
-      variants = '<div class="variants">' + lesson.examIds.map(function (eid, i) {
-        return '<span class="variant-chip" onclick="event.stopPropagation();go(\'#/e/' + eid + '\')">نموذج ' + (i + 1) + '</span>';
-      }).join('') + '</div>';
+      models = '<div class="models" onclick="event.stopPropagation()">' +
+        '<div class="models-label">الامتحانات المتاحة</div>' +
+        '<div class="models-grid">' +
+        lesson.examIds.map(function (eid, i) {
+          var e = S.exams[eid];
+          if (!e) return '';
+          var mMeta = (e.type === 'training' || e.training ? 'امتحان تدريبي · ' : '') + e.count + ' سؤالًا';
+          return '<button type="button" class="model-btn" onclick="go(\'#/e/' + eid + '\')">' +
+            '<span class="m-top"><span class="m-name">نموذج ' + (i + 1) + '</span><span class="m-arrow" aria-hidden="true">‹</span></span>' +
+            '<span class="m-meta">' + esc(mMeta) + '</span>' +
+            '</button>';
+        }).join('') +
+        '</div></div>';
     }
     return '<div class="lesson" onclick="go(\'#/e/' + lesson.examIds[0] + '\')" role="button" tabindex="0">' +
       '<div class="lno"><span>الموضوع</span><b>' + lesson.no + '</b></div>' +
       '<div class="linfo">' +
       '<div class="lt">' + esc(lesson.title) + '</div>' +
-      '<div class="ls"><span>' + esc(meta) + '</span>' + difficultyBadge(first) + '</div>' +
-      variants +
+      '<div class="ls"><span>' + esc(meta) + '</span>' + (lesson.examIds.length > 1 ? '' : difficultyBadge(first)) + '</div>' +
+      models +
       '</div>' +
       '<span class="lgo" aria-hidden="true">‹</span>' +
       '</div>';
@@ -782,6 +793,8 @@
   /* ---------------- التصدير ---------------- */
   window.go = go;
   window.S = S;
+  window.renderBrand = renderBrand;
+  window.renderHome = renderHome;
   window.navTo = navTo;
   window.scrollToSubjects = scrollToSubjects;
   window.startWithGrade = startWithGrade;

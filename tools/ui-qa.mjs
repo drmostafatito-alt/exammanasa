@@ -186,6 +186,64 @@ console.log('\n[4] المسار الكامل بالنقرات الحقيقية �
   harvestClasses(doc);
 }
 
+console.log('\n[4ب] نماذج الامتحان — ظهور واضح ومسار مستقل لكل نموذج');
+{
+  const W = dom.window;
+  W.location.hash = '#/s/philosophy/1';
+  await sleep(300);
+  // الدرس ذات 4 نماذج من الفهرس
+  const t1 = catalog.catalog.philosophy.terms[0];
+  let multi = null;
+  t1.units.forEach(u => u.chapters.forEach(ch => ch.lessons.forEach(l => { if (!multi && l.examIds.length >= 4) multi = l; })));
+  ok('يوجد درس متعدد النماذج في الفهرس (' + multi.examIds.length + ' نماذج)', !!multi && multi.examIds.length === 4);
+  const row = [...doc.querySelectorAll('.lesson:not(.comp)')].find(r => r.querySelector('.lt').textContent === multi.title);
+  ok('صف الموضوع يعرض منطقة «الامتحانات المتاحة» مجمّعة وواضحة', !!row && !!row.querySelector('.models') && row.querySelector('.models-label').textContent.includes('الامتحانات المتاحة'));
+  const btns = row ? row.querySelectorAll('.model-btn') : [];
+  ok('كل نموذج زر امتحان مستقل بارز (' + btns.length + ' أزرار — ليست رقائق صغيرة)', btns.length === multi.examIds.length && !doc.querySelector('.variant-chip'));
+  const countsOk = [...btns].every((b, i) =>
+    b.querySelector('.m-name').textContent.trim() === 'نموذج ' + (i + 1) &&
+    b.querySelector('.m-meta').textContent.includes(catalog.exams[multi.examIds[i]].count + ' سؤالًا'));
+  ok('كل زر يعرض «نموذج N» + عدد الأسئلة الفعلي من البيانات («امتحان تدريبي · 20 سؤالًا»)', countsOk);
+  ok('حجم لمس مريح (min-height ≥ 48px) وحالة hover/active في CSS',
+    /\.model-btn\s*{[^}]*min-height:\s*(4[8-9]|[5-9]\d)px/.test(css) && /\.model-btn:hover/.test(css) && /\.model-btn:active/.test(css));
+  // المسار: النقر على «نموذج 2» يفتح الامتحان الثاني تحديدًا
+  const model2 = btns[1];
+  model2.click();
+  await sleep(300);
+  const eid2 = multi.examIds[1];
+  ok('«نموذج 2» يفتح الامتحان الصحيح (#/e/' + eid2 + ')', W.location.hash === '#/e/' + eid2);
+  ok('عنوان الامتحان الصحيح للنموذج 2', doc.querySelector('.exam-head h2').textContent === catalog.exams[eid2].title);
+  // بدء نموذج 2 فعليًا وتسليمه — التحقق من الأسئلة والتصحيح
+  doc.getElementById('startBtn').click();
+  await sleep(450);
+  ok('جلسة النموذج 2: معرف الامتحان الصحيح وعدد الأسئلة الصحيح',
+    W.S.session.exam.id === eid2 && W.S.session.questions.length === catalog.exams[eid2].count);
+  ok('مفتاح الإجابة غير مكشوف قبل التسليم (حقول السؤال: نص/خيارات فقط)',
+    W.S.session.questions.every(q => JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['id', 'no', 'options', 'text'])));
+  const total = W.S.session.questions.length;
+  for (let i = 0; i < total; i++) { W.jumpQ(i); await sleep(8); doc.querySelectorAll('.opt')[i % 4].click(); await sleep(8); }
+  W.jumpQ(total - 1); await sleep(30);
+  clickBtn(doc, 'مراجعة وتسليم');
+  await sleep(150);
+  doc.getElementById('submitBtn').click();
+  await sleep(500);
+  const r = W.S.result;
+  ok('تسليم النموذج 2 ينقل للنتيجة ويحفظها', W.location.hash === '#/result' && !!r && r.total === total);
+  ok('التصحيح متسق ذاتيًا: isCorrect ≡ (إجابتك = الإجابة الصحيحة) لكل سؤال',
+    r.review.every(q => q.isCorrect === (q.studentAnswerText === q.correctAnswerText)));
+  ok('النسبة المئوية صحيحة حسابيًا وصحيح+خطأ = المجموع',
+    r.percentage === Math.round(r.score / r.total * 100) && r.correct + r.wrong === r.total && r.score === r.correct);
+  // «نموذج 4» يمتد أيضًا للامتحان الصحيح (لا توجيه كل النماذج لنفس الامتحان)
+  W.location.hash = '#/s/philosophy/1';
+  await sleep(300);
+  const row2 = [...doc.querySelectorAll('.lesson:not(.comp)')].find(x => x.querySelector('.lt').textContent === multi.title);
+  row2.querySelectorAll('.model-btn')[3].click();
+  await sleep(300);
+  ok('«نموذج 4» يفتح امتحانًا مختلفًا عن النموذج 2 (#/e/' + multi.examIds[3] + ')',
+    W.location.hash === '#/e/' + multi.examIds[3] && multi.examIds[3] !== eid2);
+  harvestClasses(doc);
+}
+
 console.log('\n[5] قاعدة منع التسليم الناقص — تحديد الأسئلة بدقة');
 {
   // جلسة جديدة عبر النقر على امتحان المنطق ت2
@@ -243,7 +301,7 @@ console.log('\n[6] الفلسفة والمنطق — ترم ← وحدة ← ف�
   const l0 = t2.units[1].chapters[0].lessons[0];
   const row = [...doc.querySelectorAll('.lesson:not(.comp)')].find(r2 => r2.querySelector('.lt').textContent === l0.title);
   ok('«الموضوع ' + l0.no + '» + الدرس حرفيًا: ' + l0.title, !!row && row.querySelector('.lno b').textContent === String(l0.no));
-  ok('نماذج متعددة تظهر كرقائق (نموذج 1/2/3)', /نموذج \d/.test(html));
+  ok('نماذج الامتحانات المتعددة تظهر كأزرار مستقلة داخل صف الموضوع', doc.querySelectorAll('.model-btn').length >= 3 && html.includes('الامتحانات المتاحة'));
   ok('شوامل الوحدات بشارة ⭐ «امتحان شامل» مميزة', doc.querySelectorAll('.lesson.comp').length >= 2 && html.includes('⭐ امتحان شامل'));
   ok('الامتحان الشامل للترم — 40 سؤالًا (فلسفة + منطق)', /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا'));
   // ت1
@@ -264,7 +322,7 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
    'fi f1', 'fi f2', 'fi f3', 'about-card', 'abody', 'specialty', 'bio', 'social-row', 'social-big', 'grade-pick', 'mainnav', 'socials',
    'nchip answered current', 'opt selected', 'rv-item', 'rq correct', 'rq wrong', 'ans mine wrong', 'ans correct', 'score-ring pass',
    'score-ring fail', 'tab active', 'badge green', 'badge gold', 'badge red', 'toast err', 'progressbar', 'navstrip', 'qcard', 'qtext',
-   'qn', 'opts', 'letter', 'txt', 'quiz-actions', 'rules-card', 'res-badges', 'review-filters', 'meta-row', 'variants', 'variant-chip',
+   'qn', 'opts', 'letter', 'txt', 'quiz-actions', 'rules-card', 'res-badges', 'review-filters', 'meta-row', 'models', 'models-label', 'models-grid', 'model-btn', 'm-top', 'm-name', 'm-arrow', 'm-meta',
    'exam-list', 'rv-note warn', 'rv-note ok', 'empty', 'spin', 'modal-bg', 'modal', 'gsub', 'bname', 'brand-txt', 'foot-brand', 'foot-sub', 'foot-copy'
   ].forEach(c => c.split(' ').forEach(x => used.add(x)));
   const missing = [...used].filter(c => !new RegExp('\\.' + c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([\\s,{:.])').test(css));
@@ -285,6 +343,45 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
   ok('خط الطالب خفيف (لا أطر/مكتبات)', !/react|vue|angular|jquery/i.test(appJs));
   ok('لا صور ثقيلة/فيديو/مكتبات وسائط في الحزمة', !/background-video|<video|\.mp4/i.test(indexHtml + appJs + css));
   ok('لا طلبات دورية/استقصاء في كود الطالب', !/setInterval/.test(appJs));
+}
+
+console.log('\n[7ب] الأمان — حماية المسارات والتوكنات');
+{
+  const adminNoAuth = await fetch(new URL('/api/admin/overview', BASE)).catch(() => null);
+  ok('مسارات الإدارة ترفض الوصول بدون جلسة (401)', !!adminNoAuth && adminNoAuth.status === 401);
+  const forged = await fetch(new URL('/api/exam/submit', BASE), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token: 'forged.token.here', answers: [0] })
+  });
+  ok('التوكن المزوَّر/العبث مرفوض (403)', forged.status === 403);
+  ok('لا كلمات مرور ولا مفاتيح في كود الواجهة العام (app.js)',
+    !/password\s*[:=]\s*['"][^'"]{4,}['"]/i.test(appJs) && !/secret\s*[:=]\s*['"][^'"]{8,}['"]/i.test(appJs) &&
+    !/"answer"\s*:/.test(appJs));
+}
+
+console.log('\n[7ج] ملف المعلم — التواصل يظهر عند وجود روابط فعلية فقط');
+{
+  const W = dom.window;
+  const saved = W.S.teacher;
+  const fakeLinks = { whatsapp: 'https://wa.me/201000000000', facebook: 'https://facebook.com/exammanasa', tiktok: 'https://tiktok.com/@exammanasa' };
+  W.S.teacher = Object.assign({}, saved, { socialLinks: fakeLinks });
+  W.renderBrand();
+  W.location.hash = '#/';
+  await sleep(300);
+  const icons = [...doc.querySelectorAll('#topSocials a')];
+  ok('عند إعداد روابط فعلية: أيقونات الهيدر الثلاث تظهر بروابطها الصحيحة',
+    icons.length === 3 && icons.every(a => Object.values(fakeLinks).includes(a.href)));
+  ok('وزر «تواصل معنا» يظهر في التنقل + قسم تواصل بثلاث بطاقات',
+    !doc.getElementById('navContact').hidden && !!doc.getElementById('contact') && doc.querySelectorAll('.social-big a').length === 3);
+  ok('زر واتساب في الواجهة الرئيسية يشير للرابط الفعلي',
+    !!doc.querySelector('.hero .btn.wa') && doc.querySelector('.hero .btn.wa').href === fakeLinks.whatsapp);
+  // إعادة الحالة الفعلية (لا روابط مُعدّة حاليًا) — إعادة رسم مباشرة
+  W.S.teacher = saved;
+  W.renderBrand();
+  W.renderHome();
+  await sleep(100);
+  ok('بدون روابط مُعدّة: لا أيقونات وهمية إطلاقًا (الحالة الفعلية الآن)',
+    doc.querySelectorAll('#topSocials a').length === 0 && doc.getElementById('navContact').hidden && !doc.getElementById('contact'));
 }
 
 console.log('\n[8] لوحة التحكم');
