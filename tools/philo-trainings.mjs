@@ -52,18 +52,18 @@ const LETTERS = 'ABCD';
 export const OFFICIAL_TOPICS = {
   1: {
     philosophy: [
-      { no: 1, title: 'التفكير الإنساني', trainingIds: ['T1-PH-01', 'T1-PH-02', 'T1-PH-03'] },
-      { no: 2, title: 'الفلسفة وطبيعة الموقف الفلسفي', trainingIds: ['T1-PH-04', 'T1-PH-05', 'T1-PH-06', 'T1-PH-07', 'T1-PH-08'] }
+      { no: 1, title: 'التفكير الإنساني', trainingIds: ['T1-PH-01', 'T1-PH-02', 'T1-PH-03', 'T1-PH-01-T2', 'T1-PH-03-T2', 'T1-PH-RELIGION-01', 'T1-PH-SCIENCE-01'] },
+      { no: 2, title: 'الفلسفة وطبيعة الموقف الفلسفي', trainingIds: ['T1-PH-04', 'T1-PH-05', 'T1-PH-06', 'T1-PH-07', 'T1-PH-08', 'T1-PH-04-T2', 'T1-PH-07-T2', 'T1-PH-08-T2'] }
     ],
     logic: [
-      { no: 1, title: 'مبادئ المنطق (الحدود - القضايا)', trainingIds: ['T1-LG-01', 'T1-LG-02', 'T1-LG-03', 'T1-LG-04', 'T1-LG-05', 'T1-LG-06', 'T1-LG-07', 'T1-LG-08'] },
-      { no: 2, title: 'الاستدلال (تعريفه - أنواعه)', trainingIds: ['T1-LG-09'] }
+      { no: 1, title: 'مبادئ المنطق (الحدود - القضايا)', trainingIds: ['T1-LG-01', 'T1-LG-02', 'T1-LG-03', 'T1-LG-04', 'T1-LG-05', 'T1-LG-06', 'T1-LG-07', 'T1-LG-08', 'T1-LG-03-T2', 'T1-LG-07-T2', 'T1-LG-07-T3', 'T1-LG-08-T2'] },
+      { no: 2, title: 'الاستدلال (تعريفه - أنواعه)', trainingIds: ['T1-LG-09', 'T1-LG-09-T2', 'T1-LG-09-T3'] }
     ]
   },
   2: {
     philosophy: [
       { no: 1, title: 'الفلسفة والأخلاق البيئية والبيوطبية', trainingIds: ['T2-PH-ENV-01', 'T2-PH-ENV-02', 'T2-PH-BIO-01', 'T2-PH-MED-01'] },
-      { no: 2, title: 'الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', trainingIds: ['T2-PH-PRO-01', 'T2-PH-VAL-01', 'T2-PH-VAL-02'] }
+      { no: 2, title: 'الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', trainingIds: ['T2-PH-PRO-01', 'T2-PH-VAL-01', 'T2-PH-VAL-02', 'T2-PH-PRO-T2'] }
     ],
     logic: [
       { no: 1, title: 'الاستقراء وتطبيق المنهج التجريبي', trainingIds: ['T2-LG-IND-01', 'T2-LG-BACON', 'T2-LG-MODERN'] },
@@ -71,6 +71,24 @@ export const OFFICIAL_TOPICS = {
     ]
   }
 };
+
+/* ------------------------------------------------------------------ *
+ * EXPECTED TRAINING SIZES (Phase 2B: trainings are no longer all 20Q)
+ * Default is 20; listed trainings carry appended source-pool questions or
+ * are second/third trainings (T2/T3) and single-lesson trainings (REL-15).
+ * Every size below equals the documented source selection — see
+ * PHASE_2B_FINAL_COVERAGE.md. A training with one quarantined question
+ * (extraction defect) ships at size − 1 and warns instead of failing.
+ * ------------------------------------------------------------------ */
+export const EXPECTED_TRAINING_SIZES = {
+  'T1-LG-02': 27, 'T1-LG-04': 28, 'T1-LG-05': 29, 'T1-LG-06': 33,
+  'T1-PH-01-T2': 29, 'T1-PH-03-T2': 29, 'T1-PH-04-T2': 27, 'T1-PH-07-T2': 34,
+  'T1-PH-08-T2': 33, 'T1-PH-RELIGION-01': 15, 'T1-PH-SCIENCE-01': 20,
+  'T1-LG-03-T2': 27, 'T1-LG-07-T2': 20, 'T1-LG-07-T3': 35, 'T1-LG-08-T2': 22,
+  'T1-LG-09-T2': 20, 'T1-LG-09-T3': 22,
+  'T2-PH-BIO-01': 21, 'T2-LG-MODERN': 58, 'T2-PH-PRO-T2': 20
+};
+export const expectedTrainingSize = (id) => EXPECTED_TRAINING_SIZES[id] ?? 20;
 
 /* Evidence-based key status for a JSON question (never a guess):
  *  - Term 1 carries answer_match_score (1.0 = answer text found verbatim in the
@@ -165,7 +183,7 @@ export function validateTrainingJson(d, term) {
     tids.add(t.training_id);
     if (!['الفلسفة', 'المنطق'].includes(t.subject)) issues.push(t.training_id + ': unknown subject ' + t.subject);
     if (!t.topic || !String(t.topic).trim()) issues.push(t.training_id + ': empty topic');
-    if (!Array.isArray(t.questions) || t.questions.length !== 20) issues.push(t.training_id + ': questions=' + (t.questions || []).length);
+    if (!Array.isArray(t.questions) || t.questions.length !== expectedTrainingSize(t.training_id)) issues.push(t.training_id + ': questions=' + (t.questions || []).length + ' (expected ' + expectedTrainingSize(t.training_id) + ')');
     if (t.exam_question_count !== (t.questions || []).length) issues.push(t.training_id + ': exam_question_count mismatch');
     const seenText = new Set();
     (t.questions || []).forEach((q, i) => {
