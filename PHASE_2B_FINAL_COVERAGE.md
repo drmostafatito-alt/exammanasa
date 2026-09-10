@@ -130,7 +130,7 @@ e0b8f23 Phase 2B-G: offline mode — 72h server TTL, client submit queue… (npm
 | درس دين ت1 (15Q) + درس علم ت1 (20Q، Q50 مستبعدة) | **PASS** |
 | امتحانات ت2 جديدة PH-01/03/04/07/08 (Q23 مستبعدة) | **PASS** |
 | LG-03/07(×2)/08/09 الجديدة | **PASS** (شمل LG-09-T3 — التداخل جزئي) |
-| كل الأسئلة الغائبة الموثقة (PH-08 Q21–54، LG-01 Q21، LG-02 Q21–27، LG-04 Q21–28، LG-05 Q21–30، LG-06 Q21–33، LG-07 Q53/Q56) | **PASS** |
+| كل الأسئلة الغائبة الموثقة (PH-08 Q21–54، LG-01 1–20 من مجمع 24 (لا Q21 في JSON — انظر PHASE_FINAL_PRODUCTION_AUDIT.md §3)، LG-02 Q21–27، LG-04 Q21–28، LG-05 Q21–30، LG-06 Q21–33، LG-07 Q53/Q56) | **PASS** |
 | T2: BIO Q33، PRO-T2 (18+2)، MODERN حرفي، DED-01 TOPUP، DED-02 Q22، AI Q32 | **PASS** |
 | REVIEW/UNRESOLVED غير ظاهرة + Q16 + بلا صعوبة | **PASS** |
 | معلمون (ID/slug/URL/تعديل/تعطيل/عزل/بنك مشترك) | **PASS** |
