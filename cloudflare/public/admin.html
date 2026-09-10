@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#F4F7F9">
+  <meta name="robots" content="noindex, nofollow">
+  <title>لوحة التحكم — منصة الامتحانات</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="topbar">
+    <div class="wrap">
+      <div class="brand">
+        <div class="logo">⚙️</div>
+        <div>
+          <h1>لوحة التحكم</h1>
+          <div class="sub">منصة الامتحانات التعليمية</div>
+        </div>
+      </div>
+      <div class="spacer"></div>
+      <span class="chip" id="adminEmail" style="display:none"></span>
+      <button class="btn ghost small" id="logoutBtn" style="display:none" onclick="logout()">خروج</button>
+    </div>
+  </div>
+
+  <main class="wrap" id="app">
+    <div style="text-align:center;padding:60px 0"><div class="spin"></div></div>
+  </main>
+
+  <script src="/admin.js"></script>
+</body>
+</html>

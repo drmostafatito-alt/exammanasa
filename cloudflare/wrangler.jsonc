@@ -1,0 +1,28 @@
+{
+  // Cloudflare Workers configuration — FREE plan
+  // Deploy guide: see cloudflare/README.md (النشر على Cloudflare مجانًا)
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "exammanasa-platform",
+  "main": "src/worker.js",
+  "compatibility_date": "2025-06-01",
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "not_found_handling": "none"
+  },
+  "kv_namespaces": [
+    {
+      "binding": "PLATFORM_KV",
+      // ⚠️ استبدل هذا بمعرف مساحة KV الحقيقية بعد إنشائها:
+      //   npx wrangler kv namespace create PLATFORM_KV
+      "id": "00000000000000000000000000000000"
+    }
+  ],
+  // Optional secrets (see README):
+  //   npx wrangler secret put SESSION_SECRET
+  //   npx wrangler secret put GAS_WEBAPP_URL
+  //   npx wrangler secret put GAS_RESULTS_SECRET
+  //   npx wrangler secret put ADMIN_INITIAL_EMAIL
+  //   npx wrangler secret put ADMIN_INITIAL_PASSWORD
+  "observability": { "enabled": false }
+}

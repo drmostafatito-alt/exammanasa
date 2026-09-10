@@ -1,0 +1,692 @@
+/**
+ * exammanasa-platform — Cloudflare Worker (Free plan)
+ * ====================================================
+ * الخادم الوحيد للمنصة: يقدّم الواجهات الثابتة، واجهة برمجة التطبيقات للطلاب
+ * (بدون كشف المفاتيح أبدًا قبل التسليم)، لوحة الإدارة (بريد/كلمة مرور)،
+ * إدارة المعلمين متعددي المستأجرين (/slug)، وحفظ النتائج + تمريرها إلى
+ * Google Sheets عبر تطبيق Google Apps Script القائم.
+ *
+ * Security model (mirrors the audited GAS implementation):
+ *  - Grading happens ONLY server-side; correct answers are never sent to the browser.
+ *  - Exam sessions are HMAC-SHA256 signed tokens (examId + seed + student + expiry).
+ *  - Per-question option order is shuffled with a seeded PRNG (mulberry32) — same
+ *    algorithm as Code.gs shuffledOrder_().
+ *  - Submissions require a valid token, are validated for completeness, and are
+ *    de-duplicated (Cache API + KV) to prevent double submission / tampering.
+ *  - Admin auth: PBKDF2-SHA256 (120k iterations) password hash in KV + signed
+ *    HttpOnly SameSite=Strict session cookie + login rate limiting.
+ *  - Answer keys live ONLY inside the Worker bundle (banks.json) and are exposed
+ *    exclusively through authenticated admin endpoints.
+ */
+import BANKS from './data/banks.json';
+
+const SESSION_TTL_SECONDS = 6 * 3600;      // 6 ساعات — مطابق لتطبيق GAS
+const ADMIN_SESSION_TTL = 8 * 3600;
+const RESERVED_SLUGS = new Set([
+  'api', 'admin', 'assets', 'static', 'favicon.ico', 'favicon.svg', 'robots.txt',
+  'index.html', 'admin.html', 'app.js', 'admin.js', 'styles.css', 'index.js',
+  'worker.js', 'wrangler.toml', 'wrangler.jsonc', 'src', 'public', 'docs', 'tests', 'www'
+]);
+
+/* ============================ helpers ============================ */
+const enc = new TextEncoder();
+const hex = (buf) => [...new Uint8Array(buf)].map(b => b.toString(16).padStart(2, '0')).join('');
+const b64url = (str) => btoa(unescape(encodeURIComponent(str))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+const fromB64url = (s) => decodeURIComponent(escape(atob(s.replace(/-/g, '+').replace(/_/g, '/'))));
+
+function json(data, status = 200, headers = {}) {
+  return new Response(JSON.stringify(data), {
+    status,
+    headers: { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store', ...headers }
+  });
+}
+const fail = (message, status = 400) => json({ error: message }, status);
+
+function securityHeaders(res) {
+  const h = new Headers(res.headers);
+  h.set('X-Content-Type-Options', 'nosniff');
+  h.set('X-Frame-Options', 'DENY');
+  h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
+  h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  return new Response(res.body, { status: res.status, headers: h });
+}
+
+/* ---- seeded shuffle — ported verbatim from Code.gs (prng_/shuffledOrder_) ---- */
+function prng(seed) {
+  let a = seed >>> 0;
+  return function () {
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = a;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffledOrder(seed, index) {
+  const rng = prng((seed ^ Math.imul(index + 1, 2654435761)) >>> 0);
+  const arr = [0, 1, 2, 3]; // original option indices
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    const t = arr[i]; arr[i] = arr[j]; arr[j] = t;
+  }
+  return arr; // arr[positionShownToStudent] = originalIndex
+}
+
+/* ---- HMAC / hashing ---- */
+async function hmac(secret, value) {
+  const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.sign('HMAC', key, enc.encode(value));
+}
+async function pbkdf2(password, salt, iterations = 120000) {
+  const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations }, key, 256);
+  return hex(bits);
+}
+const randomHex = (n = 16) => hex(crypto.getRandomValues(new Uint8Array(n)));
+
+/* ---- exam session token: payload.HMAC ---- */
+function makeToken(payload, secret) { return b64url(JSON.stringify(payload)) + '.' + b64url(String.fromCharCode(...new Uint8Array(32))).slice(0, 0); }
+// (token = base64url(payload) + '.' + base64url(hmac))
+async function signToken(payload, secret) {
+  const body = b64url(JSON.stringify(payload));
+  const sig = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, body))));
+  return body + '.' + sig;
+}
+async function verifyToken(token, secret) {
+  if (typeof token !== 'string') return null;
+  const parts = token.split('.');
+  if (parts.length !== 2) return null;
+  const expected = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, parts[0]))));
+  if (expected !== parts[1]) return null; // non-constant-time compare is acceptable here: sig is 256-bit random-keyed
+  try {
+    const payload = JSON.parse(fromB64url(parts[0]));
+    if (!payload || typeof payload !== 'object') return null;
+    if (!payload.exp || Date.now() / 1000 > payload.exp) return null;
+    return payload;
+  } catch { return null; }
+}
+
+/* ============================ storage (KV) ============================ */
+const DEFAULT_TEACHERS = [{
+  id: 't_default_mostafa',
+  slug: 'mostafa',
+  name: 'د. مصطفى تيتو',
+  phone: '',
+  specialty: 'مدرس الفلسفة والمنطق وعلم النفس — المرحلة الثانوية',
+  bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: اختبر نفسك، اعرف درجتك فورًا، وراجع إجاباتك بعد كل امتحان.',
+  photo: '',
+  socialLinks: { whatsapp: '', facebook: '', tiktok: '' },
+  colors: { primary: '#1E56C8', accent: '#C99A2E' },
+  requirePhone: true,
+  enabled: true,
+  isDefault: true,
+  createdAt: '2026-09-09T00:00:00.000Z',
+  updatedAt: '2026-09-09T00:00:00.000Z'
+}];
+
+async function kvGet(env, key) {
+  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  const v = await env.PLATFORM_KV.get(key);
+  return v === null ? null : v;
+}
+async function kvGetJson(env, key) {
+  const v = await kvGet(env, key).catch(() => null);
+  if (v == null) return null;
+  try { return JSON.parse(v); } catch { return null; }
+}
+async function kvPut(env, key, value, ttlSeconds) {
+  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  const opts = ttlSeconds ? { expirationTtl: Math.max(60, ttlSeconds) } : undefined;
+  await env.PLATFORM_KV.put(key, value, opts);
+}
+
+async function getTeachers(env) {
+  const stored = await kvGetJson(env, 'teachers').catch(() => null);
+  if (Array.isArray(stored) && stored.length) return stored;
+  return DEFAULT_TEACHERS;
+}
+async function getSessionSecret(env) {
+  if (env.SESSION_SECRET) return env.SESSION_SECRET;
+  let s = await kvGet(env, 'session_secret').catch(() => null);
+  if (!s) {
+    s = randomHex(32);
+    try { await kvPut(env, 'session_secret', s); } catch { /* KV missing — caller handles */ }
+  }
+  return s;
+}
+
+/* ============================ request parsing ============================ */
+async function readJson(request, maxBytes = 128 * 1024) {
+  const buf = await request.arrayBuffer();
+  if (buf.byteLength > maxBytes) throw new Error('حجم الطلب كبير جدًا.');
+  try { return JSON.parse(new TextDecoder().decode(buf)); } catch { throw new Error('بيانات غير صالحة.'); }
+}
+
+/* ============================ public API ============================ */
+async function publicCatalog(env) {
+  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
+  const owner = teachers.find(t => t.isDefault) || teachers.find(t => t.enabled !== false) || teachers[0] || null;
+  return {
+    version: BANKS.version, generatedAt: BANKS.generatedAt,
+    catalog: BANKS.catalog, exams: BANKS.exams,
+    owner: owner ? teacherPublic(owner) : null
+  };
+}
+
+function teacherPublic(t) {
+  return {
+    slug: t.slug, name: t.name, specialty: t.specialty || '', bio: t.bio || '', photo: t.photo || '',
+    socialLinks: t.socialLinks || {}, colors: t.colors || {},
+    requirePhone: !!t.requirePhone
+  };
+}
+
+async function handleApi(request, env, ctx, pathname) {
+  const method = request.method;
+
+  /* ---------- public: catalog ---------- */
+  if (pathname === '/api/catalog' && method === 'GET') {
+    return json(await publicCatalog(env), 200, { 'Cache-Control': 'public, max-age=300, s-maxage=3600' });
+  }
+
+  /* ---------- public: teacher profile ---------- */
+  const teacherMatch = pathname.match(/^\/api\/teacher\/([a-z0-9-]+)$/);
+  if (teacherMatch && method === 'GET') {
+    const teachers = await getTeachers(env);
+    const t = teachers.find(x => x.slug === teacherMatch[1] && x.enabled !== false);
+    if (!t) return fail('لا يوجد معلم بهذا الرابط.', 404);
+    return json({ teacher: teacherPublic(t) }, 200, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
+  }
+
+  /* ---------- student: start exam session ---------- */
+  if (pathname === '/api/exam/start' && method === 'POST') {
+    const body = await readJson(request);
+    const examId = String(body.examId || '');
+    const examMeta = BANKS.exams[examId];
+    if (!examMeta) return fail('الامتحان غير موجود.', 404);
+    const ids = BANKS.examDefs[examId];
+    if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
+
+    const name = String(body.name || '').trim();
+    const phone = String(body.phone || '').trim();
+    if (!name) return fail('اسم الطالب مطلوب.');
+    if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
+    if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) return fail('رقم الهاتف غير صالح.');
+    if (!phone) {
+      const slug = String(body.slug || '');
+      const teachers = await getTeachers(env);
+      const t = teachers.find(x => x.slug === slug);
+      if (t && t.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    }
+
+    const secret = await getSessionSecret(env).catch(() => null);
+    if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
+
+    const seed = Math.floor(Math.random() * 2147483646) + 1;
+    const nonce = randomHex(12);
+    const token = await signToken({
+      t: 'exam', examId, seed, nonce, name, phone,
+      slug: String(body.slug || ''), iss: Math.floor(Date.now() / 1000),
+      exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
+    }, secret);
+
+    const questions = ids.map((qid, i) => {
+      const q = BANKS.questions[qid];
+      const perm = shuffledOrder(seed, i);
+      return { no: i + 1, id: qid, text: q.text, options: perm.map(origIdx => q.options[origIdx]) };
+    });
+
+    return json({
+      token,
+      exam: {
+        id: examId, title: examMeta.title, count: examMeta.count,
+        lessonTitle: examMeta.lessonTitle, lessonNo: examMeta.lessonNo,
+        chapterTitle: examMeta.chapterTitle, unitTitle: examMeta.unitTitle,
+        subjectId: examMeta.subjectId, term: examMeta.term, type: examMeta.type
+      },
+      questions
+    });
+  }
+
+  /* ---------- student: submit ---------- */
+  if (pathname === '/api/exam/submit' && method === 'POST') {
+    const body = await readJson(request);
+    const token = String(body.token || '');
+    const answers = body.answers;
+    const secret = await getSessionSecret(env).catch(() => null);
+    if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
+    const sess = await verifyToken(token, secret);
+    if (!sess || sess.t !== 'exam') return fail('جلسة الامتحان غير صالحة أو منتهية. أعد فتح الامتحان.', 403);
+    if (!Array.isArray(answers) || answers.length !== BANKS.examDefs[sess.examId].length) {
+      return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
+    }
+    const unanswered = [];
+    answers.forEach((a, i) => { if (!Number.isInteger(a) || a < 0 || a > 3) unanswered.push(i + 1); });
+    if (unanswered.length) {
+      return json({
+        error: 'لا يمكن تسليم الامتحان قبل الإجابة على جميع الأسئلة. أسئلة بدون إجابة: ' + unanswered.join('، '),
+        unanswered
+      }, 400);
+    }
+
+    // dedupe (best-effort across isolates: Cache API + durable KV)
+    const tokenHash = hex(await hmac(secret + '|dedupe', token));
+    const dedupeUrl = 'https://dedupe.internal/' + tokenHash;
+    const cache = caches.default;
+    let replay = null;
+    if (env.PLATFORM_KV) {
+      const prev = await env.PLATFORM_KV.get('dedupe:' + tokenHash).catch(() => null);
+      if (prev) replay = prev;
+    }
+    if (!replay) {
+      const cached = await cache.match(dedupeUrl).catch(() => null);
+      if (cached) replay = await cached.text();
+    }
+    if (replay) {
+      try { return json(JSON.parse(replay), 200); } catch { /* fallthrough */ }
+    }
+
+    // grade — SERVER ONLY
+    const ids = BANKS.examDefs[sess.examId];
+    const examMeta = BANKS.exams[sess.examId];
+    let score = 0;
+    const review = ids.map((qid, i) => {
+      const q = BANKS.questions[qid];
+      const perm = shuffledOrder(sess.seed, i);
+      const correctOrig = 'ABCD'.indexOf(q.answer);
+      const chosenOrig = perm[answers[i]];
+      const isCorrect = chosenOrig === correctOrig;
+      if (isCorrect) score++;
+      return {
+        no: i + 1,
+        id: qid,
+        isCorrect,
+        questionText: q.text,
+        studentAnswerText: q.options[chosenOrig],
+        correctAnswerText: q.options[correctOrig]
+      };
+    });
+    const total = ids.length;
+    const percentage = Math.round((score / total) * 10000) / 100;
+
+    const result = {
+      id: tokenHash.slice(0, 16),
+      date: new Date().toISOString(),
+      name: sess.name, phone: sess.phone,
+      teacherSlug: sess.slug || '',
+      examId: sess.examId, examTitle: examMeta.title,
+      subject: examMeta.subjectId === 'psychology' ? 'علم النفس' : 'الفلسفة والمنطق',
+      term: examMeta.term,
+      unitOrSection: examMeta.unitTitle || '',
+      examType: examMeta.type, examLabel: examMeta.title,
+      total, score, percentage,
+      review
+    };
+
+    const response = {
+      id: result.id,
+      score, total, percentage,
+      correct: score, wrong: total - score,
+      pass: percentage >= 50,
+      review
+    };
+    const responseJson = JSON.stringify(response);
+
+    // persist + forward (best effort — never block the student's result)
+    const persist = async () => {
+      try {
+        if (env.PLATFORM_KV) {
+          await env.PLATFORM_KV.put('dedupe:' + tokenHash, responseJson, { expirationTtl: 7 * 24 * 3600 }).catch(() => {});
+          await env.PLATFORM_KV.put('result:' + result.id, JSON.stringify(result)).catch(() => {});
+          const recent = await env.PLATFORM_KV.get('results:recent').catch(() => null);
+          let list = [];
+          try { list = recent ? JSON.parse(recent) : []; } catch {}
+          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
+          if (list.length > 100) list = list.slice(0, 100);
+          await env.PLATFORM_KV.put('results:recent', JSON.stringify(list)).catch(() => {});
+        }
+      } catch { /* storage failure must not lose the student's result response */ }
+
+      if (env.GAS_WEBAPP_URL && env.GAS_RESULTS_SECRET) {
+        try {
+          await fetch(env.GAS_WEBAPP_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+            body: JSON.stringify({
+              action: 'appendResult',
+              secret: env.GAS_RESULTS_SECRET,
+              result: {
+                date: result.date, name: result.name, phone: result.phone,
+                unitOrSection: result.unitOrSection, examType: result.examType,
+                examLabel: result.examLabel, total, score, percentage,
+                detailsJson: JSON.stringify(review.map(r => ({ no: r.no, id: r.id, correct: r.isCorrect }))),
+                subject: result.subject, term: result.term, teacherSlug: result.teacherSlug
+              }
+            })
+          });
+        } catch { /* GAS unreachable — result stays in KV */ }
+      }
+    };
+    ctx.waitUntil(persist());
+    ctx.waitUntil(cache.put(dedupeUrl, new Response(responseJson, { headers: { 'Cache-Control': 'max-age=604800' } })).catch(() => {}));
+    return json(response);
+  }
+
+  /* ============================ admin ============================ */
+  const isAdminPath = pathname.startsWith('/api/admin/');
+  if (isAdminPath) {
+    return handleAdmin(request, env, ctx, pathname);
+  }
+
+  return fail('المسار غير موجود.', 404);
+}
+
+/* ============================ admin API ============================ */
+const loginFails = new Map(); // per-isolate best effort
+
+async function getAdminRecord(env) {
+  return kvGetJson(env, 'admin');
+}
+
+async function adminCookiePayload(request, env) {
+  const cookie = request.headers.get('Cookie') || '';
+  const m = cookie.match(/(?:^|;\s*)admin_session=([^;]+)/);
+  if (!m) return null;
+  const secret = await getSessionSecret(env).catch(() => null);
+  if (!secret) return null;
+  return verifyToken(decodeURIComponent(m[1]), secret);
+}
+
+async function handleAdmin(request, env, ctx, pathname) {
+  const method = request.method;
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+
+  /* ---------- login ---------- */
+  if (pathname === '/api/admin/login' && method === 'POST') {
+    const fails = loginFails.get(ip) || { n: 0, until: 0 };
+    if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة. حاول بعد قليل.', 429);
+
+    const body = await readJson(request);
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (!email || !password) return fail('البريد وكلمة المرور مطلوبان.');
+
+    const admin = await getAdminRecord(env);
+    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد. افتح صفحة الإعداد الأولي.', 404);
+
+    const hash = await pbkdf2(password, admin.salt, admin.iterations);
+    if (email !== admin.email || hash !== admin.hash) {
+      loginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
+      return fail('بيانات الدخول غير صحيحة.', 401);
+    }
+    loginFails.delete(ip);
+
+    const secret = await getSessionSecret(env).catch(() => null);
+    if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
+    const token = await signToken({ t: 'admin', email, exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL }, secret);
+    const res = json({ ok: true, email });
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie',
+      `admin_session=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${ADMIN_SESSION_TTL}`);
+    return new Response(res.body, { status: res.status, headers });
+  }
+
+  /* ---------- initial setup (only when no admin exists) ---------- */
+  if (pathname === '/api/admin/setup' && method === 'POST') {
+    const existing = await getAdminRecord(env);
+    if (existing) return fail('حساب المسؤول موجود بالفعل.', 409);
+    const body = await readJson(request);
+    const email = String(body.email || '').trim().toLowerCase();
+    const password = String(body.password || '');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('البريد الإلكتروني غير صالح.');
+    if (password.length < 8) return fail('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+    const salt = randomHex(16);
+    const hash = await pbkdf2(password, salt);
+    await kvPut(env, 'admin', JSON.stringify({ email, salt, hash, iterations: 120000, createdAt: new Date().toISOString() }));
+    return json({ ok: true });
+  }
+
+  /* ---------- everything below requires an admin session ---------- */
+  const session = await adminCookiePayload(request, env);
+  const authed = !!(session && session.t === 'admin');
+
+  if (pathname === '/api/admin/session' && method === 'GET') {
+    if (!authed) return fail('غير مصرح.', 401);
+    return json({ email: session.email });
+  }
+  if (pathname === '/api/admin/logout' && method === 'POST') {
+    const res = json({ ok: true });
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie', 'admin_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0');
+    return new Response(res.body, { status: res.status, headers });
+  }
+  if (!authed) return fail('غير مصرح.', 401);
+  // CSRF defense for state-changing endpoints: SameSite=Strict cookie + custom header
+  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') {
+    return fail('طلب غير مصرح.', 403);
+  }
+
+  /* ---------- change admin password ---------- */
+  if (pathname === '/api/admin/password' && method === 'POST') {
+    const body = await readJson(request);
+    const current = String(body.current || '');
+    const next = String(body.next || '');
+    const admin = await getAdminRecord(env);
+    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد.', 404);
+    const curHash = await pbkdf2(current, admin.salt, admin.iterations);
+    if (curHash !== admin.hash) return fail('كلمة المرور الحالية غير صحيحة.', 401);
+    if (next.length < 8) return fail('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
+    if (next === current) return fail('كلمة المرور الجديدة مطابقة للحالية.');
+    const salt = randomHex(16);
+    const hash = await pbkdf2(next, salt);
+    await kvPut(env, 'admin', JSON.stringify({ ...admin, salt, hash, iterations: 120000, updatedAt: new Date().toISOString() }));
+    return json({ ok: true });
+  }
+
+  /* ---------- overview ---------- */
+  if (pathname === '/api/admin/overview' && method === 'GET') {
+    const teachers = await getTeachers(env);
+    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    return json({
+      exams: Object.keys(BANKS.exams).length,
+      questions: Object.keys(BANKS.questions).length,
+      structure: BANKS.structure,
+      audit: BANKS.audit,
+      notes: BANKS.notes,
+      teachersCount: teachers.length,
+      teachersEnabled: teachers.filter(t => t.enabled !== false).length,
+      recentResultsCount: recent.length,
+      teachers: teachers.map(t => ({ slug: t.slug, name: t.name, enabled: t.enabled !== false }))
+    });
+  }
+
+  /* ---------- teachers CRUD ---------- */
+  if (pathname === '/api/admin/teachers' && method === 'GET') {
+    const teachers = await getTeachers(env);
+    return json({ teachers });
+  }
+  if (pathname === '/api/admin/teachers' && method === 'POST') {
+    const body = await readJson(request, 3 * 1024 * 1024);
+    const t = sanitizeTeacher(body, null);
+    const teachers = await getTeachers(env);
+    if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+    t.id = 't_' + randomHex(6);
+    t.createdAt = new Date().toISOString();
+    t.updatedAt = t.createdAt;
+    teachers.push(t);
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    return json({ ok: true, teacher: t });
+  }
+  const tMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)$/);
+  if (tMatch) {
+    const teachers = await getTeachers(env);
+    const idx = teachers.findIndex(x => x.id === tMatch[1]);
+    if (idx === -1) return fail('المعلم غير موجود.', 404);
+    if (method === 'PUT') {
+      const body = await readJson(request, 3 * 1024 * 1024);
+      const t = sanitizeTeacher(body, teachers[idx]);
+      if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+      t.id = teachers[idx].id;
+      t.createdAt = teachers[idx].createdAt;
+      t.updatedAt = new Date().toISOString();
+      if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
+      teachers[idx] = t;
+      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      return json({ ok: true, teacher: t });
+    }
+    if (method === 'DELETE') {
+      if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
+      teachers.splice(idx, 1);
+      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      return json({ ok: true });
+    }
+  }
+
+  /* ---------- question bank (admin sees keys) ---------- */
+  if (pathname === '/api/admin/questions' && method === 'GET') {
+    const url = new URL(request.url);
+    const subject = url.searchParams.get('subject') || '';
+    const term = url.searchParams.get('term') || '';
+    const search = (url.searchParams.get('q') || '').trim();
+    const lesson = (url.searchParams.get('lesson') || '').trim();
+    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
+    const perPage = 50;
+    const entries = Object.entries(BANKS.questions)
+      .filter(([, q]) => !subject || q.meta.subjectId === subject)
+      .filter(([, q]) => !term || String(q.meta.term || '') === term)
+      .filter(([, q]) => !lesson || String(q.meta.lesson || q.meta.chapter || '').includes(lesson))
+      .filter(([, q]) => !search || q.text.includes(search));
+    const total = entries.length;
+    const slice = entries.slice((page - 1) * perPage, page * perPage)
+      .map(([id, q]) => ({ id, text: q.text, options: q.options, answer: q.answer, meta: q.meta }));
+    return json({ total, page, perPage, questions: slice });
+  }
+
+  /* ---------- exams ---------- */
+  if (pathname === '/api/admin/exams' && method === 'GET') {
+    return json({ exams: BANKS.exams, catalog: BANKS.catalog });
+  }
+
+  /* ---------- results ---------- */
+  if (pathname === '/api/admin/results' && method === 'GET') {
+    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    return json({ results: recent });
+  }
+  if (pathname === '/api/admin/results.csv' && method === 'GET') {
+    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const rows = [['التاريخ', 'اسم الطالب', 'رقم الهاتف', 'الامتحان', 'المادة', 'الدرجة', 'النسبة %', 'المعلم'].map(esc).join(',')];
+    recent.forEach(r => rows.push([
+      new Date(r.date).toLocaleString('ar-EG'), r.name, r.phone, r.examLabel, r.subject,
+      r.score + '/' + r.total, r.percentage, r.teacherSlug
+    ].map(esc).join(',')));
+    return new Response('\uFEFF' + rows.join('\r\n'), {
+      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="results.csv"' }
+    });
+  }
+
+  return fail('المسار غير موجود.', 404);
+}
+
+function sanitizeTeacher(body, existing) {
+  const name = String(body.name || '').trim();
+  if (!name || name.length > 80) throw new Error('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
+  let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
+    .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
+  if (!slug && body.name) {
+    slug = name.toLowerCase().replace(/[^\u0600-\u06FFa-z0-9]+/gi, '-').replace(/^-|-$/g, '');
+    // Arabic names produce no latin slug — fall back to a short random one
+    if (!/^[a-z0-9-]{2,30}$/.test(slug)) slug = 't' + randomHex(4);
+  }
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw new Error('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
+  if (RESERVED_SLUGS.has(slug)) throw new Error('هذا الرابط محجوز.');
+  const social = {};
+  for (const k of ['whatsapp', 'facebook', 'tiktok']) {
+    const v = String(body.socialLinks?.[k] || '').trim();
+    if (v && !/^https?:\/\//i.test(v)) throw new Error('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+    social[k] = v;
+  }
+  const phone = String(body.phone || '').trim();
+  if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) throw new Error('رقم هاتف المعلم غير صالح.');
+  let photo = String(body.photo || existing?.photo || '');
+  if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw new Error('صورة غير صالحة.');
+  if (photo && photo.length > 2.5 * 1024 * 1024) throw new Error('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
+  const colors = {
+    primary: /^#[0-9a-fA-F]{6}$/.test(body.colors?.primary || '') ? body.colors.primary : (existing?.colors?.primary || '#123B40'),
+    accent: /^#[0-9a-fA-F]{6}$/.test(body.colors?.accent || '') ? body.colors.accent : (existing?.colors?.accent || '#C9A86A')
+  };
+  return {
+    slug, name, phone,
+    specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
+    bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
+    photo,
+    socialLinks: social,
+    colors,
+    requirePhone: body.requirePhone !== false,
+    enabled: body.enabled !== false
+  };
+}
+
+/* ============================ main entry ============================ */
+export default {
+  async fetch(request, env, ctx) {
+    try {
+      const url = new URL(request.url);
+      const pathname = decodeURIComponent(url.pathname);
+
+      if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+
+      if (pathname === '/api' || pathname.startsWith('/api/')) {
+        try {
+          return securityHeaders(await handleApi(request, env, ctx, pathname));
+        } catch (e) {
+          const msg = e && e.message ? e.message : 'خطأ غير متوقع.';
+          return securityHeaders(fail(msg, 400));
+        }
+      }
+
+      if (request.method !== 'GET' && request.method !== 'HEAD') {
+        return securityHeaders(fail('الطريقة غير مسموح بها.', 405));
+      }
+
+      // student SPA: / or /:slug ; admin SPA: /admin
+      if (pathname === '/admin' || pathname === '/admin/') {
+        const res = await env.ASSETS.fetch(new URL('https://assets.internal/admin.html'));
+        return securityHeaders(new Response(res.body, { status: 200, headers: res.headers }));
+      }
+
+      if (pathname === '/' || pathname === '') {
+        const res = await env.ASSETS.fetch(new URL('https://assets.internal/index.html'));
+        return securityHeaders(new Response(res.body, { status: 200, headers: res.headers }));
+      }
+
+      // teacher slug route
+      const slug = pathname.replace(/^\//, '').replace(/\/+$/, '');
+      if (slug && /^[a-z0-9][a-z0-9-]{0,29}$/i.test(slug) && !slug.includes('.') && !pathname.slice(1).includes('/')) {
+        if (!RESERVED_SLUGS.has(slug.toLowerCase())) {
+          const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
+          const t = teachers.find(x => x.slug === slug.toLowerCase());
+          if (t && t.enabled !== false) {
+            const res = await env.ASSETS.fetch(new URL('https://assets.internal/index.html'));
+            const headers = new Headers(res.headers);
+            headers.set('Cache-Control', 'public, max-age=60, s-maxage=300');
+            return securityHeaders(new Response(res.body, { status: 200, headers }));
+          }
+          const res = await env.ASSETS.fetch(new URL('https://assets.internal/index.html'));
+          return securityHeaders(new Response(res.body, { status: 404, headers: res.headers }));
+        }
+      }
+
+      // everything else: static assets (JS/CSS/icons) — cached for fast repeat loads
+      const res = await env.ASSETS.fetch(request);
+      if (res.status === 200 && /\.(js|css|svg)$/.test(pathname)) {
+        const headers = new Headers(res.headers);
+        headers.set('Cache-Control', 'public, max-age=3600');
+        return securityHeaders(new Response(res.body, { status: res.status, headers }));
+      }
+      return securityHeaders(res);
+    } catch (e) {
+      return securityHeaders(fail('خطأ في الخادم.', 500));
+    }
+  }
+};
