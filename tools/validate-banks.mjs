@@ -17,9 +17,10 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import vm from 'node:vm';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
-import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic, OFFICIAL_TOPICS, jsonKeyEvidence } from './philo-trainings.mjs';
+import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic, OFFICIAL_TOPICS, jsonKeyEvidence, loadKeyDecisions } from './philo-trainings.mjs';
 
 const D = loadGsData();
+const KEY_DECISIONS = loadKeyDecisions(REPO_ROOT).decisions;
 const B = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'cloudflare/src/data/banks.json'), 'utf8'));
 
 let failures = 0, warnings = 0;
@@ -80,17 +81,19 @@ console.log('\n[B] Completeness vs .gs sources');
 
   // philosophy T1 + T2
   for (const [name, bank] of [['T1', D.PHILO_BANK], ['T2', D.PHILO_T2_BANK], ['T2-LOGIC', D.PHILO_T2_LOGIC_BANK]]) {
-    let m = 0;
+    let m = 0, decided = 0;
     for (const q of bank) {
       const nq = B.questions[q.id];
       if (!nq) { fail('philo ' + name + ' missing question ' + q.id); continue; }
+      const dec = KEY_DECISIONS[q.id];
+      const expectedAnswer = dec ? dec.answer : String(q.correctAnswer).trim();
       if (nq.text === String(q.question).trim() &&
           nq.options[0] === String(q.A).trim() && nq.options[1] === String(q.B).trim() &&
           nq.options[2] === String(q.C).trim() && nq.options[3] === String(q.D).trim() &&
-          nq.answer === String(q.correctAnswer).trim()) m++;
+          nq.answer === expectedAnswer) { m++; if (dec && dec.answer !== String(q.correctAnswer).trim()) decided++; }
       else fail('philo ' + name + ' ' + q.id + ': content mismatch');
     }
-    if (m === bank.length) ok('philosophy ' + name + ': ' + m + '/' + bank.length + ' questions identical to source');
+    if (m === bank.length) ok('philosophy ' + name + ': ' + m + '/' + bank.length + ' questions identical to source' + (decided ? ' (' + decided + ' keys overridden by data/key-decisions.json — documented)' : ''));
   }
 
   // exam count parity with legacy + new

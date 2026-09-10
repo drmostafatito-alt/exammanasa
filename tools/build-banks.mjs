@@ -20,7 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
-import { buildTrainings, renderTrainingReport } from './philo-trainings.mjs';
+import { buildTrainings, renderTrainingReport, loadKeyDecisions } from './philo-trainings.mjs';
 
 const OUT = path.resolve(REPO_ROOT, 'cloudflare/src/data/banks.json');
 const D = loadGsData();
@@ -494,6 +494,22 @@ const legacyPhiloTrainingIds = Object.values(exams)
   .filter(e => e.subjectId === 'philosophy' && e.type === 'training').map(e => e.id);
 const { terms: trainingTerms, report: trainingReport } = buildTrainings({ repoRoot: REPO_ROOT, questions, exams });
 legacyPhiloTrainingIds.forEach(id => { exams[id].legacy = true; });
+// Key decisions also cover legacy-bank questions that live ONLY in comprehensive
+// exams (never passed through buildTrainings). Apply them here, same rules.
+{
+  const KD = loadKeyDecisions(REPO_ROOT);
+  let n = 0;
+  Object.entries(KD.decisions).forEach(([id, dec]) => {
+    const q = questions[id];
+    if (!q || q.meta?.subjectId !== 'philosophy' || q.meta?.keyStatus === 'official-source-decision') return;
+    q.answer = dec.answer;
+    q.meta.verificationStatus = 'verified'; q.meta.keyStatus = 'official-source-decision';
+    q.meta.keySource = dec.source; if (dec.note) q.meta.keyNote = dec.note;
+    trainingReport.decisionsApplied.push({ term: q.meta.term, trainingId: '(comprehensive-only)', id, kind: 'answer', answer: dec.answer, source: dec.source });
+    n++;
+  });
+  if (n) console.log('Key decisions applied to comprehensive-only questions: ' + n);
+}
 trainingTerms.forEach(t => {
   const old = legacyTerms.find(x => x.term === t.term);
   const comps = [];
