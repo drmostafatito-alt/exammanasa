@@ -21,6 +21,13 @@ import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLa
 
 const D = loadGsData();
 const KEY_DECISIONS = loadKeyDecisions(REPO_ROOT).decisions;
+const RESTORE_OPTIONS = loadKeyDecisions(REPO_ROOT).restoreOptions;
+// A JSON question with an empty option is unusable UNLESS a documented restoreOptions
+// entry supplies it (same rule build-banks.mjs applies). Returns the effective options.
+const effectiveJsonOptions = (q) => {
+  const ro = RESTORE_OPTIONS[q.id];
+  return ro ? ro.options : q.options;
+};
 const B = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'cloudflare/src/data/banks.json'), 'utf8'));
 
 let failures = 0, warnings = 0;
@@ -275,7 +282,7 @@ console.log('\n[D] Structure & curriculum mapping');
       if (e.subjectId !== 'philosophy' || e.term !== term || e.type !== 'training' || e.legacy) { fail(t.training_id + ': wrong metadata'); continue; }
       if (e.lessonTitle !== t.topic || e.sectionTitle !== t.subject) { fail(t.training_id + ': lesson/section ≠ JSON'); continue; }
       if ('difficulty' in e) { fail(t.training_id + ': difficulty exposed to students'); continue; }
-      const expected = t.questions.filter(q => q.options.every(o => stripJsonLabel(o)));
+      const expected = t.questions.filter(q => effectiveJsonOptions(q).every(o => stripJsonLabel(o)));
       if (ids.length !== expected.length || ids.length < 19 || ids.length > 20) { fail(t.training_id + ': ' + ids.length + ' questions (JSON usable ' + expected.length + ')'); continue; }
       if (new Set(ids).size !== ids.length) { fail(t.training_id + ': duplicate question inside training'); continue; }
       let good = true;
@@ -283,7 +290,7 @@ console.log('\n[D] Structure & curriculum mapping');
         const bq = B.questions[ids[i]];
         if (!bq) { fail(t.training_id + ' q' + (i + 1) + ': unresolved ' + ids[i]); good = false; return; }
         if (normArabic(bq.text) !== normArabic(cleanQuestionText(jq.question))) { fail(t.training_id + ' q' + (i + 1) + ': text ≠ JSON (' + ids[i] + ')'); good = false; }
-        const jo = jq.options.map(o => normArabic(stripJsonLabel(o)).replace(/ئ/g, 'ي').replace(/ؤ/g, 'و'));
+        const jo = effectiveJsonOptions(jq).map(o => normArabic(stripJsonLabel(o)).replace(/ئ/g, 'ي').replace(/ؤ/g, 'و'));
         const bo = bq.options.map(o => normArabic(o).replace(/ئ/g, 'ي').replace(/ؤ/g, 'و'));
         if (JSON.stringify(jo) !== JSON.stringify(bo)) { fail(t.training_id + ' q' + (i + 1) + ': options ≠ JSON (' + ids[i] + ')'); good = false; }
         if (bq.options.length !== 4 || !['A', 'B', 'C', 'D'].includes(bq.answer)) { fail(ids[i] + ': invalid options/key'); good = false; }

@@ -1,978 +1,1049 @@
 {
- "_doc": "قرارات مفاتيح الإجابة — انظر KEY_AUDIT_REPORT.md. sourceType: A=وزارة/رسمي، B=كتاب الأسئلة (نموذج الإجابة)، C=مصادر تعليمية متعددة متفقة، D=استدلال منهجي/منطق صوري.",
- "decisions": {
-  "PL-0003": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (السؤال الأول في «أسئلة على التفكير الإنساني وأهميته» حرفيًا) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "النجار يعمل وفق تصميم = تنظيم الخبرات/تنظيم التفكير (كتاب الوزارة: «منظم التفكير»)؛ مفتاح الكتاب: تنظيم التفكير",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0035": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1: «القدرة على التحليل والتقويم والنقد: يقي الفرد من التأثر بأفكار الآخرين بشكل غير عقلاني»",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "C",
-   "reason": "نص الكتاب الرسمي يطابق الموقف (عدم التأثر بآراء الأصدقاء)؛ مفتاح كتاب الأسئلة (الصحة النفسية) مخالف لنص الوزارة",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0342": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (خطوات التفكير الناقد: إصدار الأحكام والقرارات المستنيرة) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "«أكد العلماء على ضرورة منع…» = إصدار حكم/قرار مستنير؛ مفتاح الكتاب: إصدار الأحكام",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0358": {
-   "answer": "D",
-   "source": "كتاب الوزارة ت1 (الطلاقة: إنتاج أكبر عدد ممكن من الأفكار في فترة زمنية محددة) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الإجابة السريعة بعدة مصادر = الطلاقة؛ مفتاح الكتاب: الطلاقة",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0346": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (التحقق: اكتمال عناصر العمل الإبداعي والتحقق من قيمته)",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "B",
-   "reason": "مفتاح الكتاب «التقويم» يقصد مرحلة التحقق؛ نص ماركسبري = اختبار الفكرة",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0360": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (مرحلة التحقق)",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "A",
-   "reason": "نجاح الفكرة وتطبيقها صناعيًا = التحقق",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "T1-PH-04-Q14": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: «معرفة مطلوبة لذاتها») + كتاب الوزارة ت1: التعريف الأول «الفلسفة علم المعرفة الكلية المطلوبة لذاتها… تدرس الحقيقة الكلية للموجودات»",
-   "sourceType": "B+A",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "مفتاح الكتاب = التعريف الأول، والخيار الوحيد المعبر عنه بين خيارات السؤال هو «تدرس الوجود ككل»",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0545": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: علم كلي) + كتاب الوزارة ت1 (التعريف الأول: علم المعرفة الكلية)",
-   "sourceType": "B+A",
-   "confidence": "High",
-   "old": "B",
-   "reason": "الإنسان صورة مصغرة للعالم → معرفة كلية؛ مفتاح الكتاب: علم كلي = الخيار C",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0531": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (معرفة مطلوبة لذاتها = علم كلي يحقق المتعة العقلية)",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "A",
-   "reason": "مفتاح الكتاب «معرفة مطلوبة لذاتها» يطابق الخيار A",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0685": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: د — القيم/الأخلاق)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "الأكسيولوجيا = مبحث القيم",
-   "url": ""
-  },
-  "T1-PH-06-Q13": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: تعميق الوعي الفردي وحل المشكلات)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "الخيار الوحيد المتضمن «تعميق الوعي الفردي» مع «المشكلات» هو A (صياغة الخيار «تقبل» بدل «حل» كما وردت في المصدر ولم تُعدّل)",
-   "url": ""
-  },
-  "PL-0815": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كشف مشكلات المجتمع والارتقاء بالمجتمع)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "الخيار الوحيد المتضمن مواجهة/كشف المشكلات دون بند مناقض هو D",
-   "url": ""
-  },
-  "PL-0890": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: اليوناني) + https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف اليوناني = «اعرف نفسك» واكتشاف الإنسان لنفسه",
-   "sourceType": "B+C",
-   "confidence": "High",
-   "old": "A",
-   "reason": "معرفة الذات = سمة الموقف الفلسفي اليوناني (سقراط)",
-   "url": ""
-  },
-  "PL-0892": {
-   "answer": "B",
-   "source": "https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف في العصر الحديث = ديكارت واصطناع الشك",
-   "sourceType": "C",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "«من لا يشك لا يعرف» = الشك المنهجي الديكارتي (حديث)؛ مفتاح كتاب الأسئلة (الوسيط) يبدو مبدَّلًا مع السؤال التالي",
-   "url": ""
-  },
-  "PL-0894": {
-   "answer": "C",
-   "source": "https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف في العصر الوسيط = التوفيق بين الفلسفة والدين",
-   "sourceType": "C",
-   "confidence": "Medium",
-   "old": "C",
-   "reason": "«الدين أصدق فلسفة» = التوفيق بين الدين والفلسفة (وسيط)؛ مفتاح كتاب الأسئلة (الحديث) يبدو مبدَّلًا مع السؤال السابق",
-   "url": ""
-  },
-  "PL-0898": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الحديث) + https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف الحديث = المناهج العلمية والسيطرة على الطبيعة",
-   "sourceType": "B+C",
-   "confidence": "Medium",
-   "old": "C",
-   "reason": "المنهج العلمي والتفوق على الطبيعة = سمة العصر الحديث",
-   "url": ""
-  },
-  "PL-0958": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الخصائص)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "اختلاف الموقف باختلاف الشخص = طبيعة/خصائص الموقف؛ لا دليل مضاد",
-   "url": ""
-  },
-  "PL-0902": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الخضوع للسلطات — غير موجود بين الخيارات)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "أقرب خيار متاح لمعنى الخضوع لسلطة الرئيس هو الافتقار للشجاعة الفكرية (الخيار C عكس المطلوب)",
-   "url": ""
-  },
-  "PL-0912": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البصيرة — غير موجود بين الخيارات؛ الخاصية في الكتاب «البصيرة واليقظة»)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "أقرب خيار = اليقظة الدائمة",
-   "url": ""
-  },
-  "PL-0884": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النسق والدقة المنطقية)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
-   "url": ""
-  },
-  "PL-0886": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البصيرة واليقظة)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
-   "url": ""
-  },
-  "PL-0920": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النسق المنطقي)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
-   "url": ""
-  },
-  "PL-0930": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الصبر والتروي)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
-   "url": ""
-  },
-  "T1-PH-08-Q07": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النقد المحكم — غير موجود بين الخيارات) + كتاب الوزارة ت1 (مهارات التفكير الفلسفي: الشك/النقد/الحوار/التحليل والتركيب)",
-   "sourceType": "B+A",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "التوقف عن التصديق والتساؤل عن المصدر والأدلة = الشك (أقرب المهارات المتاحة)",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "T1-LG-01-Q04": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "الأحاسيس مقابل المنطق = التحرر من تأثير العاطفة",
-   "url": ""
-  },
-  "T1-LG-01-Q05": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "التحليل العقلاني وبيان مواطن الخطأ = الاتجاه/التفكير النقدي",
-   "url": ""
-  },
-  "T1-LG-01-Q06": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان) + تعريف كينز للمنطق «المبادئ العامة للتفكير الصحيح» (hindawi.org)",
-   "sourceType": "A+B+C",
-   "confidence": "High",
-   "old": "D",
-   "reason": "«مجال يبحث في النواحي العامة للفكر الصحيح» = تعريف المنطق",
-   "url": ""
-  },
-  "T1-LG-01-Q08": {
-   "answer": "D",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "من الملاحظة إلى قانون علمي = تنمية الروح العلمية",
-   "url": ""
-  },
-  "T1-LG-01-Q09": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "«اعقلوا الخبر عقل رعاية» = التمييز بين الأدلة",
-   "url": ""
-  },
-  "T1-LG-01-Q11": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "التجربة → قانون الإبصار = الروح العلمية",
-   "url": ""
-  },
-  "T1-LG-01-Q12": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "الكاشف والمميز لصحيح الفكر عن الفاسد = التمييز بين الأدلة",
-   "url": ""
-  },
-  "T1-LG-01-Q13": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "العقل لا الوجدان = التحرر من التأثير السلبي للعاطفة",
-   "url": ""
-  },
-  "T1-LG-01-Q14": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان) + shbabbek.com/show/260547 (السؤال نفسه حرفيًا: الآلة العاصمة للسان)",
-   "sourceType": "A+B+C",
-   "confidence": "High",
-   "old": "D",
-   "reason": "تركيب الجمل الصحيحة/عصمة اللسان = اختيار الألفاظ/المفردات بدقة",
-   "url": ""
-  },
-  "T1-LG-01-Q15": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "عدم التسليم إلا بالحجة = تنمية الاتجاه النقدي",
-   "url": ""
-  },
-  "T1-LG-01-Q16": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "التوصل لحقائق فلكية جديدة = الروح العلمية",
-   "url": ""
-  },
-  "T1-LG-01-Q17": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "التحقق والتقصي وإصدار الحكم بمعايير = الاتجاه النقدي",
-   "url": ""
-  },
-  "T1-LG-01-Q18": {
-   "answer": "D",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "التحليل والتقييم = الروح النقدية",
-   "url": ""
-  },
-  "T1-LG-01-Q19": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإشارات المعبرة عن الفكر — لغة) + https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) (المنطق لغةً: الكلام الظاهر والباطن)",
-   "sourceType": "B+C",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "الوصف اللغوي للكلام الظاهر/الباطن يشير لمفهوم اللغة كإشارات معبرة عن الفكر",
-   "url": ""
-  },
-  "T1-LG-01-Q20": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان): التعريف الاصطلاحي «العلم الذي يدرس القواعد العامة للتفكير الصحيح»",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "تمييز العمليات الذهنية الصحيحة من الفاسدة = التعريف الاصطلاحي",
-   "url": ""
-  },
-  "T1-LG-02-Q04": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: سوء استخدام اللغة)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "حُلّة (ثوب/إناء) = غموض اللغة",
-   "url": ""
-  },
-  "PL-0158": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الديني)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "الإيماني = الديني",
-   "url": ""
-  },
-  "PL-0200": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: موضوع الدراسة)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "محتوى الدراسة = موضوع الدراسة",
-   "url": ""
-  },
-  "PL-1454": {
-   "answer": "C",
-   "source": "تعريف الحد الجزئي في المنطق التقليدي: «ما يمتنع فرض صدقه على كثيرين» (امتناع الاشتراك)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "نسختا مفتاح الكتاب متعارضتان؛ التعريف الكلاسيكي يحسم: الجزئي",
-   "url": ""
-  },
-  "PL-1470": {
-   "answer": "B",
-   "source": "تعريف الحد الكلي: يُحمل بمعنى واحد على أفراد لا متناهين ويُطلق على كل واحد منهم (بخلاف الجمعي)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "نسختا المفتاح متعارضتان؛ التعريف يحسم: الكلي",
-   "url": ""
-  },
-  "PL-1472": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: تلازم)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "اقتران ≈ تلازم (أقرب خيار)",
-   "url": ""
-  },
-  "PL-1512": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الكلي)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "«الخبرة» حد كلي بالتعميم",
-   "url": ""
-  },
-  "T1-LG-05-Q02": {
-   "answer": "A",
-   "source": "تعريف العرض العام: صفة عرضية غير لازمة سريعة الزوال (تعريفات الجرجاني)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "نسختا المفتاح متعارضتان (عرض عام/فصل)؛ التعريف يحسم: العرض العام",
-   "url": ""
-  },
-  "T1-LG-05-Q03": {
-   "answer": "A",
-   "source": "تعريف الجنس: كلي يشمل أنواعًا مختلفة ذات صفات مشتركة",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "نسختا المفتاح متعارضتان (جنس/نوع)؛ «جملة أنواع» = جنس",
-   "url": ""
-  },
-  "T1-LG-05-Q09": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: عرضية غير مميزة — عرض عام)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "",
-   "url": ""
-  },
-  "T1-LG-06-Q19": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: «يلوم أدواته»)",
-   "sourceType": "B+D",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "المحمول هو كل ما بعد الموضوع «العامل السيئ»: «دائمًا يلوم أدواته» (الخيار B يطابق مفتاح الكتاب)",
-   "url": ""
-  },
-  "T1-LG-06-Q20": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: جزء من القضية — موضوع)",
-   "sourceType": "B+D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "«الغياب» هو الموضوع المحكوم عليه في القضية",
-   "url": ""
-  },
-  "PL-1859": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح مُتردَّد: بسيطة/تحليلية)",
-   "sourceType": "B+D",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "واقعة تاريخية يضيف فيها المحمول معلومة جديدة = تأليفية؛ «بسيطة» ليست من الخيارات",
-   "url": ""
-  },
-  "PL-1875": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: بسيطة — تصنيف آخر غير موجود بين الخيارات)",
-   "sourceType": "B+D",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "المحمول يضيف معلومة غير متضمنة في الموضوع = تركيبية",
-   "url": ""
-  },
-  "PL-1879": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البسيطة — غير موجود بين الخيارات)",
-   "sourceType": "B+D",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "تأليفية",
-   "url": ""
-  },
-  "PL-1881": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: التركيبية)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "التركيبية = التأليفية",
-   "url": ""
-  },
-  "PL-1953": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كلية موجبة)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "قضية بسيطة كلية",
-   "url": ""
-  },
-  "PL-1508": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الجزئي بالإضافة — النسختان متفقتان)",
-   "sourceType": "B+D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "«كتاب الجمهورية لأفلاطون» حد جزئي بالإضافة (اسم مضاف إلى علم)",
-   "url": ""
-  },
-  "PL-2076": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: بعض الطلاب يجتهدون صادقة)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "",
-   "url": ""
-  },
-  "PL-2092": {
-   "answer": "D",
-   "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "D",
-   "reason": "صدق (ك م) يستلزم كذب (ك س) بالتضاد وكذب (ج س) بالتناقض → قضيتان كاذبتان؛ كذب (ك م) لا يعطي إلا كذبًا واحدًا",
-   "url": ""
-  },
-  "PL-2098": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كذب الجزء يضمن كذب الكل) + قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "B+D",
-   "confidence": "High",
-   "old": "D",
-   "reason": "في التداخل قد تكذب القضيتان معًا لأن كذب الجزئية يستلزم كذب الكلية",
-   "url": ""
-  },
-  "PL-2100": {
-   "answer": "C",
-   "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "D",
-   "reason": "مع صدق (ك س) القضية المتفقة في الكيف فقط هي (ج س) بالتداخل وهي صادقة؛ مفتاح الكتاب (ج م صادقة) مخالف للكيف وكاذبة بالتناقض؛ مفتاح البنك (ك م) مختلفة الكيف",
-   "url": ""
-  },
-  "PL-2110": {
-   "answer": "B",
-   "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "صدق الجزئية يجعل الكلية المتداخلة معها غير معروفة",
-   "url": ""
-  },
-  "PL-2112": {
-   "answer": "C",
-   "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "(ك م) و(ج س) متناقضتان",
-   "url": ""
-  },
-  "PL-2124": {
-   "answer": "B",
-   "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "الموضوعان مختلفان (الحيوانات/الكائنات) فلا تقابل",
-   "url": ""
-  },
-  "PL-2218": {
-   "answer": "A",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "ك س + ك م ⇒ ك س (الضرب الثاني من الشكل الأول) قياس منتج",
-   "url": ""
-  },
-  "PL-2220": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "نتيجة موجبة عن مقدمة سالبة",
-   "url": ""
-  },
-  "PL-2228": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الحد الأوسط «علة» ≠ «يحدثها علة» → أربعة حدود",
-   "url": ""
-  },
-  "PL-2230": {
-   "answer": "A",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "الشكل الأول يوجب كلية الكبرى؛ الكبرى هنا جزئية (سلب الكبرى جائز في الشكل الأول)",
-   "url": ""
-  },
-  "PL-2232": {
-   "answer": "D",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "D",
-   "reason": "«المسافرين» موضوع الكبرى الكلية = مستغرق",
-   "url": ""
-  },
-  "PL-2242": {
-   "answer": "D",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "النتيجة جزئية موجبة → الصغرى المكملة جزئية موجبة (ك م + ج م ⇒ ج م)",
-   "url": ""
-  },
-  "PL-2226": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: المقدمتين سالبتين) + قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "B+D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "مقدمتان سالبتان = الإخلال بشرط الكيف",
-   "url": ""
-  },
-  "PL-2234": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الصغرى سالبة في الشكل الأول",
-   "url": ""
-  },
-  "PL-2204": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: القياس الأرسطي/قاعدة الكل والجزء)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "",
-   "url": ""
-  },
-  "PL-2250": {
-   "answer": "B",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "نتيجة ج س تلزم عن ك س + ج م: مختلفتان كمًّا وكيفًا",
-   "url": ""
-  },
-  "PL-2262": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "مقدمتان مختلفتان كمًّا وكيفًا ⇒ نتيجة جزئية سالبة",
-   "url": ""
-  },
-  "PL-2264": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الصغرى سالبة",
-   "url": ""
-  },
-  "PL-2286": {
-   "answer": "A",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "A",
-   "reason": "نتيجة موجبة عن مقدمة سالبة فلا تلزم",
-   "url": ""
-  },
-  "PL-2288": {
-   "answer": "B",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "B",
-   "reason": "نتيجة ك س تلزم عن ك س + ك م: متفقتان كمًّا مختلفتان كيفًا",
-   "url": ""
-  },
-  "PL-2308": {
-   "answer": "C",
-   "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
-   "sourceType": "D",
-   "confidence": "High",
-   "old": "C",
-   "reason": "النتيجة التي تستغرق المحمول فقط = ج س ⇐ ك س + ج م",
-   "url": ""
-  },
-  "PLT2-0005": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت2 (السؤال 2 من الأسئلة العامة حرفيًا؛ المعنى الاصطلاحي: لا يتوقف على الطبيعة المادية بل يشمل التفاعل الحضاري) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "B",
-   "reason": "المادي + المعنوي = المعنى الاصطلاحي",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0007": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت2 (السؤال 4 حرفيًا؛ القهر والاستبداد: إحداث تحولات حادة في طبيعة الكائنات الحية وأشكالها) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "تعديل المادة الوراثية = مرحلة القهر والاستبداد",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0015": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت2 (السؤال 16 حرفيًا؛ القهر والاستبداد: «اعتداء على مقدرات الطبيعة وإخلال بالتوازن البيئي») + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "عبارة «اختلال التوازن البيئي» من تعريف مرحلة القهر",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0071": {
-   "answer": "D",
-   "source": "كتاب الوزارة ت2 (السؤال 22 حرفيًا؛ زرع الأعضاء: انتزاع الأعضاء من مانح حي أو ميت) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الإنسان وجثته مصدر للأنسجة = زراعة الأعضاء",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0078": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت2 (أخلاقيات العيادة: «خريطة علاج تقدر وتحترم المريض الذي يثق في الطبيب») + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "التلاعب بدماغ المريض يخالف احترام حق المريض",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0116": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت2 (الطواعية: «تستمد جذورها من الحرية والاستقلالية والقدرة على اتخاذ القرارات الشخصية»)",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "A",
-   "reason": "حق الحرية وتقرير المصير = الطواعية (يطابق مفتاح JSON)",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0130": {
-   "answer": "A",
-   "source": "كتاب الوزارة ت2 (السؤال 1 من «أسئلة الفلسفة وأخلاقيات المهنة» حرفيًا؛ تحليل الواقع الثقافي واستخلاص القيم بمشاركة الفيلسوف) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "تحديد القيم (العدل/المساواة/الحرية) = استخلاص القيم",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0141": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: تكوين انطباع جيد عند المتعاملين) + كتاب الوزارة ت2 (تكوين صورة إيجابية عن المؤسسة)",
-   "sourceType": "B+A",
-   "confidence": "Medium",
-   "old": "C",
-   "reason": "تأثير سلوك المعلم في تلاميذه ومجتمعه = الصورة الإيجابية",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0144": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: وضع أسس ميثاق أخلاق المهنة) + كتاب الوزارة ت2 (تحديد الأسس والقواعد المحددة لأداء أعمال المؤسسة)",
-   "sourceType": "B+A",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "وضع معايير للسلوك المهني = تحديد الأسس والقواعد",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2-0205": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: التطابق — غير موجود بين الخيارات)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "الحقيقة من الواقع الخارجي = الفكر المادي/نظرية التطابق",
-   "url": ""
-  },
-  "PLT2-0207": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: البراجماتية العملية)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "B",
-   "reason": "اختلاف إملائي فقط",
-   "url": ""
-  },
-  "PLT2-0210": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: التسامح الفكري)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "B",
-   "reason": "الانفتاح وتقبل الغير = التسامح الفكري",
-   "url": ""
-  },
-  "PLT2-0217": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الكشف عن الحقائق)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "أقرب خيار: الاتجاه الواعي نحو العالم المحيط",
-   "url": ""
-  },
-  "PLT2-0212": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: اختيار الفعل عن روية وتدبر)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "عدم التسرع بالحكم على القول = الروية والتدبر؛ لا دليل مضاد",
-   "url": ""
-  },
-  "PLT2-0040": {
-   "answer": "A",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: هانز يوناس) + كتاب الوزارة ت2 (السؤال 7 حرفيًا)",
-   "sourceType": "A+B",
-   "confidence": "High",
-   "old": "A",
-   "reason": "",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
-  },
-  "PLT2L-001": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الناقص)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "",
-   "url": ""
-  },
-  "T2-LG-BACON-Q11": {
-   "answer": "C",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: السوق)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "C",
-   "reason": "",
-   "url": ""
-  },
-  "T2-LG-BACON-Q19": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الجنس)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "",
-   "url": ""
-  },
-  "PLT2L-012": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الاستقراء التام)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "C",
-   "reason": "فحص «الأجزاء» ثم التعميم على «الكل» = الاستقراء التام؛ لا دليل مضاد",
-   "url": ""
-  },
-  "T2-LG-IND-01-Q03": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الناقص) + hindawi.org (التام = التلخيصي؛ الاستقراء العلمي الحديث = الناقص)",
-   "sourceType": "B+C",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "ملاحظة نماذج بدل كل الأفراد = الاستقراء الناقص = «العلمي» بين الخيارات؛ «التام» يناقض النص",
-   "url": ""
-  },
-  "T2-LG-IND-01-Q15": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: المثال د)",
-   "sourceType": "B",
-   "confidence": "High",
-   "old": "D",
-   "reason": "نتيجة أعم من المقدمات = استقراء",
-   "url": ""
-  },
-  "T2-LG-DED-02-Q16": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت2 (أهمية الذكاء الاصطناعي) — استدلال مباشر من النص",
-   "sourceType": "D",
-   "confidence": "Medium",
-   "old": "C",
-   "reason": "توقع الفيضانات وتتبع الحرائق = التعامل مع الكوارث الطبيعية",
-   "url": ""
-  },
-  "PL-0017": {
-   "answer": "C",
-   "source": "كتاب الوزارة ت1 (أسئلة عامة س1 حرفيًا؛ المسطر «مهد الطريق إلى إيمان الغد»)",
-   "sourceType": "A",
-   "confidence": "High",
-   "old": "C",
-   "reason": "الغد/المستقبل = التخطيط للمستقبل؛ مفتاح كتاب الأسئلة (تنظيم التفكير) مخالف للجزء المسطر في نسخة الوزارة",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  },
-  "PL-0332": {
-   "answer": "B",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإشراق) + JSON (B)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "استخراج الفكرة = ولادة شرارة الإبداع (الإشراق)؛ لا مصدر أقوى مخالف",
-   "url": ""
-  },
-  "PL-0336": {
-   "answer": "D",
-   "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإعداد) + JSON (D)",
-   "sourceType": "B",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "الجزء المسطر غير محفوظ في النسخ النصية؛ مفتاح الكتاب يشير إلى «فترة التفكير الواعي التي تسبق الإلهام» = الإعداد",
-   "url": ""
-  },
-  "T1-LG-01-Q10": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق: تنمية الاتجاه النقدي) — ترجيح بين نسختي مفتاح الكتاب المتعارضتين (3438: النقدي / 3466: العاطفة)",
-   "sourceType": "A+D",
-   "confidence": "Medium",
-   "old": "D",
-   "reason": "فحص الأخبار وتحليلها وقبول الصحيح ورفض المضلل = الاتجاه النقدي",
-   "url": ""
-  },
-  "T1-LG-05-Q07": {
-   "answer": "C",
-   "source": "شجرة فورفوريوس: الترتيب التصاعدي يبدأ من النوع الأدنى (بطة) إلى الجنس الأعلى (كائن)",
-   "sourceType": "D",
-   "confidence": "Medium",
-   "old": "A",
-   "reason": "مفتاح الإنتاج A ترتيب مستحيل؛ مفتاح الكتاب B هو الترتيب التنازلي؛ «تصاعديًا» = C — يُراجع مع نموذج الإجابة الرسمي",
-   "url": ""
-  },
-  "T1-LG-01-Q03": {
-   "answer": "B",
-   "source": "كتاب الوزارة ت1 (أهمية المنطق: التحرر من العاطفة والشائعات) عبر nafham.com + JSON (B)",
-   "sourceType": "A+D",
-   "confidence": "Medium",
-   "old": "B",
-   "reason": "الشغف (عاطفة) مقابل المنطق = التحرر من العاطفة؛ مفتاح كتاب الأسئلة (الروح العلمية) لا يطابق مضمون العبارة",
-   "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
-  }
- },
- "restoreOptions": {},
- "unresolved": {
-  "T1-PH-04-Q16": "الخيار A فارغ في كل النسخ؛ لم يُعثر على النص الأصلي الكامل على الإنترنت — يبقى معزولًا (quarantined)",
-  "T1-PH-04-Q19": "مفتاح كتاب الأسئلة «الشرق القديم» (المقولة لكونفوشيوس/الصين) غير موجود بين الخيارات (اليونان/فارس/أسبرطة/أثينا) — خيارات معيبة",
-  "PL-0561": "مفتاح الكتاب «المبادئ الأولى» مقابل «المعرفة الجزئية الحسية» (البنك) و«الخبرات الفردية» (تعريف ثانٍ في كتاب الوزارة) — لا مصدر حاسم",
-  "T1-LG-02-Q20": "مفتاح الكتاب «التسرع في الحكم» غير موجود بين الخيارات؛ المرشح بالاستدلال فقط «القابلية للاستهواء» — لا يُعتمد استدلال منفرد",
-  "PL-1436": "«سنترال»: نسختا مفتاح الكتاب متعارضتان (الكلي/السالب) ولا مصدر رسمي متاح",
-  "T1-LG-05-Q06": "الجزء المسطر مفقود في النسخ النصية (مساحة من اليابس = جنس / محاطة بالماء = فصل)، ومفتاح الكتاب «النوع» ليس من الخيارات",
-  "T1-LG-05-Q14": "الجزء المسطر مفقود؛ مفتاح الكتاب «الجنس والنوع» ليس من الخيارات"
- }
+  "_doc": "قرارات مفاتيح الإجابة — انظر KEY_AUDIT_REPORT.md. sourceType: A=وزارة/رسمي أو قرار معلّم المادة، B=كتاب الأسئلة (نموذج الإجابة) — غير موثوق، جزء منه مُولَّد آليًا، C=مصادر تعليمية متعددة متفقة، D=استدلال منهجي/منطق صوري.",
+  "decisions": {
+    "PL-0003": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (السؤال الأول في «أسئلة على التفكير الإنساني وأهميته» حرفيًا) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "النجار يعمل وفق تصميم = تنظيم الخبرات/تنظيم التفكير (كتاب الوزارة: «منظم التفكير»)؛ مفتاح الكتاب: تنظيم التفكير",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0035": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1: «القدرة على التحليل والتقويم والنقد: يقي الفرد من التأثر بأفكار الآخرين بشكل غير عقلاني»",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "C",
+      "reason": "نص الكتاب الرسمي يطابق الموقف (عدم التأثر بآراء الأصدقاء)؛ مفتاح كتاب الأسئلة (الصحة النفسية) مخالف لنص الوزارة",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0342": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (خطوات التفكير الناقد: إصدار الأحكام والقرارات المستنيرة) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "«أكد العلماء على ضرورة منع…» = إصدار حكم/قرار مستنير؛ مفتاح الكتاب: إصدار الأحكام",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0358": {
+      "answer": "D",
+      "source": "كتاب الوزارة ت1 (الطلاقة: إنتاج أكبر عدد ممكن من الأفكار في فترة زمنية محددة) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الإجابة السريعة بعدة مصادر = الطلاقة؛ مفتاح الكتاب: الطلاقة",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0346": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (التحقق: اكتمال عناصر العمل الإبداعي والتحقق من قيمته)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "B",
+      "reason": "مفتاح الكتاب «التقويم» يقصد مرحلة التحقق؛ نص ماركسبري = اختبار الفكرة",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0360": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (مرحلة التحقق)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "A",
+      "reason": "نجاح الفكرة وتطبيقها صناعيًا = التحقق",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "T1-PH-04-Q14": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: «معرفة مطلوبة لذاتها») + كتاب الوزارة ت1: التعريف الأول «الفلسفة علم المعرفة الكلية المطلوبة لذاتها… تدرس الحقيقة الكلية للموجودات»",
+      "sourceType": "B+A",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "مفتاح الكتاب = التعريف الأول، والخيار الوحيد المعبر عنه بين خيارات السؤال هو «تدرس الوجود ككل»",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0545": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: علم كلي) + كتاب الوزارة ت1 (التعريف الأول: علم المعرفة الكلية)",
+      "sourceType": "B+A",
+      "confidence": "High",
+      "old": "B",
+      "reason": "الإنسان صورة مصغرة للعالم → معرفة كلية؛ مفتاح الكتاب: علم كلي = الخيار C",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0531": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (معرفة مطلوبة لذاتها = علم كلي يحقق المتعة العقلية)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "A",
+      "reason": "مفتاح الكتاب «معرفة مطلوبة لذاتها» يطابق الخيار A",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0685": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: د — القيم/الأخلاق)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "الأكسيولوجيا = مبحث القيم",
+      "url": ""
+    },
+    "T1-PH-06-Q13": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: تعميق الوعي الفردي وحل المشكلات)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "الخيار الوحيد المتضمن «تعميق الوعي الفردي» مع «المشكلات» هو A (صياغة الخيار «تقبل» بدل «حل» كما وردت في المصدر ولم تُعدّل)",
+      "url": ""
+    },
+    "PL-0815": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كشف مشكلات المجتمع والارتقاء بالمجتمع)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "الخيار الوحيد المتضمن مواجهة/كشف المشكلات دون بند مناقض هو D",
+      "url": ""
+    },
+    "PL-0890": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: اليوناني) + https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف اليوناني = «اعرف نفسك» واكتشاف الإنسان لنفسه",
+      "sourceType": "B+C",
+      "confidence": "High",
+      "old": "A",
+      "reason": "معرفة الذات = سمة الموقف الفلسفي اليوناني (سقراط)",
+      "url": ""
+    },
+    "PL-0892": {
+      "answer": "B",
+      "source": "https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف في العصر الحديث = ديكارت واصطناع الشك",
+      "sourceType": "C",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "«من لا يشك لا يعرف» = الشك المنهجي الديكارتي (حديث)؛ مفتاح كتاب الأسئلة (الوسيط) يبدو مبدَّلًا مع السؤال التالي",
+      "url": ""
+    },
+    "PL-0894": {
+      "answer": "C",
+      "source": "https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف في العصر الوسيط = التوفيق بين الفلسفة والدين",
+      "sourceType": "C",
+      "confidence": "Medium",
+      "old": "C",
+      "reason": "«الدين أصدق فلسفة» = التوفيق بين الدين والفلسفة (وسيط)؛ مفتاح كتاب الأسئلة (الحديث) يبدو مبدَّلًا مع السؤال السابق",
+      "url": ""
+    },
+    "PL-0898": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الحديث) + https://modars1.com/t39047 + https://everestmagazines.com/archives/25973 (الموقف الفلسفي عبر العصور): الموقف الحديث = المناهج العلمية والسيطرة على الطبيعة",
+      "sourceType": "B+C",
+      "confidence": "Medium",
+      "old": "C",
+      "reason": "المنهج العلمي والتفوق على الطبيعة = سمة العصر الحديث",
+      "url": ""
+    },
+    "PL-0958": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الخصائص)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "اختلاف الموقف باختلاف الشخص = طبيعة/خصائص الموقف؛ لا دليل مضاد",
+      "url": ""
+    },
+    "PL-0902": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الخضوع للسلطات — غير موجود بين الخيارات)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "أقرب خيار متاح لمعنى الخضوع لسلطة الرئيس هو الافتقار للشجاعة الفكرية (الخيار C عكس المطلوب)",
+      "url": ""
+    },
+    "PL-0912": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البصيرة — غير موجود بين الخيارات؛ الخاصية في الكتاب «البصيرة واليقظة»)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "أقرب خيار = اليقظة الدائمة",
+      "url": ""
+    },
+    "PL-0884": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النسق والدقة المنطقية)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
+      "url": ""
+    },
+    "PL-0886": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البصيرة واليقظة)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
+      "url": ""
+    },
+    "PL-0920": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النسق المنطقي)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
+      "url": ""
+    },
+    "PL-0930": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الصبر والتروي)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "تطابق المعنى مع اختلاف الصياغة فقط",
+      "url": ""
+    },
+    "T1-PH-08-Q07": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: النقد المحكم — غير موجود بين الخيارات) + كتاب الوزارة ت1 (مهارات التفكير الفلسفي: الشك/النقد/الحوار/التحليل والتركيب)",
+      "sourceType": "B+A",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "التوقف عن التصديق والتساؤل عن المصدر والأدلة = الشك (أقرب المهارات المتاحة)",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "T1-LG-01-Q04": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "الأحاسيس مقابل المنطق = التحرر من تأثير العاطفة",
+      "url": ""
+    },
+    "T1-LG-01-Q05": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "التحليل العقلاني وبيان مواطن الخطأ = الاتجاه/التفكير النقدي",
+      "url": ""
+    },
+    "T1-LG-01-Q06": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان) + تعريف كينز للمنطق «المبادئ العامة للتفكير الصحيح» (hindawi.org)",
+      "sourceType": "A+B+C",
+      "confidence": "High",
+      "old": "D",
+      "reason": "«مجال يبحث في النواحي العامة للفكر الصحيح» = تعريف المنطق",
+      "url": ""
+    },
+    "T1-LG-01-Q08": {
+      "answer": "D",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "من الملاحظة إلى قانون علمي = تنمية الروح العلمية",
+      "url": ""
+    },
+    "T1-LG-01-Q09": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "«اعقلوا الخبر عقل رعاية» = التمييز بين الأدلة",
+      "url": ""
+    },
+    "T1-LG-01-Q11": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "التجربة → قانون الإبصار = الروح العلمية",
+      "url": ""
+    },
+    "T1-LG-01-Q12": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "الكاشف والمميز لصحيح الفكر عن الفاسد = التمييز بين الأدلة",
+      "url": ""
+    },
+    "T1-LG-01-Q13": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "العقل لا الوجدان = التحرر من التأثير السلبي للعاطفة",
+      "url": ""
+    },
+    "T1-LG-01-Q14": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان) + shbabbek.com/show/260547 (السؤال نفسه حرفيًا: الآلة العاصمة للسان)",
+      "sourceType": "A+B+C",
+      "confidence": "High",
+      "old": "D",
+      "reason": "تركيب الجمل الصحيحة/عصمة اللسان = اختيار الألفاظ/المفردات بدقة",
+      "url": ""
+    },
+    "T1-LG-01-Q15": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "عدم التسليم إلا بالحجة = تنمية الاتجاه النقدي",
+      "url": ""
+    },
+    "T1-LG-01-Q16": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "التوصل لحقائق فلكية جديدة = الروح العلمية",
+      "url": ""
+    },
+    "T1-LG-01-Q17": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "التحقق والتقصي وإصدار الحكم بمعايير = الاتجاه النقدي",
+      "url": ""
+    },
+    "T1-LG-01-Q18": {
+      "answer": "D",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "التحليل والتقييم = الروح النقدية",
+      "url": ""
+    },
+    "T1-LG-01-Q19": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإشارات المعبرة عن الفكر — لغة) + https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) (المنطق لغةً: الكلام الظاهر والباطن)",
+      "sourceType": "B+C",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "الوصف اللغوي للكلام الظاهر/الباطن يشير لمفهوم اللغة كإشارات معبرة عن الفكر",
+      "url": ""
+    },
+    "T1-LG-01-Q20": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق) عبر https://www.nafham.com (مبادئ علم المنطق — أهمية المنطق) + كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (نسختا المفتاح 3438/3466 متفقتان): التعريف الاصطلاحي «العلم الذي يدرس القواعد العامة للتفكير الصحيح»",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "تمييز العمليات الذهنية الصحيحة من الفاسدة = التعريف الاصطلاحي",
+      "url": ""
+    },
+    "T1-LG-02-Q04": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: سوء استخدام اللغة)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "حُلّة (ثوب/إناء) = غموض اللغة",
+      "url": ""
+    },
+    "PL-0158": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الديني)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "الإيماني = الديني",
+      "url": ""
+    },
+    "PL-0200": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: موضوع الدراسة)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "محتوى الدراسة = موضوع الدراسة",
+      "url": ""
+    },
+    "PL-1454": {
+      "answer": "C",
+      "source": "تعريف الحد الجزئي في المنطق التقليدي: «ما يمتنع فرض صدقه على كثيرين» (امتناع الاشتراك)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "نسختا مفتاح الكتاب متعارضتان؛ التعريف الكلاسيكي يحسم: الجزئي",
+      "url": ""
+    },
+    "PL-1470": {
+      "answer": "B",
+      "source": "تعريف الحد الكلي: يُحمل بمعنى واحد على أفراد لا متناهين ويُطلق على كل واحد منهم (بخلاف الجمعي)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "نسختا المفتاح متعارضتان؛ التعريف يحسم: الكلي",
+      "url": ""
+    },
+    "PL-1472": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: تلازم)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "اقتران ≈ تلازم (أقرب خيار)",
+      "url": ""
+    },
+    "PL-1512": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الكلي)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "«الخبرة» حد كلي بالتعميم",
+      "url": ""
+    },
+    "T1-LG-05-Q02": {
+      "answer": "A",
+      "source": "تعريف العرض العام: صفة عرضية غير لازمة سريعة الزوال (تعريفات الجرجاني)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "نسختا المفتاح متعارضتان (عرض عام/فصل)؛ التعريف يحسم: العرض العام",
+      "url": ""
+    },
+    "T1-LG-05-Q03": {
+      "answer": "A",
+      "source": "تعريف الجنس: كلي يشمل أنواعًا مختلفة ذات صفات مشتركة",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "نسختا المفتاح متعارضتان (جنس/نوع)؛ «جملة أنواع» = جنس",
+      "url": ""
+    },
+    "T1-LG-05-Q09": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: عرضية غير مميزة — عرض عام)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "",
+      "url": ""
+    },
+    "T1-LG-06-Q19": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: «يلوم أدواته»)",
+      "sourceType": "B+D",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "المحمول هو كل ما بعد الموضوع «العامل السيئ»: «دائمًا يلوم أدواته» (الخيار B يطابق مفتاح الكتاب)",
+      "url": ""
+    },
+    "T1-LG-06-Q20": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: جزء من القضية — موضوع)",
+      "sourceType": "B+D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "«الغياب» هو الموضوع المحكوم عليه في القضية",
+      "url": ""
+    },
+    "PL-1859": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح مُتردَّد: بسيطة/تحليلية)",
+      "sourceType": "B+D",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "واقعة تاريخية يضيف فيها المحمول معلومة جديدة = تأليفية؛ «بسيطة» ليست من الخيارات",
+      "url": ""
+    },
+    "PL-1875": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: بسيطة — تصنيف آخر غير موجود بين الخيارات)",
+      "sourceType": "B+D",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "المحمول يضيف معلومة غير متضمنة في الموضوع = تركيبية",
+      "url": ""
+    },
+    "PL-1879": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: البسيطة — غير موجود بين الخيارات)",
+      "sourceType": "B+D",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "تأليفية",
+      "url": ""
+    },
+    "PL-1881": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: التركيبية)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "التركيبية = التأليفية",
+      "url": ""
+    },
+    "PL-1953": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كلية موجبة)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "قضية بسيطة كلية",
+      "url": ""
+    },
+    "PL-1508": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الجزئي بالإضافة — النسختان متفقتان)",
+      "sourceType": "B+D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "«كتاب الجمهورية لأفلاطون» حد جزئي بالإضافة (اسم مضاف إلى علم)",
+      "url": ""
+    },
+    "PL-2076": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: بعض الطلاب يجتهدون صادقة)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "",
+      "url": ""
+    },
+    "PL-2092": {
+      "answer": "D",
+      "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "D",
+      "reason": "صدق (ك م) يستلزم كذب (ك س) بالتضاد وكذب (ج س) بالتناقض → قضيتان كاذبتان؛ كذب (ك م) لا يعطي إلا كذبًا واحدًا",
+      "url": ""
+    },
+    "PL-2098": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: كذب الجزء يضمن كذب الكل) + قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "B+D",
+      "confidence": "High",
+      "old": "D",
+      "reason": "في التداخل قد تكذب القضيتان معًا لأن كذب الجزئية يستلزم كذب الكلية",
+      "url": ""
+    },
+    "PL-2100": {
+      "answer": "C",
+      "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "D",
+      "reason": "مع صدق (ك س) القضية المتفقة في الكيف فقط هي (ج س) بالتداخل وهي صادقة؛ مفتاح الكتاب (ج م صادقة) مخالف للكيف وكاذبة بالتناقض؛ مفتاح البنك (ك م) مختلفة الكيف",
+      "url": ""
+    },
+    "PL-2110": {
+      "answer": "B",
+      "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "صدق الجزئية يجعل الكلية المتداخلة معها غير معروفة",
+      "url": ""
+    },
+    "PL-2112": {
+      "answer": "C",
+      "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "(ك م) و(ج س) متناقضتان",
+      "url": ""
+    },
+    "PL-2124": {
+      "answer": "B",
+      "source": "قواعد مربع التقابل (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "الموضوعان مختلفان (الحيوانات/الكائنات) فلا تقابل",
+      "url": ""
+    },
+    "PL-2218": {
+      "answer": "A",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "ك س + ك م ⇒ ك س (الضرب الثاني من الشكل الأول) قياس منتج",
+      "url": ""
+    },
+    "PL-2220": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "نتيجة موجبة عن مقدمة سالبة",
+      "url": ""
+    },
+    "PL-2228": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الحد الأوسط «علة» ≠ «يحدثها علة» → أربعة حدود",
+      "url": ""
+    },
+    "PL-2230": {
+      "answer": "A",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "الشكل الأول يوجب كلية الكبرى؛ الكبرى هنا جزئية (سلب الكبرى جائز في الشكل الأول)",
+      "url": ""
+    },
+    "PL-2232": {
+      "answer": "D",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "D",
+      "reason": "«المسافرين» موضوع الكبرى الكلية = مستغرق",
+      "url": ""
+    },
+    "PL-2242": {
+      "answer": "D",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "النتيجة جزئية موجبة → الصغرى المكملة جزئية موجبة (ك م + ج م ⇒ ج م)",
+      "url": ""
+    },
+    "PL-2226": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: المقدمتين سالبتين) + قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "B+D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "مقدمتان سالبتان = الإخلال بشرط الكيف",
+      "url": ""
+    },
+    "PL-2234": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الصغرى سالبة في الشكل الأول",
+      "url": ""
+    },
+    "PL-2204": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: القياس الأرسطي/قاعدة الكل والجزء)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "",
+      "url": ""
+    },
+    "PL-2250": {
+      "answer": "B",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "نتيجة ج س تلزم عن ك س + ج م: مختلفتان كمًّا وكيفًا",
+      "url": ""
+    },
+    "PL-2262": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "مقدمتان مختلفتان كمًّا وكيفًا ⇒ نتيجة جزئية سالبة",
+      "url": ""
+    },
+    "PL-2264": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الصغرى سالبة",
+      "url": ""
+    },
+    "PL-2286": {
+      "answer": "A",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "A",
+      "reason": "نتيجة موجبة عن مقدمة سالبة فلا تلزم",
+      "url": ""
+    },
+    "PL-2288": {
+      "answer": "B",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "B",
+      "reason": "نتيجة ك س تلزم عن ك س + ك م: متفقتان كمًّا مختلفتان كيفًا",
+      "url": ""
+    },
+    "PL-2308": {
+      "answer": "C",
+      "source": "قواعد القياس الأرسطي والشكل الأول (منطق صوري قابل للاشتقاق)",
+      "sourceType": "D",
+      "confidence": "High",
+      "old": "C",
+      "reason": "النتيجة التي تستغرق المحمول فقط = ج س ⇐ ك س + ج م",
+      "url": ""
+    },
+    "PLT2-0005": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت2 (السؤال 2 من الأسئلة العامة حرفيًا؛ المعنى الاصطلاحي: لا يتوقف على الطبيعة المادية بل يشمل التفاعل الحضاري) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "B",
+      "reason": "المادي + المعنوي = المعنى الاصطلاحي",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0007": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت2 (السؤال 4 حرفيًا؛ القهر والاستبداد: إحداث تحولات حادة في طبيعة الكائنات الحية وأشكالها) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "تعديل المادة الوراثية = مرحلة القهر والاستبداد",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0015": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت2 (السؤال 16 حرفيًا؛ القهر والاستبداد: «اعتداء على مقدرات الطبيعة وإخلال بالتوازن البيئي») + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "عبارة «اختلال التوازن البيئي» من تعريف مرحلة القهر",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0071": {
+      "answer": "D",
+      "source": "كتاب الوزارة ت2 (السؤال 22 حرفيًا؛ زرع الأعضاء: انتزاع الأعضاء من مانح حي أو ميت) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الإنسان وجثته مصدر للأنسجة = زراعة الأعضاء",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0078": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت2 (أخلاقيات العيادة: «خريطة علاج تقدر وتحترم المريض الذي يثق في الطبيب») + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "التلاعب بدماغ المريض يخالف احترام حق المريض",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0116": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت2 (الطواعية: «تستمد جذورها من الحرية والاستقلالية والقدرة على اتخاذ القرارات الشخصية»)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "A",
+      "reason": "حق الحرية وتقرير المصير = الطواعية (يطابق مفتاح JSON)",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0130": {
+      "answer": "A",
+      "source": "كتاب الوزارة ت2 (السؤال 1 من «أسئلة الفلسفة وأخلاقيات المهنة» حرفيًا؛ تحليل الواقع الثقافي واستخلاص القيم بمشاركة الفيلسوف) + كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "تحديد القيم (العدل/المساواة/الحرية) = استخلاص القيم",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0141": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: تكوين انطباع جيد عند المتعاملين) + كتاب الوزارة ت2 (تكوين صورة إيجابية عن المؤسسة)",
+      "sourceType": "B+A",
+      "confidence": "Medium",
+      "old": "C",
+      "reason": "تأثير سلوك المعلم في تلاميذه ومجتمعه = الصورة الإيجابية",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0144": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: وضع أسس ميثاق أخلاق المهنة) + كتاب الوزارة ت2 (تحديد الأسس والقواعد المحددة لأداء أعمال المؤسسة)",
+      "sourceType": "B+A",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "وضع معايير للسلوك المهني = تحديد الأسس والقواعد",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2-0205": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: التطابق — غير موجود بين الخيارات)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "الحقيقة من الواقع الخارجي = الفكر المادي/نظرية التطابق",
+      "url": ""
+    },
+    "PLT2-0207": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: البراجماتية العملية)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "B",
+      "reason": "اختلاف إملائي فقط",
+      "url": ""
+    },
+    "PLT2-0210": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: التسامح الفكري)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "B",
+      "reason": "الانفتاح وتقبل الغير = التسامح الفكري",
+      "url": ""
+    },
+    "PLT2-0217": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الكشف عن الحقائق)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "أقرب خيار: الاتجاه الواعي نحو العالم المحيط",
+      "url": ""
+    },
+    "PLT2-0212": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: اختيار الفعل عن روية وتدبر)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "عدم التسرع بالحكم على القول = الروية والتدبر؛ لا دليل مضاد",
+      "url": ""
+    },
+    "PLT2-0040": {
+      "answer": "A",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: هانز يوناس) + كتاب الوزارة ت2 (السؤال 7 حرفيًا)",
+      "sourceType": "A+B",
+      "confidence": "High",
+      "old": "A",
+      "reason": "",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term2/StudentBook/philosophyandlogic_ARABIC_1_Secondary_T2.pdf"
+    },
+    "PLT2L-001": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الناقص)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "",
+      "url": ""
+    },
+    "T2-LG-BACON-Q11": {
+      "answer": "C",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: السوق)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "C",
+      "reason": "",
+      "url": ""
+    },
+    "T2-LG-BACON-Q19": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الجنس)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "",
+      "url": ""
+    },
+    "PLT2L-012": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الاستقراء التام)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "C",
+      "reason": "فحص «الأجزاء» ثم التعميم على «الكل» = الاستقراء التام؛ لا دليل مضاد",
+      "url": ""
+    },
+    "T2-LG-IND-01-Q03": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: الناقص) + hindawi.org (التام = التلخيصي؛ الاستقراء العلمي الحديث = الناقص)",
+      "sourceType": "B+C",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "ملاحظة نماذج بدل كل الأفراد = الاستقراء الناقص = «العلمي» بين الخيارات؛ «التام» يناقض النص",
+      "url": ""
+    },
+    "T2-LG-IND-01-Q15": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الثاني (data/sources) — نموذج الإجابة (المفتاح: المثال د)",
+      "sourceType": "B",
+      "confidence": "High",
+      "old": "D",
+      "reason": "نتيجة أعم من المقدمات = استقراء",
+      "url": ""
+    },
+    "T2-LG-DED-02-Q16": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت2 (أهمية الذكاء الاصطناعي) — استدلال مباشر من النص",
+      "sourceType": "D",
+      "confidence": "Medium",
+      "old": "C",
+      "reason": "توقع الفيضانات وتتبع الحرائق = التعامل مع الكوارث الطبيعية",
+      "url": ""
+    },
+    "PL-0017": {
+      "answer": "C",
+      "source": "كتاب الوزارة ت1 (أسئلة عامة س1 حرفيًا؛ المسطر «مهد الطريق إلى إيمان الغد»)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "C",
+      "reason": "الغد/المستقبل = التخطيط للمستقبل؛ مفتاح كتاب الأسئلة (تنظيم التفكير) مخالف للجزء المسطر في نسخة الوزارة",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0332": {
+      "answer": "B",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإشراق) + JSON (B)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "استخراج الفكرة = ولادة شرارة الإبداع (الإشراق)؛ لا مصدر أقوى مخالف",
+      "url": ""
+    },
+    "PL-0336": {
+      "answer": "D",
+      "source": "كتاب أسئلة الترم الأول (data/sources) — نموذج الإجابة (المفتاح: الإعداد) + JSON (D)",
+      "sourceType": "B",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "الجزء المسطر غير محفوظ في النسخ النصية؛ مفتاح الكتاب يشير إلى «فترة التفكير الواعي التي تسبق الإلهام» = الإعداد",
+      "url": ""
+    },
+    "T1-LG-01-Q10": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق: تنمية الاتجاه النقدي) — ترجيح بين نسختي مفتاح الكتاب المتعارضتين (3438: النقدي / 3466: العاطفة)",
+      "sourceType": "A+D",
+      "confidence": "Medium",
+      "old": "D",
+      "reason": "فحص الأخبار وتحليلها وقبول الصحيح ورفض المضلل = الاتجاه النقدي",
+      "url": ""
+    },
+    "T1-LG-05-Q07": {
+      "answer": "C",
+      "source": "شجرة فورفوريوس: الترتيب التصاعدي يبدأ من النوع الأدنى (بطة) إلى الجنس الأعلى (كائن)",
+      "sourceType": "D",
+      "confidence": "Medium",
+      "old": "A",
+      "reason": "مفتاح الإنتاج A ترتيب مستحيل؛ مفتاح الكتاب B هو الترتيب التنازلي؛ «تصاعديًا» = C — يُراجع مع نموذج الإجابة الرسمي",
+      "url": ""
+    },
+    "T1-LG-01-Q03": {
+      "answer": "B",
+      "source": "كتاب الوزارة ت1 (أهمية المنطق: التحرر من العاطفة والشائعات) عبر nafham.com + JSON (B)",
+      "sourceType": "A+D",
+      "confidence": "Medium",
+      "old": "B",
+      "reason": "الشغف (عاطفة) مقابل المنطق = التحرر من العاطفة؛ مفتاح كتاب الأسئلة (الروح العلمية) لا يطابق مضمون العبارة",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "T1-PH-04-Q19": {
+      "answer": "B",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B) + كتاب الوزارة الرسمي — الفلسفة والمنطق، الصف الأول الثانوي، ت1 (نشأة الفلسفة: «زرادشت في فارس»)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "A",
+      "reason": "المقولة (التعليم والتعلم + الواجبات نحو الآباء والآلهة) زرادشتية الطابع ⇒ فارس، وهي موجودة بين الاختيارات. مفتاح كتاب الأسئلة «الشرق القديم» خارج الاختيارات ⇒ مرفوض.",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    },
+    "PL-0561": {
+      "answer": "A",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "A",
+      "reason": "جون لوك تجريبي ينكر الأفكار الفطرية ⇒ الاعتماد على المعرفة الجزئية الحسية. يحسم التعارض بين بنك PhiloData.gs (A) وملف التدريبات (B) لصالح A في النسختين."
+    },
+    "T1-PH-04-Q20": {
+      "answer": "A",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "B",
+      "reason": "جون لوك تجريبي ينكر الأفكار الفطرية ⇒ الاعتماد على المعرفة الجزئية الحسية. يحسم التعارض بين بنك PhiloData.gs (A) وملف التدريبات (B) لصالح A في النسختين."
+    },
+    "T1-LG-02-Q20": {
+      "answer": "C",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "B",
+      "reason": "السؤال بصيغة «يخالف»: التحقق من صحة الخبر يخالف القابلية للاستهواء (تصديق ما يُلقى دون تمحيص). مفتاح كتاب الأسئلة «التسرع في الحكم» خارج الاختيارات ⇒ مرفوض."
+    },
+    "PL-1436": {
+      "answer": "C",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "D",
+      "reason": "«سنترال» لفظ يصدق على كثيرين يشتركون في صفات معينة ويُطلق على كل فرد منهم ⇒ حد كلي. يحسم تعارض كتلتَي المفاتيح المكررتين في كتاب الأسئلة (الكلي/السالب) لصالح «الكلي»."
+    },
+    "T1-LG-05-Q06": {
+      "answer": "D",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "D",
+      "reason": "الجزء المسطَّر = «مساحة من اليابس» وهو الكلي الأعم الذي تندرج تحته الجزيرة ⇒ الجنس. مفتاح كتاب الأسئلة «النوع» خارج الاختيارات ⇒ مرفوض.",
+      "underlinedSpan": "مساحة من اليابس"
+    },
+    "T1-LG-05-Q14": {
+      "answer": "A",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "C",
+      "reason": "المسطَّر = «حيوانات» (جنس) + «تسعى للبقاء» (صفة عرضية غير مميزة ⇒ عرض عام). مفتاح كتاب الأسئلة «الجنس والنوع» خارج الاختيارات ⇒ مرفوض.",
+      "underlinedSpan": "حيوانات … تسعى للبقاء"
+    },
+    "T1-PH-04-Q16": {
+      "answer": "D",
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B) + كتاب الوزارة الرسمي — الفلسفة والمنطق، الصف الأول الثانوي، ت1 («من أبرز حكماء الشرق القديم: أخناتون في مصر، بوذا في الهند، كونفوشيوس في الصين، زرادشت في فارس»)",
+      "sourceType": "A",
+      "confidence": "High",
+      "old": "D",
+      "reason": "كونفوشيوس صيني ⇒ الشرق القديم. رُفع العزل بعد استعادة الخيار A («مصر») ⇒ T1 = 340.",
+      "url": "https://elearnningcontent.blob.core.windows.net/elearnningcontent/2026/Secondry/Secondry1/Term1/StudentBook/Philosophy_and_Logic_Tr1_1sec.pdf"
+    }
+  },
+  "restoreOptions": {
+    "T1-PH-04-Q16": {
+      "options": [
+        "مصر",
+        "أسبرطة",
+        "اليونان القديم",
+        "الشرق القديم"
+      ],
+      "source": "قرار معلّم المادة (مالك المستودع) — جلسة مراجعة Answer-Key QA؛ يُقدَّم على «نموذج الإجابة» في كتاب الأسئلة بعد ثبوت أن جزءًا منه مُولَّد آليًا (انظر KEY_AUDIT_REPORT.md § مصداقية المصدر B) — الخيار A فارغ في ملف .docx الأصلي (فقرة 1142 بلا أي <w:r>/<w:t>)؛ استعادته بقرار المعلّم",
+      "note": "المفتاح يبقى D (الشرق القديم): كتاب الوزارة ينص «كونفوشيوس في الصين» ضمن حكماء الشرق القديم."
+    }
+  },
+  "unresolved": {}
 }

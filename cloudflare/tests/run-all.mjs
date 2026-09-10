@@ -237,7 +237,7 @@ try {
     ok('كل درس يحمل اسمًا حقيقيًا (لا «الدرس N» عامًا) ورقمًا متسلسلًا', s1.lessons.concat(s2.lessons).every(l => l.title.trim() && !/^الدرس\s*(الأول|الثاني|الثالث|\d+)$/.test(l.title.trim())) && s1.topics.concat(s2.topics).every(tp => tp.lessons.every((l, i) => l.no === i + 1)));
     ok('الترم الثاني: الفلسفة موضوعان (البيئية والبيوطبية / المهنية والقيم) والمنطق موضوعان (الاستقراء / الاستنباط) — 11 درسًا',
       s2.topics.length === 4 && s2.t.sections[0].topics.map(t => t.title).join('|') === 'الفلسفة والأخلاق البيئية والبيوطبية|الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد' && s2.t.sections[1].topics.map(t => t.title).join('|') === 'الاستقراء وتطبيق المنهج التجريبي|الاستنباط وتطبيقه في العلوم الصورية' && s2.lessons.length === 11 && lessonsOf(s2, 0, 0).length === 3 && lessonsOf(s2, 0, 1).length === 2 && lessonsOf(s2, 1, 0).length === 3 && lessonsOf(s2, 1, 1).length === 3);
-    ok('الترم الأول: 339 سؤالًا في التدريبات (17×20 − سؤال واحد محجوز لعيب استخراج موثق)', s1.q === 339 && s1.trainings.filter(tr => tr.questionCount === 20).length === 16 && s1.trainings.filter(tr => tr.questionCount === 19).length === 1);
+    ok('الترم الأول: 340 سؤالًا في التدريبات (17×20 — لا أسئلة محجوزة بعد استعادة الخيار الناقص بقرار موثق)', s1.q === 340 && s1.trainings.filter(tr => tr.questionCount === 20).length === 17 && s1.trainings.filter(tr => tr.questionCount === 19).length === 0);
     ok('الترم الثاني: 13 تدريبًا / 260 سؤالًا (13×20)', s2.trainings.length === 13 && s2.q === 260 && s2.trainings.every(tr => tr.questionCount === 20));
     const allTr = s1.trainings.concat(s2.trainings);
     ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI)', new Set(allTr.map(tr => tr.examId)).size === 30 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
@@ -253,11 +253,14 @@ try {
     const fs2 = fs; const norm = (x) => String(x || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/[إأآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[«»"“”'’‘.،,:؛;\-–—…()\[\]؟?!]/g, ' ').replace(/\s+/g, ' ').trim();
     const stripL = (t) => { let o = String(t || ''), p = null; while (o !== p) { p = o; o = o.replace(/^\s*[\(（]?[أابجدهABCDabcd][\)）\]\s.\-–:：]+\s*/, '').trim(); } return o; };
     let jsonOk = true, det = [];
+    // an empty JSON option is only usable when a documented restoreOptions entry supplies it
+    const RESTORE = (JSON.parse(fs2.readFileSync(path.join(ROOT, 'data', 'key-decisions.json'), 'utf8')).restoreOptions) || {};
+    const effOpts = (q) => (RESTORE[q.id] ? RESTORE[q.id].options : q.options);
     for (const term of [1, 2]) {
       const J = JSON.parse(fs2.readFileSync(path.join(ROOT, 'data', 'ExamManasa_Term' + term + '_Philosophy_Logic_ExamData.json'), 'utf8'));
       for (const t of J.training_exams) {
         const ids = BANKS.examDefs[t.training_id];
-        const exp = t.questions.filter(q => q.options.every(o => stripL(o)));
+        const exp = t.questions.filter(q => effOpts(q).every(o => stripL(o)));
         if (!ids || ids.length !== exp.length || new Set(ids).size !== ids.length) { jsonOk = false; det.push(t.training_id + ':len'); continue; }
         exp.forEach((jq, i) => {
           const bq = BANKS.questions[ids[i]];
@@ -413,8 +416,8 @@ try {
     ok('تصدير CSV مع BOM عربي (0xEF 0xBB 0xBF)',
       csvResp.status === 200 && csvBytes[0] === 0xEF && csvBytes[1] === 0xBB && csvBytes[2] === 0xBF && csvText.includes('اسم الطالب'));
     const overview = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
-    ok('نظرة عامة: 113 امتحانًا / 1769 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
-      overview.data.exams === 113 && overview.data.questions === 1769 && overview.data.structure.philosophyTrainings.term1.trainings === 17 && overview.data.structure.philosophyTrainings.term2.trainings === 13 &&
+    ok('نظرة عامة: 113 امتحانًا / 1770 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
+      overview.data.exams === 113 && overview.data.questions === 1770 && overview.data.structure.philosophyTrainings.term1.trainings === 17 && overview.data.structure.philosophyTrainings.term2.trainings === 13 &&
       overview.data.audit.psychology.corrections.length === 8);
     const qs = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('البيئية'), { headers: { Cookie: cookie } });
     ok('بنك الأسئلة: بحث + مفاتيح للمسؤول فقط', qs.status === 200 && qs.data.questions.length > 0 && qs.data.questions[0].answer);
