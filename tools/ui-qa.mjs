@@ -110,7 +110,9 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
   const phExams = Object.values(catalog.exams).filter(e => e.subjectId === 'philosophy').length;
   ok('بطاقتا الصفين: الأول الثانوي (فلسفة ومنطق) + الثاني الثانوي (بكالوريا — علم النفس)',
     html.includes('الصف الأول الثانوي') && html.includes('الفلسفة والمنطق') && html.includes('الصف الثاني الثانوي') && html.includes('بكالوريا — علم النفس'));
-  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phExams + ' فلسفة)', html.includes(psyExams + ' امتحانًا') && html.includes(phExams + ' امتحانًا'));
+  const phTrainings = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.reduce((k, tp) => k + tp.lessons.reduce((z, l) => z + l.trainings.length, 0), 0), 0), 0);
+  const phTopics = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.length, 0), 0);
+  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعًا و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعًا') && phTrainings === 30 && phExams > phTrainings);
   ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات',
     doc.querySelectorAll('.feature').length === 3 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات'));
   ok('قسم «عن المعلم والمنصة» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
@@ -186,38 +188,65 @@ console.log('\n[4] المسار الكامل بالنقرات الحقيقية �
   harvestClasses(doc);
 }
 
-console.log('\n[4ب] نماذج الامتحان — ظهور واضح ومسار مستقل لكل نموذج');
+console.log('\n[4ب] الفلسفة والمنطق — الترم ← الموضوع (2) ← الدرس (اسم حقيقي) ← تدريبات الدرس ← الامتحان (بالنقرات الحقيقية)');
 {
   const W = dom.window;
   W.location.hash = '#/s/philosophy/1';
   await sleep(300);
-  // الدرس ذات 4 نماذج من الفهرس
   const t1 = catalog.catalog.philosophy.terms[0];
-  let multi = null;
-  t1.units.forEach(u => u.chapters.forEach(ch => ch.lessons.forEach(l => { if (!multi && l.examIds.length >= 4) multi = l; })));
-  ok('يوجد درس متعدد النماذج في الفهرس (' + multi.examIds.length + ' نماذج)', !!multi && multi.examIds.length === 4);
-  const row = [...doc.querySelectorAll('.lesson:not(.comp)')].find(r => r.querySelector('.lt').textContent === multi.title);
-  ok('صف الموضوع يعرض منطقة «الامتحانات المتاحة» مجمّعة وواضحة', !!row && !!row.querySelector('.models') && row.querySelector('.models-label').textContent.includes('الامتحانات المتاحة'));
-  const btns = row ? row.querySelectorAll('.model-btn') : [];
-  ok('كل نموذج زر امتحان مستقل بارز (' + btns.length + ' أزرار — ليست رقائق صغيرة)', btns.length === multi.examIds.length && !doc.querySelector('.variant-chip'));
-  const countsOk = [...btns].every((b, i) =>
-    b.querySelector('.m-name').textContent.trim() === 'نموذج ' + (i + 1) &&
-    b.querySelector('.m-meta').textContent.includes(catalog.exams[multi.examIds[i]].count + ' سؤالًا'));
-  ok('كل زر يعرض «نموذج N» + عدد الأسئلة الفعلي من البيانات («امتحان تدريبي · 20 سؤالًا»)', countsOk);
-  ok('حجم لمس مريح (min-height ≥ 48px) وحالة hover/active في CSS',
-    /\.model-btn\s*{[^}]*min-height:\s*(4[8-9]|[5-9]\d)px/.test(css) && /\.model-btn:hover/.test(css) && /\.model-btn:active/.test(css));
-  // المسار: النقر على «نموذج 2» يفتح الامتحان الثاني تحديدًا
-  const model2 = btns[1];
-  model2.click();
+  const topics1 = t1.sections.flatMap(sec => sec.topics);
+  const trOf = tp => tp.lessons.flatMap(l => l.trainings);
+  let html = doc.getElementById('app').innerHTML;
+  ok('صفحة الترم: الفلسفة موضوعان + المنطق موضوعان فقط (4 بطاقات) — لا دروس ولا تدريبات ولا «نموذج N»', doc.querySelectorAll('.topic-card').length === 4 && topics1.length === 4 && !doc.querySelector('.lesson-card') && !doc.querySelector('.training-card') && !doc.querySelector('.model-btn') && !/نموذج \d/.test(html));
+  ok('عناوين الموضوعات الرسمية', ['التفكير الإنساني', 'الفلسفة وطبيعة الموقف الفلسفي', 'مبادئ المنطق (الحدود - القضايا)', 'الاستدلال (تعريفه - أنواعه)'].every(t => html.includes(t)));
+  ok('بطاقة الموضوع تعرض عدد الدروس وعدد التدريبات', [...doc.querySelectorAll('.topic-card .ls')].every(el => /درس|دروس/.test(el.textContent) && /تدريب/.test(el.textContent)));
+  ok('قسم «امتحانات شاملة» منفصل عن الموضوعات (3 شوامل ت1)', html.includes('امتحانات شاملة') && doc.querySelectorAll('.lesson.comp').length === 3);
+  ok('لا مستويات صعوبة في أي مكان', !/مستوى (سهل|متوسط|متقدم|صعب)/.test(html));
+  // انقر الموضوع 1 من الفلسفة
+  const tp0 = topics1[0];
+  const card0 = [...doc.querySelectorAll('.topic-card')].find(c => c.querySelector('.lt').textContent === tp0.title);
+  ok('بطاقة الموضوع 1 «' + tp0.title + '» تحمل رابطًا مباشرًا (#/s/philosophy/1/t/…)', !!card0 && card0.getAttribute('href') === '#/s/philosophy/1/t/' + encodeURIComponent(tp0.key));
+  card0.click();
   await sleep(300);
-  const eid2 = multi.examIds[1];
-  ok('«نموذج 2» يفتح الامتحان الصحيح (#/e/' + eid2 + ')', W.location.hash === '#/e/' + eid2);
-  ok('عنوان الامتحان الصحيح للنموذج 2', doc.querySelector('.exam-head h2').textContent === catalog.exams[eid2].title);
-  // بدء نموذج 2 فعليًا وتسليمه — التحقق من الأسئلة والتصحيح
+  html = doc.getElementById('app').innerHTML;
+  ok('صفحة الموضوع: المسار صحيح وتعرض دروس هذا الموضوع فقط (' + tp0.lessons.length + ')', W.location.hash === '#/s/philosophy/1/t/' + encodeURIComponent(tp0.key) && W.S.view === 'topic' && doc.querySelectorAll('.lesson-card').length === tp0.lessons.length && !doc.querySelector('.training-card'));
+  ok('بطاقة الدرس: «الدرس N — الاسم الحقيقي» + عدد التدريبات + «عرض التدريبات»', tp0.lessons.every((l, i) => { const c = doc.querySelectorAll('.lesson-card')[i]; return c.querySelector('.lt').textContent === 'الدرس ' + l.no + ' — ' + l.title && c.textContent.includes(l.trainings.length + ' تدريب') && c.textContent.includes('عرض التدريبات'); }));
+  ok('أسماء الدروس هي أسماء JSON الحقيقية (التفكير والنشاط العقلي / أساليب التفكير / مهارات التفكير الفلسفي)', ['التفكير والنشاط العقلي', 'أساليب التفكير', 'مهارات التفكير الفلسفي'].every(t => html.includes(t)) && !/الدرس \d+ — الدرس/.test(html));
+  ok('لا تسريب لدروس موضوع آخر', [...doc.querySelectorAll('.lesson-card .lt')].every(el => tp0.lessons.some(l => el.textContent.endsWith(l.title))));
+  ok('مسار الموقع + زر العودة إلى الموضوعات', doc.querySelector('.crumb').textContent.includes('الترم الأول') && html.includes('العودة إلى موضوعات'));
+  // الدرس 1 → تدريباته
+  doc.querySelector('.lesson-card').click();
+  await sleep(300);
+  html = doc.getElementById('app').innerHTML;
+  const l0 = tp0.lessons[0];
+  ok('صفحة الدرس: المسار #/s/philosophy/1/t/{topic}/l/{lesson} وتدريبات هذا الدرس فقط (' + l0.trainings.length + ')', W.location.hash === '#/s/philosophy/1/t/' + encodeURIComponent(tp0.key) + '/l/' + encodeURIComponent(l0.key) && W.S.view === 'lesson' && doc.querySelectorAll('.training-card').length === l0.trainings.length && !doc.querySelector('.lesson-card'));
+  ok('عنوان الصفحة «الدرس 1 — ' + l0.title + '»', doc.querySelector('.topic-head h2').textContent === 'الدرس 1 — ' + l0.title);
+  const tc = doc.querySelector('.training-card');
+  ok('بطاقة التدريب: اسم التدريب + 20 سؤالًا + «ابدأ الامتحان» — بلا صعوبة', !!tc && tc.querySelector('.tc-title').textContent === l0.trainings[0].title && tc.textContent.includes(l0.trainings[0].questionCount + ' سؤالًا') && tc.querySelector('.tc-start').textContent.includes('ابدأ الامتحان') && !/مستوى/.test(tc.textContent));
+  ok('أزرار العودة: إلى دروس الموضوع + إلى الترم', html.includes('العودة إلى دروس الموضوع') && html.includes('العودة إلى الترم الأول'));
+  ok('حجم لمس مريح: بطاقة التدريب ≥ 96px وزر البدء ≥ 48px، عمود واحد على الموبايل',
+    /\.training-card\s*{[^}]*min-height:\s*(9[6-9]|\d{3})px/.test(css) && /\.training-card \.tc-start\s*{[^}]*min-height:\s*(4[8-9]|[5-9]\d)px/.test(css) && /@media \(max-width: 600px\)\s*{[^@]*\.topic-grid, \.training-grid\s*{\s*grid-template-columns:\s*1fr/.test(css));
+  // ت2: درس بأكثر من تدريب (الفلسفة البيئية = تدريبان)
+  W.location.hash = '#/s/philosophy/2';
+  await sleep(300);
+  const t2 = catalog.catalog.philosophy.terms[1];
+  const multiTp = t2.sections.flatMap(sec => sec.topics).find(tp => tp.lessons.some(l => l.trainings.length >= 2));
+  const multi = multiTp.lessons.find(l => l.trainings.length >= 2);
+  ok('ت2: يوجد درس بأكثر من تدريب (' + multi.title + ' — ' + multi.trainings.length + ')', !!multi);
+  [...doc.querySelectorAll('.topic-card')].find(c => c.querySelector('.lt').textContent === multiTp.title).click();
+  await sleep(300);
+  [...doc.querySelectorAll('.lesson-card')].find(c => c.querySelector('.lt').textContent.endsWith(multi.title)).click();
+  await sleep(300);
+  const cards = [...doc.querySelectorAll('.training-card')];
+  ok('تدريبات الدرس كبطاقات مستقلة «تدريب 1» / «تدريب 2» بعدد الأسئلة الحقيقي', cards.length === multi.trainings.length && cards.every((c, i) => c.querySelector('.tc-title').textContent === 'تدريب ' + (i + 1) && c.textContent.includes(catalog.exams[multi.trainings[i].examId].count + ' سؤالًا')));
+  cards[1].querySelector('.tc-start').click();
+  await sleep(300);
+  const eid2 = multi.trainings[1].examId;
+  ok('«تدريب 2» يفتح الامتحان الصحيح (#/e/' + eid2 + ') وصفحة البدء تعرض الدرس والتدريب', W.location.hash === '#/e/' + eid2 && doc.querySelector('.exam-head h2').textContent.includes(multi.title) && doc.querySelector('.exam-head h2').textContent.includes('تدريب 2') && !/مستوى|سهل:|متوسط:|متقدم:/.test(doc.getElementById('app').innerHTML));
+  ok('مسار صفحة الامتحان يتضمن الموضوع والدرس', doc.querySelector('.crumb').textContent.includes('الموضوع ' + multiTp.no) && doc.querySelector('.crumb').textContent.includes('الدرس ' + multi.no));
   doc.getElementById('startBtn').click();
   await sleep(450);
-  ok('جلسة النموذج 2: معرف الامتحان الصحيح وعدد الأسئلة الصحيح',
-    W.S.session.exam.id === eid2 && W.S.session.questions.length === catalog.exams[eid2].count);
+  ok('جلسة تدريب 2: معرف الامتحان الصحيح و20 سؤالًا', W.S.session.exam.id === eid2 && W.S.session.questions.length === 20);
   ok('مفتاح الإجابة غير مكشوف قبل التسليم (حقول السؤال: نص/خيارات فقط)',
     W.S.session.questions.every(q => JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['id', 'no', 'options', 'text'])));
   const total = W.S.session.questions.length;
@@ -228,19 +257,32 @@ console.log('\n[4ب] نماذج الامتحان — ظهور واضح ومسا�
   doc.getElementById('submitBtn').click();
   await sleep(500);
   const r = W.S.result;
-  ok('تسليم النموذج 2 ينقل للنتيجة ويحفظها', W.location.hash === '#/result' && !!r && r.total === total);
-  ok('التصحيح متسق ذاتيًا: isCorrect ≡ (إجابتك = الإجابة الصحيحة) لكل سؤال',
-    r.review.every(q => q.isCorrect === (q.studentAnswerText === q.correctAnswerText)));
-  ok('النسبة المئوية صحيحة حسابيًا وصحيح+خطأ = المجموع',
-    r.percentage === Math.round(r.score / r.total * 100) && r.correct + r.wrong === r.total && r.score === r.correct);
-  // «نموذج 4» يمتد أيضًا للامتحان الصحيح (لا توجيه كل النماذج لنفس الامتحان)
-  W.location.hash = '#/s/philosophy/1';
+  ok('تسليم تدريب 2 ينقل للنتيجة ويحفظها (تصحيح على الخادم)', W.location.hash === '#/result' && !!r && r.total === total);
+  ok('التصحيح متسق ذاتيًا: isCorrect ≡ (إجابتك = الإجابة الصحيحة) لكل سؤال', r.review.every(q => q.isCorrect === (q.studentAnswerText === q.correctAnswerText)));
+  ok('النسبة المئوية صحيحة حسابيًا وصحيح+خطأ = المجموع', r.percentage === Math.round(r.score / r.total * 100) && r.correct + r.wrong === r.total && r.score === r.correct);
+  clickBtn(doc, 'امتحانات أخرى');
   await sleep(300);
-  const row2 = [...doc.querySelectorAll('.lesson:not(.comp)')].find(x => x.querySelector('.lt').textContent === multi.title);
-  row2.querySelectorAll('.model-btn')[3].click();
-  await sleep(300);
-  ok('«نموذج 4» يفتح امتحانًا مختلفًا عن النموذج 2 (#/e/' + multi.examIds[3] + ')',
-    W.location.hash === '#/e/' + multi.examIds[3] && multi.examIds[3] !== eid2);
+  const lessonHash = '#/s/philosophy/2/t/' + encodeURIComponent(multiTp.key) + '/l/' + encodeURIComponent(multi.key);
+  ok('«امتحانات أخرى» من النتيجة يعيد إلى صفحة الدرس نفسه', W.location.hash === lessonHash && doc.querySelectorAll('.training-card').length === multi.trainings.length);
+  // Refresh / direct URL / Back
+  const fresh = boot('/mostafa');
+  fresh.window.location.hash = lessonHash;
+  await sleep(600);
+  const fdoc = fresh.window.document;
+  ok('فتح رابط الدرس مباشرة/بعد Refresh يعرض تدريبات الدرس مع بقاء سياق المعلم', fdoc.querySelectorAll('.training-card').length === multi.trainings.length && fresh.window.S.slug === 'mostafa' && fresh.window.S.term === 2);
+  fresh.window.history.back(); await sleep(250);
+  fresh.window.location.hash = '#/s/philosophy/2/t/' + encodeURIComponent(multiTp.key);
+  await sleep(250);
+  ok('العودة إلى الموضوع تعرض دروسه (Back لا يكسر السياق)', fdoc.querySelectorAll('.lesson-card').length === multiTp.lessons.length && !fdoc.querySelector('.training-card'));
+  fresh.window.location.hash = '#/s/philosophy/2';
+  await sleep(250);
+  ok('العودة إلى الترم تعرض الموضوعات الأربعة', fdoc.querySelectorAll('.topic-card').length === 4);
+  fresh.window.location.hash = '#/s/philosophy/2/t/' + encodeURIComponent(multiTp.key) + '/l/nope';
+  await sleep(250);
+  ok('مفتاح درس غير موجود يعود بأمان لصفحة الموضوع', fresh.window.location.hash === '#/s/philosophy/2/t/' + encodeURIComponent(multiTp.key) && fdoc.querySelectorAll('.lesson-card').length > 0);
+  fresh.window.location.hash = '#/s/philosophy/2/t/nope';
+  await sleep(250);
+  ok('مفتاح موضوع غير موجود يعود بأمان لصفحة الترم', fresh.window.location.hash === '#/s/philosophy/2' && fdoc.querySelectorAll('.topic-card').length === 4);
   harvestClasses(doc);
 }
 
@@ -250,8 +292,11 @@ console.log('\n[5] قاعدة منع التسليم الناقص — تحديد 
   const W = dom.window;
   W.location.hash = '#/s/philosophy/2';
   await sleep(300);
-  const rows = [...doc.querySelectorAll('.lesson:not(.comp)')];
-  rows[0].click();
+  doc.querySelector('.topic-card').click();
+  await sleep(300);
+  doc.querySelector('.lesson-card').click();
+  await sleep(300);
+  doc.querySelector('.training-card .tc-start').click();
   await sleep(300);
   doc.getElementById('startBtn').click();
   await sleep(450);
@@ -288,7 +333,7 @@ console.log('\n[5] قاعدة منع التسليم الناقص — تحديد 
   harvestClasses(doc);
 }
 
-console.log('\n[6] الفلسفة والمنطق — ترم ← وحدة ← فصل ← موضوع ← امتحان ← شوامل');
+console.log('\n[6] الفلسفة والمنطق — أسماء الموضوعات من JSON حرفيًا + الشوامل منفصلة + علم النفس دون تغيير');
 {
   const W = dom.window;
   W.location.hash = '#/s/philosophy/2';
@@ -296,21 +341,90 @@ console.log('\n[6] الفلسفة والمنطق — ترم ← وحدة ← ف�
   let html = doc.getElementById('app').innerHTML;
   ok('تبويبا الترم الأول/الثاني', html.includes('الترم الأول') && html.includes('الترم الثاني'));
   const t2 = catalog.catalog.philosophy.terms[1];
-  ok('وحدتا ت2 (فلسفة + منطق) كبطاقات وحدات', doc.querySelectorAll('.unit-card').length === t2.units.length && html.includes('الوحدة الأولى: الفلسفة') && html.includes('الوحدة الثانية: المنطق'));
-  ok('الفصول داخل الوحدات بتسميتها الرسمية', html.includes('الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية') && html.includes('الفصل الأول: الاستقراء وتطبيق المنهج التجريبي'));
-  const l0 = t2.units[1].chapters[0].lessons[0];
-  const row = [...doc.querySelectorAll('.lesson:not(.comp)')].find(r2 => r2.querySelector('.lt').textContent === l0.title);
-  ok('«الموضوع ' + l0.no + '» + الدرس حرفيًا: ' + l0.title, !!row && row.querySelector('.lno b').textContent === String(l0.no));
-  ok('نماذج الامتحانات المتعددة تظهر كأزرار مستقلة داخل صف الموضوع', doc.querySelectorAll('.model-btn').length >= 3 && html.includes('الامتحانات المتاحة'));
-  ok('شوامل الوحدات بشارة ⭐ «امتحان شامل» مميزة', doc.querySelectorAll('.lesson.comp').length >= 2 && html.includes('⭐ امتحان شامل'));
-  ok('الامتحان الشامل للترم — 40 سؤالًا (فلسفة + منطق)', /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا'));
-  // ت1
+  ok('ت2: 4 موضوعات رسمية (2 فلسفة + 2 منطق) — الدروس لا تظهر على صفحة الترم', doc.querySelectorAll('.topic-card').length === 4 && !doc.querySelector('.lesson-card') && ['الفلسفة والأخلاق البيئية والبيوطبية', 'الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', 'الاستقراء وتطبيق المنهج التجريبي', 'الاستنباط وتطبيقه في العلوم الصورية'].every(t => html.includes(t)));
+  { // كل الدروس بأسماء JSON الحقيقية عبر صفحات الموضوعات
+    const t2c = catalog.catalog.philosophy.terms[1];
+    let allLessonsOk = true;
+    for (const sec of t2c.sections) for (const tp of sec.topics) {
+      W.location.hash = '#/s/philosophy/2/t/' + encodeURIComponent(tp.key); await sleep(250);
+      const titles = [...doc.querySelectorAll('.lesson-card .lt')].map(el => el.textContent);
+      if (JSON.stringify(titles) !== JSON.stringify(tp.lessons.map(l => 'الدرس ' + l.no + ' — ' + l.title))) allLessonsOk = false;
+    }
+    ok('ت2: كل موضوع يعرض دروسه فقط بأسمائها الحقيقية من JSON (الفلسفة البيئية / الأخلاق البيوطبية / … / المنطق والذكاء الاصطناعي)', allLessonsOk);
+    W.location.hash = '#/s/philosophy/2'; await sleep(250); html = doc.getElementById('app').innerHTML;
+  }
+  ok('ت2: الشوامل (شامل المنطق + شامل الترم 40 سؤالًا) في قسم «امتحانات شاملة» منفصل', doc.querySelectorAll('.lesson.comp').length === 2 && /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا') && html.includes('⭐ امتحان شامل'));
+  const sumTr = () => [...doc.querySelectorAll('.topic-card .ls')].reduce((n, el) => n + parseInt((el.textContent.match(/(\d+) تدريب/) || [0, 0])[1], 10), 0);
+  ok('ت2: عدد التدريبات في بطاقات الموضوعات = 13', sumTr() === 13);
   W.location.hash = '#/s/philosophy/1';
   await sleep(300);
   html = doc.getElementById('app').innerHTML;
-  ok('ت1: الوحدة الأولى: الفلسفة / الوحدة الثانية: المنطق', html.includes('الوحدة الأولى: الفلسفة') && html.includes('الوحدة الثانية: المنطق'));
-  ok('ت1: الامتحان الشامل للترم موجود', html.includes('الامتحان الشامل للترم'));
+  ok('ت1: 4 موضوعات / 17 تدريبًا / 3 شوامل', doc.querySelectorAll('.topic-card').length === 4 && sumTr() === 17 && doc.querySelectorAll('.lesson.comp').length === 3);
+  ok('لا أفقي: لا عناصر تتجاوز عرض الحاوية (لا white-space:nowrap على البطاقات، شبكات auto-fill)', /\.topic-grid\s*{[^}]*auto-fill/.test(css) && /\.training-grid\s*{[^}]*auto-fill/.test(css));
+  // علم النفس كما هو
+  W.location.hash = '#/s/psychology';
+  await sleep(300);
+  html = doc.getElementById('app').innerHTML;
+  ok('علم النفس دون تغيير: 6 وحدات × 4 موضوعات + شامل لكل وحدة + شامل المنهج، بلا بطاقات موضوعات/تدريبات', doc.querySelectorAll('.unit-card').length === 6 && doc.querySelectorAll('.lesson:not(.comp)').length === 24 && doc.querySelectorAll('.lesson.comp').length === 7 && !doc.querySelector('.topic-card') && !doc.querySelector('.training-card'));
   harvestClasses(doc);
+}
+
+console.log('\n[6ب] تعدد المعلمين — /mostafa → /ahmed → /mohamed → /mostafa (تبويب جديد/تحديث/Back)');
+{
+  const owner = catalog.owner;
+  // معلمان إضافيان عبر واجهة المسؤول (بيانات اختبار داخل جلسة الاختبار المعزولة فقط)
+  const jar = {};
+  const jpost = async (url, body, headers) => {
+    const r = await fetch(new URL(url, BASE), { method: 'POST', headers: Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, headers || {}), body: JSON.stringify(body) });
+    const sc = r.headers.get('set-cookie'); if (sc) jar.cookie = sc.split(';')[0];
+    return { status: r.status, data: await r.json().catch(() => ({})) };
+  };
+  let login = await jpost('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' });
+  if (login.status === 404) { await jpost('/api/admin/setup', { email: 'admin@test.local', password: 'TestAdminPass-2026' }); login = await jpost('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' }); }
+  const H = { Cookie: jar.cookie };
+  const created = [];
+  const mk = async (b) => { const r = await jpost('/api/admin/teachers', b, H); if (r.data && r.data.teacher) created.push(r.data.teacher.id); };
+  await mk({ name: 'أ. أحمد عبدالله', slug: 'ahmed', specialty: 'فلسفة ومنطق', bio: 'نبذة أحمد', phone: '01111111111', socialLinks: { facebook: 'https://facebook.com/ahmed.test' }, requirePhone: false, enabled: true });
+  await mk({ name: 'أ. محمد سعيد', slug: 'mohamed', specialty: 'علم نفس', bio: 'نبذة محمد', phone: '01222222222', socialLinks: { whatsapp: 'https://wa.me/201222222222' }, requirePhone: true, enabled: true });
+  const check = async (slug, name, bio) => {
+    const d2 = boot('/' + slug);
+    await sleep(600);
+    const dd = d2.window.document, h = dd.body.innerHTML;
+    const others = ['د. مصطفى تيتو', 'أ. أحمد عبدالله', 'أ. محمد سعيد'].filter(n => n !== name);
+    const okBrand = dd.getElementById('brandName').textContent === name && h.includes(bio) && others.every(n => !h.includes(n)) && (slug === 'ahmed' || !h.includes('01111111111')) && (slug === 'mohamed' || !h.includes('01222222222'));
+    // الترم ← الموضوع ← التدريب بنفس بيانات المعلم
+    d2.window.location.hash = '#/s/philosophy/1';
+    await sleep(250);
+    const tp0 = catalog.catalog.philosophy.terms[0].sections[0].topics[0];
+    d2.window.location.hash = '#/s/philosophy/1/t/' + encodeURIComponent(tp0.key);
+    await sleep(250);
+    const okTopic = dd.querySelectorAll('.lesson-card').length === tp0.lessons.length;
+    d2.window.location.hash = '#/s/philosophy/1/t/' + encodeURIComponent(tp0.key) + '/l/' + encodeURIComponent(tp0.lessons[0].key);
+    await sleep(250);
+    const okNav = okTopic && dd.querySelectorAll('.training-card').length >= 1 && d2.window.S.slug === slug && dd.getElementById('brandName').textContent === name;
+    if (!okBrand || !okNav) console.log('    ↳ ' + slug + ': brand=' + dd.getElementById('brandName').textContent + ' bio=' + h.includes(bio) + ' others=' + others.filter(n => h.includes(n)).join('/') + ' phones=' + ((slug !== 'ahmed' && h.includes('01111111111')) || (slug !== 'mohamed' && h.includes('01222222222'))) + ' nav=' + okNav);
+    return { okBrand, okNav, win: d2.window };
+  };
+  const seq = [['mostafa', owner.name, owner.bio], ['ahmed', 'أ. أحمد عبدالله', 'نبذة أحمد'], ['mohamed', 'أ. محمد سعيد', 'نبذة محمد'], ['mostafa', owner.name, owner.bio]];
+  let allBrand = true, allNav = true, lastWin;
+  for (const [slug, name, bio] of seq) { const r = await check(slug, name, bio); allBrand = allBrand && r.okBrand; allNav = allNav && r.okNav; lastWin = r.win; }
+  ok('كل صفحة معلم تعرض بيانات معلمها فقط (اسم/نبذة) بلا تسريب اسم أو هاتف معلم آخر — عبر التسلسل كاملًا', allBrand);
+  ok('الترم ← الموضوع ← الدرس ← التدريب يعمل داخل كل معلم مع الحفاظ على slug في الحالة', allNav);
+  // Back/Forward داخل نفس التبويب لا يغيّر المعلم
+  lastWin.location.hash = '#/s/philosophy/1';
+  await sleep(200);
+  lastWin.history.back(); await sleep(250);
+  lastWin.history.forward(); await sleep(250);
+  ok('Back/Forward يحافظان على المعلم (mostafa) والصفحة الصحيحة', lastWin.S.slug === 'mostafa' && lastWin.document.getElementById('brandName').textContent === owner.name && lastWin.location.hash === '#/s/philosophy/1');
+  // بدء امتحان من صفحة أحمد: التوكن يحمل slug أحمد؛ النتيجة تحمل teacherSlug
+  const st = await fetch(new URL('/api/exam/start', BASE), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ examId: 'T1-PH-01', name: 'طالب أحمد', phone: '', slug: 'ahmed' }) }).then(r => r.json());
+  const payload = JSON.parse(Buffer.from(st.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
+  ok('جلسة من صفحة /ahmed: التوكن الموقّع يحمل slug=ahmed (هاتف اختياري حسب إعداد المعلم)', payload.slug === 'ahmed' && st.questions && st.questions.length === 20);
+  const ghost = await fetch(new URL('/ghost-teacher', BASE));
+  const ghostApi = await fetch(new URL('/api/teacher/ghost-teacher', BASE));
+  ok('معلم غير موجود: الصفحة 404 و/api/teacher 404 بلا fallback لمعلم آخر', ghost.status === 404 && ghostApi.status === 404 && !(await ghost.text()).includes(owner.name));
+  // تنظيف
+  for (const id of created) await fetch(new URL('/api/admin/teachers/' + id, BASE), { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: jar.cookie } }).catch(() => {});
 }
 
 console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + تغطية CSS + سلامة اللغة');
@@ -322,7 +436,7 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
    'fi f1', 'fi f2', 'fi f3', 'about-card', 'abody', 'specialty', 'bio', 'social-row', 'social-big', 'grade-pick', 'mainnav', 'socials',
    'nchip answered current', 'opt selected', 'rv-item', 'rq correct', 'rq wrong', 'ans mine wrong', 'ans correct', 'score-ring pass',
    'score-ring fail', 'tab active', 'badge green', 'badge gold', 'badge red', 'toast err', 'progressbar', 'navstrip', 'qcard', 'qtext',
-   'qn', 'opts', 'letter', 'txt', 'quiz-actions', 'rules-card', 'res-badges', 'review-filters', 'meta-row', 'models', 'models-label', 'models-grid', 'model-btn', 'm-top', 'm-name', 'm-arrow', 'm-meta',
+   'qn', 'opts', 'letter', 'txt', 'quiz-actions', 'rules-card', 'res-badges', 'review-filters', 'meta-row', 'topic-card', 'lesson-card', 'lgo-text', 'topic-grid', 'topics-hint', 'topic-head', 'training-grid', 'training-card', 'tc-no', 'tc-body', 'tc-title', 'tc-meta', 'tc-start', 'topic-nav',
    'exam-list', 'rv-note warn', 'rv-note ok', 'empty', 'spin', 'modal-bg', 'modal', 'gsub', 'bname', 'brand-txt', 'foot-brand', 'foot-sub', 'foot-copy'
   ].forEach(c => c.split(' ').forEach(x => used.add(x)));
   const missing = [...used].filter(c => !new RegExp('\\.' + c.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '([\\s,{:.])').test(css));

@@ -20,6 +20,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
+import { buildTrainings, renderTrainingReport, loadKeyDecisions } from './philo-trainings.mjs';
 
 const OUT = path.resolve(REPO_ROOT, 'cloudflare/src/data/banks.json');
 const D = loadGsData();
@@ -479,6 +480,46 @@ const t2 = buildPhilosophyTerm(2, T2_BANK, T2_EXAMS, T2_UNITS, null);
 t2.termComprehensiveExamId = buildT2TermComprehensive();
 catalog.philosophy.terms.push(t2);
 
+/* ================================================================== *
+ * 3) PHILOSOPHY & LOGIC — PRODUCTION STRUCTURE (Term → Topic → Training)
+ *    Source of truth: data/ExamManasa_Term{1,2}_Philosophy_Logic_ExamData.json
+ *    (see tools/philo-trainings.mjs for the rules). The legacy lesson/model
+ *    exams built above are kept server-side ONLY (flagged legacy) so that old
+ *    result rows / bookmarked exam ids keep resolving — they are no longer
+ *    listed in the student catalog. Comprehensive exams are preserved and
+ *    listed in a separate "امتحانات شاملة" section per term.
+ * ================================================================== */
+const legacyTerms = catalog.philosophy.terms;
+const legacyPhiloTrainingIds = Object.values(exams)
+  .filter(e => e.subjectId === 'philosophy' && e.type === 'training').map(e => e.id);
+const { terms: trainingTerms, report: trainingReport } = buildTrainings({ repoRoot: REPO_ROOT, questions, exams });
+legacyPhiloTrainingIds.forEach(id => { exams[id].legacy = true; });
+// Key decisions also cover legacy-bank questions that live ONLY in comprehensive
+// exams (never passed through buildTrainings). Apply them here, same rules.
+{
+  const KD = loadKeyDecisions(REPO_ROOT);
+  let n = 0;
+  Object.entries(KD.decisions).forEach(([id, dec]) => {
+    const q = questions[id];
+    if (!q || q.meta?.subjectId !== 'philosophy' || q.meta?.keyStatus === 'official-source-decision') return;
+    q.answer = dec.answer;
+    q.meta.verificationStatus = 'verified'; q.meta.keyStatus = 'official-source-decision';
+    q.meta.keySource = dec.source; if (dec.note) q.meta.keyNote = dec.note;
+    trainingReport.decisionsApplied.push({ term: q.meta.term, trainingId: '(comprehensive-only)', id, kind: 'answer', answer: dec.answer, source: dec.source });
+    n++;
+  });
+  if (n) console.log('Key decisions applied to comprehensive-only questions: ' + n);
+}
+trainingTerms.forEach(t => {
+  const old = legacyTerms.find(x => x.term === t.term);
+  const comps = [];
+  old.units.forEach(u => { if (u.comprehensiveExamId) comps.push(u.comprehensiveExamId); });
+  if (old.termComprehensiveExamId) comps.push(old.termComprehensiveExamId);
+  t.comprehensiveExamIds = comps;
+});
+catalog.philosophy.terms = trainingTerms;
+catalog.philosophy.structure = 'term>section>topic>lesson>training';
+
 // Public exam metadata (no question ids, no answers).
 // difficulty = per-exam distribution of question difficulty (real bank data —
 // psych questions carry no difficulty rating, so the field is omitted there).
@@ -490,7 +531,14 @@ Object.values(exams).forEach(e => {
     chapterTitle: e.chapterTitle || null, unitTitle: e.unitTitle || null,
     training: e.training || null, variant: e.variant || 1
   };
-  if (e.questionIds) {
+  // Training-structure fields (philosophy only) — psychology payload stays byte-identical
+  if (e.topicKey) Object.assign(pub, {
+    sectionId: e.sectionId, sectionTitle: e.sectionTitle,
+    topicKey: e.topicKey, topicNo: e.topicNo, topicTitle: e.topicTitle,
+    lessonKey: e.lessonKey, trainingNo: e.trainingNo
+  });
+  if (e.legacy) pub.legacy = true;
+  if (e.questionIds && e.subjectId !== 'philosophy') { // difficulty levels are no longer student-facing for الفلسفة والمنطق
     const d = { easy: 0, medium: 0, hard: 0 };
     e.questionIds.forEach(qid => { const x = questions[qid].meta.difficulty; if (d[x] !== undefined) d[x]++; });
     if (d.easy + d.medium + d.hard > 0) pub.difficulty = d;
@@ -508,13 +556,29 @@ function keyDist(ids) {
   return d;
 }
 
-const philoT1Ids = D.PHILO_BANK.map(q => q.id);
-const philoT2Ids = D.PHILO_T2_BANK.concat(D.PHILO_T2_LOGIC_BANK).map(q => q.id);
+const philoT1Ids = Object.keys(questions).filter(id => questions[id].meta.subjectId === 'philosophy' && questions[id].meta.term === 1);
+const philoT2Ids = Object.keys(questions).filter(id => questions[id].meta.subjectId === 'philosophy' && questions[id].meta.term === 2);
 const philoT2LogicIds = D.PHILO_T2_LOGIC_BANK.map(q => q.id);
 const psychIds = Object.keys(questions).filter(id => id.startsWith('PSY-'));
 
+const listedPhiloExams = Object.values(exams).filter(e => e.subjectId === 'philosophy' && !e.legacy);
+const trainingStats = {};
+[1, 2].forEach(term => {
+  const t = catalog.philosophy.terms.find(x => x.term === term);
+  const allLessons = t.sections.flatMap(s => s.topics.flatMap(tp => tp.lessons));
+  const allTrainings = allLessons.flatMap(l => l.trainings);
+  const topics = t.sections.reduce((n, s) => n + s.topics.length, 0);
+  trainingStats[term] = { topics, lessons: allLessons.length, trainings: allTrainings.length, trainingQuestions: allTrainings.reduce((k, tr) => k + tr.questionCount, 0), comprehensiveExams: t.comprehensiveExamIds.length };
+});
+fs.writeFileSync(path.resolve(REPO_ROOT, 'AUDIT_PHILOSOPHY_TRAININGS.md'), renderTrainingReport(trainingReport, [
+  '- الترم الأول: ' + trainingStats[1].topics + ' موضوعات / ' + trainingStats[1].lessons + ' درسًا / ' + trainingStats[1].trainings + ' تدريبًا / ' + trainingStats[1].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[1].comprehensiveExams + ' امتحانات شاملة محفوظة',
+  '- الترم الثاني: ' + trainingStats[2].topics + ' موضوعات / ' + trainingStats[2].lessons + ' درسًا / ' + trainingStats[2].trainings + ' تدريبًا / ' + trainingStats[2].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[2].comprehensiveExams + ' امتحانات شاملة محفوظة',
+  '- امتحانات النماذج القديمة (' + legacyPhiloTrainingIds.length + ') محفوظة على الخادم فقط (legacy) ولم تعد تُعرض للطالب.',
+  '- إجمالي بنك الأسئلة: ' + Object.keys(questions).length + ' (علم النفس ' + Object.keys(questions).filter(id => id.startsWith('PSY-')).length + ' دون تغيير).'
+]));
+
 const banks = {
-  version: 4,
+  version: 5,
   generatedAt: new Date().toISOString(),
   catalog,
   exams: publicExams,
@@ -532,6 +596,17 @@ const banks = {
     philosophyTerm2: {
       examCount: Object.values(exams).filter(e => e.subjectId === 'philosophy' && e.term === 2).length,
       uniqueQuestions: philoT2Ids.length
+    },
+    philosophyTrainings: {
+      source: 'data/ExamManasa_Term{1,2}_Philosophy_Logic_ExamData.json',
+      term1: trainingStats[1], term2: trainingStats[2],
+      listedExams: listedPhiloExams.length,
+      legacyHiddenExams: legacyPhiloTrainingIds.length,
+      newQuestionsFromJson: trainingReport.newQuestions.length,
+      keyConflictsBankKept: trainingReport.keyConflicts.length,
+      quarantined: trainingReport.quarantined.length,
+      sourceKeyOverrides: trainingReport.sourceOverrides.length,
+      needsReview: trainingReport.newQuestions.filter(n => n.keyStatus === 'json-only').length + trainingReport.keyConflicts.filter(k => k.status === 'conflict-bank-key-kept').length
     }
   },
   audit: {
@@ -594,4 +669,7 @@ console.log('Exams:', Object.keys(exams).length,
   '(psych:', banks.structure.psychology.examCount,
   '| philo T1:', banks.structure.philosophyTerm1.examCount,
   '| philo T2:', banks.structure.philosophyTerm2.examCount + ')');
+console.log('Philosophy trainings:', JSON.stringify(trainingStats), '| legacy hidden:', legacyPhiloTrainingIds.length,
+  '| new q from JSON:', trainingReport.newQuestions.length, '| key conflicts (bank kept):', trainingReport.keyConflicts.length,
+  '| quarantined:', trainingReport.quarantined.length);
 console.log('Output:', OUT, '(' + Math.round(fs.statSync(OUT).size / 1024) + ' KB)');

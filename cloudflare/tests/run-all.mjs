@@ -18,6 +18,7 @@
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import vm from 'node:vm';
 import { fileURLToPath } from 'node:url';
@@ -151,19 +152,22 @@ try {
   {
     const r = await jfetch('/api/catalog');
     const examCount = Object.keys(r.data.exams).length;
-    ok('83 امتحانًا', examCount === 83, 'got ' + examCount);
+    const listed = Object.values(r.data.exams).filter(e => !e.legacy).length;
+    ok('113 امتحانًا في الفهرس (66 معروضًا + 47 نموذجًا قديمًا محفوظًا)', examCount === 113 && listed === 66, 'got ' + examCount + '/' + listed);
     ok('الفهرس يتضمن مالك المنصة (owner) ببيانات عامة فقط',
       r.data.owner && r.data.owner.name === 'د. مصطفى تيتو' && r.data.owner.slug === 'mostafa' &&
       'specialty' in r.data.owner && !('phone' in r.data.owner) && !('id' in r.data.owner));
     const anyExam = r.data.exams['T2L-COMP'];
-    ok('بيانات صعوبة حقيقية في امتحانات الفلسفة (بدون تسريب مفاتيح)',
-      anyExam.difficulty && anyExam.difficulty.easy + anyExam.difficulty.medium + anyExam.difficulty.hard === 20 &&
+    ok('لا مستويات صعوبة في أي امتحان فلسفة معروض للطالب (أُزيلت بطلب المنتج) وبدون تسريب مفاتيح',
+      Object.values(r.data.exams).filter(e => e.subjectId === 'philosophy').every(e => !('difficulty' in e)) &&
       !('questionIds' in anyExam) && !('answer' in anyExam));
     ok('لا مفاتيح إجابة في الكتالوج', !r.text.includes('"answer"'));
     ok('لا قوائم أسئلة في الكتالوج', !r.text.includes('questionIds'));
     ok('لا نصوص أسئلة في الكتالوج', !BANKS.examDefs || !r.text.includes(Object.values(BANKS.questions)[0].text.slice(0, 30)));
     const t1 = r.data.catalog.philosophy.terms[0];
-    ok('أسماء الوحدات الرسمية (الفلسفة/المنطق)', t1.units[0].title === 'الوحدة الأولى: الفلسفة' && t1.units[1].title === 'الوحدة الثانية: المنطق');
+    ok('الفلسفة والمنطق: الترم → القسم (الفلسفة/المنطق) → موضوعان → الدرس → التدريب', t1.sections.length === 2 && t1.sections[0].title === 'الفلسفة' && t1.sections[1].title === 'المنطق' && t1.sections.every(s => s.topics.length === 2) && t1.sections[0].topics[0].lessons[0].trainings[0].examId === 'T1-PH-01');
+    ok('لا مستويات صعوبة في بيانات تدريبات الفلسفة المعروضة للطالب', Object.values(r.data.exams).filter(e => e.topicKey).every(e => !('difficulty' in e)));
+    ok('لا تسريب لحقول مفاتيح JSON في الفهرس', !/correct_option|correct_answer|keyStatus|jsonKey/.test(r.text));
     const psy = r.data.catalog.psychology;
     ok('علم النفس: ٦ وحدات + شامل كامل', psy.units.length === 6 && psy.subjectComprehensiveExamId === 'PSY-FULL-COMP');
     const exam = r.data.exams['U1-T1'];
@@ -213,8 +217,79 @@ try {
     ok('رفض قيم إجابة خارج النطاق', badVal.status === 400);
   }
 
-  /* ============ 6. perfect-score round-trip: ALL 83 exams ============ */
-  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (83)');
+  /* ============ 5b. Philosophy & Logic training structure (JSON = source of truth) ============ */
+  console.log('\n[5ب] الفلسفة والمنطق — الترم → الموضوع → التدريب (من JSON)');
+  {
+    const cat = (await jfetch('/api/catalog')).data;
+    const ph = cat.catalog.philosophy;
+    const summarize = (term) => {
+      const t = ph.terms.find(x => x.term === term);
+      const topics = t.sections.flatMap(s => s.topics);
+      const lessons = topics.flatMap(tp => tp.lessons);
+      const trainings = lessons.flatMap(l => l.trainings);
+      return { t, topics, lessons, trainings, q: trainings.reduce((n, tr) => n + tr.questionCount, 0) };
+    };
+    const s1 = summarize(1), s2 = summarize(2);
+    const lessonsOf = (S, sec, no) => S.t.sections[sec].topics[no].lessons.map(l => l.title);
+    ok('الترم الأول: الفلسفة موضوعان (التفكير الإنساني / الفلسفة وطبيعة الموقف الفلسفي) والمنطق موضوعان (مبادئ المنطق / الاستدلال)',
+      s1.topics.length === 4 && s1.t.sections[0].topics.map(t => t.title).join('|') === 'التفكير الإنساني|الفلسفة وطبيعة الموقف الفلسفي' && s1.t.sections[1].topics.map(t => t.title).join('|') === 'مبادئ المنطق (الحدود - القضايا)|الاستدلال (تعريفه - أنواعه)');
+    ok('الترم الأول: 17 درسًا بأسماء JSON الحقيقية (3+5 فلسفة، 8+1 منطق) / 17 تدريبًا', s1.lessons.length === 17 && lessonsOf(s1, 0, 0).join('|') === 'التفكير والنشاط العقلي|أساليب التفكير|مهارات التفكير الفلسفي' && lessonsOf(s1, 0, 1).length === 5 && lessonsOf(s1, 1, 0).length === 8 && lessonsOf(s1, 1, 1).join('|') === 'القياس الأرسطي' && s1.trainings.length === 17);
+    ok('كل درس يحمل اسمًا حقيقيًا (لا «الدرس N» عامًا) ورقمًا متسلسلًا', s1.lessons.concat(s2.lessons).every(l => l.title.trim() && !/^الدرس\s*(الأول|الثاني|الثالث|\d+)$/.test(l.title.trim())) && s1.topics.concat(s2.topics).every(tp => tp.lessons.every((l, i) => l.no === i + 1)));
+    ok('الترم الثاني: الفلسفة موضوعان (البيئية والبيوطبية / المهنية والقيم) والمنطق موضوعان (الاستقراء / الاستنباط) — 11 درسًا',
+      s2.topics.length === 4 && s2.t.sections[0].topics.map(t => t.title).join('|') === 'الفلسفة والأخلاق البيئية والبيوطبية|الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد' && s2.t.sections[1].topics.map(t => t.title).join('|') === 'الاستقراء وتطبيق المنهج التجريبي|الاستنباط وتطبيقه في العلوم الصورية' && s2.lessons.length === 11 && lessonsOf(s2, 0, 0).length === 3 && lessonsOf(s2, 0, 1).length === 2 && lessonsOf(s2, 1, 0).length === 3 && lessonsOf(s2, 1, 1).length === 3);
+    ok('الترم الأول: 339 سؤالًا في التدريبات (17×20 − سؤال واحد محجوز لعيب استخراج موثق)', s1.q === 339 && s1.trainings.filter(tr => tr.questionCount === 20).length === 16 && s1.trainings.filter(tr => tr.questionCount === 19).length === 1);
+    ok('الترم الثاني: 13 تدريبًا / 260 سؤالًا (13×20)', s2.trainings.length === 13 && s2.q === 260 && s2.trainings.every(tr => tr.questionCount === 20));
+    const allTr = s1.trainings.concat(s2.trainings);
+    ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI)', new Set(allTr.map(tr => tr.examId)).size === 30 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
+    ok('كل تدريب ينتمي لدرس واحد فقط ولا يظهر تحت درس/موضوع آخر', [1, 2].every(term => { const seen = new Set(); return summarize(term).lessons.every(l => l.trainings.every(tr => !seen.has(tr.examId) && seen.add(tr.examId))); }));
+    ok('metadata كل تدريب تطابق موضوعه ودرسه (topicKey/lessonKey/lessonTitle/trainingNo/count)', allTr.every(tr => { const e = cat.exams[tr.examId]; return e && e.type === 'training' && !e.legacy && e.count === tr.questionCount && e.title === tr.title; }) &&
+      [1, 2].every(term => summarize(term).topics.every(tp => tp.lessons.every(l => l.trainings.every((tr, i) => { const e = cat.exams[tr.examId]; return e.topicKey === tp.key && e.topicTitle === tp.title && e.lessonKey === l.key && e.lessonNo === l.no && e.lessonTitle === l.title && e.trainingNo === i + 1; })))));
+    ok('كل تدريب يحتفظ بـ training_id/الدرس/العنوان/20 سؤالًا (لا دمج ولا تحويل إلى label)', allTr.every(tr => BANKS.examDefs[tr.examId] && BANKS.examDefs[tr.examId].length === tr.questionCount && tr.questionCount >= 19));
+    ok('الامتحانات الشاملة في قسم منفصل وليست تدريبات (ت1: PHI-COMP, LOG-COMP, PHLO-COMP · ت2: T2L-COMP, T2-TERM-COMP)',
+      JSON.stringify(s1.t.comprehensiveExamIds) === JSON.stringify(['PHI-COMP', 'LOG-COMP', 'PHLO-COMP']) && JSON.stringify(s2.t.comprehensiveExamIds) === JSON.stringify(['T2L-COMP', 'T2-TERM-COMP']) &&
+      s1.t.comprehensiveExamIds.concat(s2.t.comprehensiveExamIds).every(id => !allTr.some(tr => tr.examId === id)));
+    ok('النماذج القديمة لا تظهر في الفهرس لكنها ما زالت قابلة للحل على الخادم (روابط/نتائج قديمة)', !JSON.stringify(ph).includes('PHI-C1-T1') && !!cat.exams['PHI-C1-T1'] && cat.exams['PHI-C1-T1'].legacy === true);
+    // server side: each training = JSON question set (verbatim, same order), 4 options, valid key, no dups
+    const fs2 = fs; const norm = (x) => String(x || '').replace(/[\u064B-\u0652\u0640]/g, '').replace(/[إأآ]/g, 'ا').replace(/ى/g, 'ي').replace(/ة/g, 'ه').replace(/[«»"“”'’‘.،,:؛;\-–—…()\[\]؟?!]/g, ' ').replace(/\s+/g, ' ').trim();
+    const stripL = (t) => { let o = String(t || ''), p = null; while (o !== p) { p = o; o = o.replace(/^\s*[\(（]?[أابجدهABCDabcd][\)）\]\s.\-–:：]+\s*/, '').trim(); } return o; };
+    let jsonOk = true, det = [];
+    for (const term of [1, 2]) {
+      const J = JSON.parse(fs2.readFileSync(path.join(ROOT, 'data', 'ExamManasa_Term' + term + '_Philosophy_Logic_ExamData.json'), 'utf8'));
+      for (const t of J.training_exams) {
+        const ids = BANKS.examDefs[t.training_id];
+        const exp = t.questions.filter(q => q.options.every(o => stripL(o)));
+        if (!ids || ids.length !== exp.length || new Set(ids).size !== ids.length) { jsonOk = false; det.push(t.training_id + ':len'); continue; }
+        exp.forEach((jq, i) => {
+          const bq = BANKS.questions[ids[i]];
+          if (!bq || norm(bq.text) !== norm(String(jq.question).replace(/^\s*[.\-–]\s+/, '')) || bq.options.length !== 4 || !'ABCD'.includes(bq.answer)) { jsonOk = false; det.push(t.training_id + ':q' + (i + 1)); }
+        });
+      }
+    }
+    ok('كل تدريب على الخادم = مجموعة أسئلة JSON نفسها بالترتيب نفسه، 4 خيارات ومفتاح صالح، بلا تكرار', jsonOk, det.slice(0, 5).join(', '));
+    {
+      const prodQ = [...new Set(allTr.flatMap(tr => BANKS.examDefs[tr.examId]))].map(id => BANKS.questions[id]);
+      const allowed = new Set(['verified', 'needs-review']);
+      ok('كل سؤال إنتاجي له verificationStatus صريح (verified أو needs-review) — لا مفاتيح مخمَّنة بلا وسم', prodQ.every(q => allowed.has(q.meta.verificationStatus)));
+      const nr = prodQ.filter(q => q.meta.verificationStatus === 'needs-review' || q.meta.keyStatus === 'conflict-bank-key-kept').length;
+      ok('الأسئلة غير المؤكدة موسومة needs-review وموثقة في AUDIT_PHILOSOPHY_TRAININGS.md (' + nr + ' من ' + prodQ.length + ')', nr < prodQ.length * 0.15 && fs.existsSync(path.join(ROOT, 'AUDIT_PHILOSOPHY_TRAININGS.md')));
+    }
+    // start a JSON training session: no keys, 20 questions, 4 options
+    const st = await post('/api/exam/start', { examId: 'T1-LG-03', name: 'اختبار تدريب', phone: '01000000000', slug: 'mostafa' });
+    ok('بدء تدريب JSON (T1-LG-03): 20 سؤالًا × 4 خيارات، بلا مفاتيح، الجلسة تحمل slug المعلم', st.status === 200 && st.data.questions.length === 20 && st.data.questions.every(q => q.options.length === 4 && JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['id', 'no', 'options', 'text'])) && !JSON.stringify(st.data).includes('"answer"') && decodeToken(st.data.token).slug === 'mostafa' && st.data.exam.lessonTitle === 'الحدود المنطقية' && !('difficulty' in st.data.exam));
+    const seed = decodeToken(st.data.token).seed;
+    const sub = await post('/api/exam/submit', { token: st.data.token, answers: correctPositions('T1-LG-03', seed) });
+    ok('تصحيح تدريب JSON على الخادم: الدرجة الكاملة 20/20', sub.status === 200 && sub.data.score === 20 && sub.data.percentage === 100);
+    // psychology frozen (sha256 of catalog+exams+examDefs+questions vs pre-rebuild snapshot)
+    const psyExams = Object.fromEntries(Object.entries(BANKS.exams).filter(([, e]) => e.subjectId === 'psychology').sort());
+    const psyDefs = Object.fromEntries(Object.keys(psyExams).sort().map(id => [id, BANKS.examDefs[id]]));
+    const psyQ = Object.fromEntries(Object.entries(BANKS.questions).filter(([, q]) => q.meta.subjectId === 'psychology').sort());
+    const h = crypto.createHash('sha256').update(JSON.stringify({ catalog: BANKS.catalog.psychology, exams: psyExams, examDefs: psyDefs, questions: psyQ })).digest('hex');
+    ok('علم النفس لم يتغير (sha256 مطابق للقطة ما قبل إعادة البناء)', h === '8851437be88724537693cbf1ad57c0531e36eca4b55dcea102f7c077b44a8198', h);
+    ok('علم النفس: نفس واجهة الفهرس (6 وحدات × 4 موضوعات + شامل) دون أي حقول تدريبات', cat.catalog.psychology.units.length === 6 && cat.catalog.psychology.units.every(u => u.lessons.length === 4 && u.comprehensiveExamId) && !JSON.stringify(cat.catalog.psychology).includes('topicKey') && !Object.values(cat.exams).some(e => e.subjectId === 'psychology' && ('topicKey' in e || 'legacy' in e)));
+  }
+
+  /* ============ 6. perfect-score round-trip: ALL exams ============ */
+  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (113)');
   {
     const examIds = Object.keys(BANKS.examDefs);
     let allOk = true, badOnes = [];
@@ -228,7 +303,7 @@ try {
         allOk = false; badOnes.push(`${examId}:${s.status}/${s.data && s.data.score}/${r.data.exam.count}`);
       }
     }
-    ok('83/83 امتحانًا: الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk, badOnes.join(', '));
+    ok(examIds.length + '/' + examIds.length + ' امتحانًا (بما فيها 30 تدريب JSON و47 نموذجًا قديمًا): الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk && examIds.length === 113, badOnes.join(', '));
   }
 
   /* ============ 7. zero-score + review ============ */
@@ -338,8 +413,8 @@ try {
     ok('تصدير CSV مع BOM عربي (0xEF 0xBB 0xBF)',
       csvResp.status === 200 && csvBytes[0] === 0xEF && csvBytes[1] === 0xBB && csvBytes[2] === 0xBF && csvText.includes('اسم الطالب'));
     const overview = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
-    ok('نظرة عامة: 83 امتحانًا / 1549 سؤالًا + توثيق التصحيحات',
-      overview.data.exams === 83 && overview.data.questions === 1549 &&
+    ok('نظرة عامة: 113 امتحانًا / 1769 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
+      overview.data.exams === 113 && overview.data.questions === 1769 && overview.data.structure.philosophyTrainings.term1.trainings === 17 && overview.data.structure.philosophyTrainings.term2.trainings === 13 &&
       overview.data.audit.psychology.corrections.length === 8);
     const qs = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('البيئية'), { headers: { Cookie: cookie } });
     ok('بنك الأسئلة: بحث + مفاتيح للمسؤول فقط', qs.status === 200 && qs.data.questions.length > 0 && qs.data.questions[0].answer);
