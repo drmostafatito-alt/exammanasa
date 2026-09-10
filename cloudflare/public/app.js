@@ -52,7 +52,7 @@
     return fetch(path, opts ? Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts) : undefined)
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (data) {
-          if (!r.ok) { var e = new Error(data.error || ('خطأ ' + r.status)); e.data = data; throw e; }
+          if (!r.ok) { var e = new Error(data.error || ('خطأ ' + r.status)); e.data = data; e.status = r.status; throw e; }
           return data;
         });
       });
@@ -862,8 +862,8 @@
             go('#/result'); renderResult();
           } else { toastMsg('تم تسليم امتحان معلّق بنجاح.'); }
         }).catch(function (e) {
-          if (e instanceof TypeError) return; // فشل شبكة حقيقي → يبقى في الطابور
-          done.push(p.token); // رفض نهائي من الخادم → إسقاط مع تنبيه
+          if (e instanceof TypeError || (e.status && e.status >= 500)) return; // فشل شبكة/خادم مؤقت → يبقى في الطابور
+          done.push(p.token); // رفض نهائي من الخادم (4xx) → إسقاط مع تنبيه
           toastMsg('تعذّر تسليم امتحان معلّق: ' + e.message, true);
         });
       });
@@ -906,6 +906,11 @@
         S.reviewMode = false;
         S.current = (unanswered[0] - 1) || 0;
         renderQuiz();
+      } else if (e instanceof TypeError || (e.status && e.status >= 500)) {
+        // انقطاع أثناء الإرسال (حتى لو كان navigator.onLine=true) → لا فقدان: يُحفظ في الطابور ويُعاد الإرسال تلقائيًا
+        btn.disabled = false;
+        btn.textContent = 'تسليم الامتحان';
+        queueOfflineSubmit();
       } else {
         btn.disabled = false;
         btn.textContent = 'تسليم الامتحان';
