@@ -13,6 +13,7 @@
  *   9. إدارة المعلمين: إنشاء/تعطيل/حذف + التحقق من المدخلات
  *  10. النتائج و CSV
  *  11. تكافؤ خلط الخيارات مع خوارزمية تطبيق GAS الأصلي (Code.gs)
+ *  12. حدود المحاولات لكل معلم (خادم + عدّاد ذري) وتوحيد أرقام الهواتف
  *
  * Usage: npm test   (from cloudflare/)
  */
@@ -465,6 +466,70 @@ try {
       }
     }
     ok('خوارزمية الخلط مطابقة تمامًا لـ Code.gs (500 بذرة × 60 موضعًا)', same, firstDiff);
+  }
+
+  /* ============ 12. attempt limits (server-side, race-safe) + phone normalization ============ */
+  console.log('\n[12] حدود المحاولات (خادم + عدّاد ذري) وتوحيد الهاتف');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم محدود', slug: 'limited12', unlimited: false, maxAttempts: 2, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد محاولات (2) + unlimited=false', mk.status === 200 && mk.data.teacher.unlimited === false && mk.data.teacher.maxAttempts === 2);
+    const PH = '01055556666';
+    const doAttempt = async () => {
+      const st = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب محدود', phone: PH, slug: 'limited12' });
+      if (st.status !== 200) return st;
+      const seed = decodeToken(st.data.token).seed;
+      const sub = await post('/api/exam/submit', { token: st.data.token, answers: correctPositions('U1-T1', seed) });
+      return { status: sub.status, data: sub.data, start: st.data };
+    };
+    const a1 = await doAttempt();
+    ok('المحاولة 1 تنجح + الاستجابة تعلن المتبقي قبل الاستهلاك (2/2)', a1.status === 200 && a1.start.attempts && a1.start.attempts.remaining === 2 && a1.start.attempts.limit === 2);
+    const a2 = await doAttempt();
+    ok('المحاولة 2 تنجح + المتبقي (1/2)', a2.status === 200 && a2.start.attempts.remaining === 1);
+    const a3 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب محدود', phone: PH, slug: 'limited12' });
+    ok('بدء المحاولة 3 مرفوض مبكرًا (429)', a3.status === 429);
+    // submit-time gate: a token issued before exhaustion must also be rejected
+    const mk2 = await post('/api/admin/teachers', { name: 'محدود ب', slug: 'limited12b', unlimited: false, maxAttempts: 2, requirePhone: true }, { Cookie: cookie });
+    const PH2 = '01077778888';
+    const held = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ب', phone: PH2, slug: 'limited12b' });
+    for (let k = 0; k < 2; k++) {
+      const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ب', phone: PH2, slug: 'limited12b' });
+      const sd = decodeToken(s.data.token).seed;
+      await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', sd) });
+    }
+    const heldSub = await post('/api/exam/submit', { token: held.data.token, answers: correctPositions('U1-T1', decodeToken(held.data.token).seed) });
+    ok('التسليم بعد الاستنفاد مرفوض على الخادم (429) حتى بتوكن قديم', heldSub.status === 429);
+    // concurrency: 6 parallel submits, limit 3 → exactly 3 pass (atomicity proof)
+    const mk3 = await post('/api/admin/teachers', { name: 'محدود ج', slug: 'limited12c', unlimited: false, maxAttempts: 3, requirePhone: true }, { Cookie: cookie });
+    const PH3 = '01099990000';
+    const tokens = [];
+    for (let k = 0; k < 6; k++) {
+      const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ج', phone: PH3, slug: 'limited12c' });
+      tokens.push(s.data.token);
+    }
+    const parResults = await Promise.all(tokens.map(t => post('/api/exam/submit', { token: t, answers: correctPositions('U1-T1', decodeToken(t).seed) })));
+    const okN = parResults.filter(r => r.status === 200).length;
+    const rejN = parResults.filter(r => r.status === 429).length;
+    ok('تزامن: 6 تسليمات متوازية بحد 3 → 3 ناجحة + 3 مرفوضة بالضبط (ذرية)', okN === 3 && rejN === 3, okN + '/' + rejN);
+    // unlimited default unaffected
+    const u = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب حر', phone: '01000000001', slug: 'mostafa' });
+    ok('المعلم غير المحدود: بدء بلا حقل attempts', u.status === 200 && !('attempts' in u.data));
+    // phone normalization: variants collapse to one canonical identity
+    for (const v of ['+2 010-1234 5678', '00201012345678', '٠١٠١٢٣٤٥٦٧٨']) {
+      const s = await post('/api/exam/start', { examId: 'T2P-C1-T1', name: 'طالب توحيد', phone: v });
+      if (s.status !== 200) { ok('توحيد الهاتف: بدء بصيغة ' + v, false, 'status ' + s.status); break; }
+      const sd = decodeToken(s.data.token).seed;
+      await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('T2P-C1-T1', sd) });
+    }
+    await new Promise(r => setTimeout(r, 800)); // waitUntil persist
+    const res = await jfetch('/api/admin/results', { headers: { Cookie: cookie } });
+    const mine = res.data.results.filter(r => r.name === 'طالب توحيد');
+    ok('توحيد الهاتف: 3 صيغ → نفس الرقم المعياري في النتائج', mine.length === 3 && mine.every(r => r.phone === '01012345678'), JSON.stringify(mine.map(r => r.phone)));
+    const badPh = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '019123' });
+    ok('رفض هاتف لا يطابق صيغة الموبايل المصري', badPh.status === 400);
+    // cleanup
+    for (const id of [mk.data.teacher.id, mk2.data.teacher.id, mk3.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
   }
 
   console.log('\n══════════════════════════════');

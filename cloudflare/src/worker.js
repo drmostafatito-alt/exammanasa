@@ -42,6 +42,24 @@ function json(data, status = 200, headers = {}) {
 }
 const fail = (message, status = 400) => json({ error: message }, status);
 
+/* ---- phone normalization (Egyptian mobiles; server-side identity) ----
+ * Accepts Arabic-Indic/Persian digits, spaces/dashes, +20/0020 prefixes.
+ * Canonical form: 01XXXXXXXXX (11 digits). Used for attempt-limit identity
+ * and stored in tokens/results — the client value is never trusted as-is. */
+function normalizePhone(raw) {
+  let d = String(raw || '').trim()
+    .replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))
+    .replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
+  d = d.replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = d.slice(1);
+  if (d.startsWith('0020')) d = d.slice(4);
+  else if (d.startsWith('20') && d.length >= 12) d = d.slice(2);
+  if (/^1[0125]\d{8}$/.test(d)) d = '0' + d; // missing trunk zero
+  return d;
+}
+function isValidEgMobile(d) { return /^01[0125][0-9]{8}$/.test(d); }
+function normalizeName(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+
 function securityHeaders(res) {
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options', 'nosniff');
@@ -207,15 +225,25 @@ async function handleApi(request, env, ctx, pathname) {
     if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
 
     const name = String(body.name || '').trim();
-    const phone = String(body.phone || '').trim();
+    const rawPhone = String(body.phone || '').trim();
     if (!name) return fail('اسم الطالب مطلوب.');
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
-    if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) return fail('رقم الهاتف غير صالح.');
-    if (!phone) {
-      const slug = String(body.slug || '');
-      const teachers = await getTeachers(env);
-      const t = teachers.find(x => x.slug === slug);
-      if (t && t.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    const normPhone = normalizePhone(rawPhone);
+    if (rawPhone && !isValidEgMobile(normPhone)) return fail('رقم الهاتف غير صالح. أدخل رقمًا مصريًا صحيحًا (01xxxxxxxxx).');
+    const slug = String(body.slug || '');
+    const teachers = await getTeachers(env);
+    const teacher = teachers.find(x => x.slug === slug) || null;
+    if (!rawPhone && teacher && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    // read-only limit pre-check (atomic enforcement happens at submit time)
+    const limit = teacherLimit(teacher);
+    let attemptsInfo = null;
+    if (limit > 0) {
+      const stub = await limiterStub(env, await limitKey(slug, examId, studentIdentity(normPhone, name)));
+      if (!stub) return fail('خدمة حدود المحاولات غير متاحة حاليًا.', 503);
+      const st = await stub.fetch('https://limiter.internal/count').then(r => r.json()).catch(() => null);
+      const used = (st && Number.isFinite(st.used)) ? st.used : 0;
+      if (used >= limit) return fail('استنفدت عدد المحاولات المسموح به لهذا الامتحان (' + limit + ').', 429);
+      attemptsInfo = { used, limit, remaining: limit - used };
     }
 
     const secret = await getSessionSecret(env).catch(() => null);
@@ -224,8 +252,8 @@ async function handleApi(request, env, ctx, pathname) {
     const seed = Math.floor(Math.random() * 2147483646) + 1;
     const nonce = randomHex(12);
     const token = await signToken({
-      t: 'exam', examId, seed, nonce, name, phone,
-      slug: String(body.slug || ''), iss: Math.floor(Date.now() / 1000),
+      t: 'exam', examId, seed, nonce, name, phone: normPhone,
+      slug, iss: Math.floor(Date.now() / 1000),
       exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
     }, secret);
 
@@ -237,6 +265,7 @@ async function handleApi(request, env, ctx, pathname) {
 
     return json({
       token,
+      ...(attemptsInfo ? { attempts: attemptsInfo } : {}),
       exam: {
         id: examId, title: examMeta.title, count: examMeta.count,
         lessonTitle: examMeta.lessonTitle, lessonNo: examMeta.lessonNo,
@@ -283,6 +312,21 @@ async function handleApi(request, env, ctx, pathname) {
     }
     if (replay) {
       try { return json(JSON.parse(replay), 200); } catch { /* fallthrough */ }
+    }
+
+    // atomic attempt consumption for limited teachers (race-safe inside the DO)
+    {
+      const teachers = await getTeachers(env);
+      const t = teachers.find(x => x.slug === (sess.slug || '')) || null;
+      const lim = teacherLimit(t);
+      if (lim > 0) {
+        const stub = await limiterStub(env, await limitKey(sess.slug || '', sess.examId, studentIdentity(sess.phone || '', sess.name || '')));
+        if (!stub) return fail('خدمة حدود المحاولات غير متاحة حاليًا.', 503);
+        const c = await stub.fetch('https://limiter.internal/consume', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: lim })
+        }).then(r => r.json()).catch(() => null);
+        if (!c || c.allowed !== true) return fail('استنفدت عدد المحاولات المسموح به لهذا الامتحان (' + lim + ').', 429);
+      }
     }
 
     // grade — SERVER ONLY
@@ -619,8 +663,60 @@ function sanitizeTeacher(body, existing) {
     photo,
     socialLinks: social,
     requirePhone: body.requirePhone !== false,
-    enabled: body.enabled !== false
+    enabled: body.enabled !== false,
+    unlimited: body.unlimited !== false,
+    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3))
   };
+}
+
+/* ============================ attempt limiter (Durable Object) ============
+ * Race-safe per-student attempt counting. Each (teacher, exam, student-identity)
+ * maps to ONE DO instance (idFromName); /consume does an atomic
+ * read-check-increment inside that single instance, so concurrent submissions
+ * can never over-consume — unlike KV read-modify-write. Free plan includes DO. */
+export class AttemptLimiter {
+  constructor(state) { this.state = state; }
+  async fetch(request) {
+    const url = new URL(request.url);
+    const used = (await this.state.storage.get('used')) || 0;
+    if (url.pathname === '/count' && request.method === 'GET') {
+      return Response.json({ used });
+    }
+    if (url.pathname === '/consume' && request.method === 'POST') {
+      let limit = 0;
+      try { limit = Math.max(1, Math.min(50, parseInt((await request.json()).limit, 10) || 0)); } catch {}
+      if (!limit) return Response.json({ error: 'limit required' }, 400);
+      // Serializable storage transaction: the read-check-increment is atomic even
+      // when concurrent consumes interleave at await points — the losers retry
+      // and observe the incremented value. This is the race-safety guarantee.
+      const result = await this.state.storage.transaction(async (txn) => {
+        const cur = (await txn.get('used')) || 0;
+        if (cur >= limit) return { allowed: false, used: cur, remaining: 0 };
+        await txn.put('used', cur + 1);
+        return { allowed: true, used: cur + 1, remaining: limit - cur - 1 };
+      });
+      return Response.json(result);
+    }
+    return new Response('not found', { status: 404 });
+  }
+}
+
+async function limiterStub(env, key) {
+  if (!env.ATTEMPT_LIMITER) return null;
+  return env.ATTEMPT_LIMITER.get(env.ATTEMPT_LIMITER.idFromName('v1:' + key));
+}
+async function limitKey(slug, examId, identity) {
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(slug + '|' + examId + '|' + identity));
+  return slug + ':' + examId + ':' + hex(digest).slice(0, 32);
+}
+// 0 = unlimited (default). A positive number = max submitted attempts per student per exam.
+function teacherLimit(t) {
+  if (!t || t.unlimited !== false) return 0;
+  const n = parseInt(t.maxAttempts, 10);
+  return Number.isFinite(n) ? Math.max(1, Math.min(50, n)) : 3;
+}
+function studentIdentity(normPhone, name) {
+  return normPhone ? 'p:' + normPhone : 'n:' + normalizeName(name);
 }
 
 /* ============================ main entry ============================ */
