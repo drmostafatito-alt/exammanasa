@@ -241,6 +241,16 @@ async function handleApi(request, env, ctx, pathname) {
     const teacher = teachers.find(x => x.slug === slug) || null;
     if (teacher && teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
     if (!rawPhone && teacher && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    // Student limit — registration is the moment a distinct student is counted. Atomic inside the
+    // teacher's DO instance, so N concurrent new registrations can never exceed the limit.
+    let studentSeat = null;
+    if (teacher) {
+      const reg = await registerStudent(env, teacher, studentIdentity(normPhone, name), { enforce: true });
+      if (!reg) return fail('خدمة تسجيل الطلاب غير متاحة حاليًا.', 503);
+      if (reg.allowed !== true) return fail(STUDENT_LIMIT_MSG, 429);
+      const sl = studentLimitOf(teacher);
+      studentSeat = { unlimited: sl.unlimited, limit: sl.limit, current: reg.count, remaining: sl.unlimited ? null : Math.max(0, sl.limit - reg.count) };
+    }
     // read-only limit pre-check (atomic enforcement happens at submit time)
     const limit = teacherLimit(teacher);
     let attemptsInfo = null;
@@ -275,6 +285,7 @@ async function handleApi(request, env, ctx, pathname) {
     return json({
       token,
       ...(attemptsInfo ? { attempts: attemptsInfo } : {}),
+      ...(studentSeat ? { students: studentSeat } : {}),
       offline: { enabled: offlineMode, expiresAt: new Date((iss + ttl) * 1000).toISOString() },
       exam: {
         id: examId, title: examMeta.title, count: examMeta.count,
@@ -328,6 +339,14 @@ async function handleApi(request, env, ctx, pathname) {
     {
       const teachers = await getTeachers(env);
       const t = teachers.find(x => x.slug === (sess.slug || '')) || null;
+      if (t && t.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
+      if (t) {
+        // Seat check at submit too: a token whose student was never registered (or a teacher whose
+        // limit was lowered afterwards) cannot bypass the limit. Registered students are always allowed.
+        const reg = await registerStudent(env, t, studentIdentity(sess.phone || '', sess.name || ''), { enforce: true });
+        if (!reg) return fail('خدمة تسجيل الطلاب غير متاحة حاليًا.', 503);
+        if (reg.allowed !== true) return fail(STUDENT_LIMIT_MSG, 429);
+      }
       const lim = teacherLimit(t);
       if (lim > 0) {
         const stub = await limiterStub(env, await limitKey(sess.slug || '', sess.examId, studentIdentity(sess.phone || '', sess.name || '')));
@@ -559,14 +578,32 @@ async function handleAdmin(request, env, ctx, pathname) {
       teachersCount: teachers.length,
       teachersEnabled: teachers.filter(t => t.enabled !== false).length,
       recentResultsCount: recent.length,
-      teachers: teachers.map(t => ({ slug: t.slug, name: t.name, enabled: t.enabled !== false }))
+      teachers: await Promise.all(teachers.map(async t => ({ slug: t.slug, name: t.name, enabled: t.enabled !== false, studentLimit: await studentLimitStatus(env, t) })))
     });
   }
 
   /* ---------- teachers CRUD ---------- */
   if (pathname === '/api/admin/teachers' && method === 'GET') {
     const teachers = await getTeachers(env);
-    return json({ teachers });
+    const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+    const withStatus = await Promise.all(teachers.map(async t => ({ ...t, studentLimitStatus: await studentLimitStatus(env, t) })));
+    return json({ teachers: withStatus, archived });
+  }
+  /* ---------- restore an archived teacher (delete is non-destructive) ---------- */
+  const restoreMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/restore$/);
+  if (restoreMatch && method === 'POST') {
+    const teachers = await getTeachers(env);
+    const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+    const i = archived.findIndex(x => x.id === restoreMatch[1]);
+    if (i === -1) return fail('المعلم غير موجود في الأرشيف.', 404);
+    const t = archived[i];
+    if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم حاليًا بواسطة معلم آخر — عدّل رابط المعلم الحالي أولًا.', 409);
+    delete t.archivedAt; t.enabled = false; t.updatedAt = new Date().toISOString();
+    archived.splice(i, 1);
+    teachers.push(t);
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await kvPut(env, 'teachers:archived', JSON.stringify(archived));
+    return json({ ok: true, teacher: t });
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
     const body = await readJson(request, 3 * 1024 * 1024);
@@ -587,7 +624,9 @@ async function handleAdmin(request, env, ctx, pathname) {
     const t = teachers.find(x => x.id === statsMatch[1]);
     if (!t) return fail('المعلم غير موجود.', 404);
     const tlist = await kvGetJson(env, 'results:teacher:' + t.slug).catch(() => null) || [];
-    const students = new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size;
+    const slStatus = await studentLimitStatus(env, t);
+    // distinct registered students come from the per-teacher registry (exact, not capped by the 100-row index)
+    const students = Math.max(slStatus.current, new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size);
     const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
     const pass = tlist.filter(r => r.percentage >= 50).length;
     const perExam = {};
@@ -597,8 +636,9 @@ async function handleAdmin(request, env, ctx, pathname) {
       perExam[k].attempts++; perExam[k].sum += r.percentage;
     });
     return json({
-      teacher: { id: t.id, slug: t.slug, name: t.name, enabled: t.enabled !== false, unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3, offlineMode: t.offlineMode === true },
-      totals: { results: tlist.length, students, avgPercentage: avg, passRate: tlist.length ? Math.round(pass / tlist.length * 10000) / 100 : 0 },
+      teacher: teacherAdminSummary(t),
+      studentLimit: slStatus,
+      totals: { results: tlist.length, students, registeredStudents: slStatus.current, avgPercentage: avg, passRate: tlist.length ? Math.round(pass / tlist.length * 10000) / 100 : 0 },
       perExam: Object.values(perExam).map(e => ({ examId: e.examId, title: e.title, attempts: e.attempts, avgPercentage: Math.round(e.sum / e.attempts * 100) / 100 })).sort((a, b) => b.attempts - a.attempts),
       recent: tlist.slice(0, 10)
     });
@@ -621,10 +661,15 @@ async function handleAdmin(request, env, ctx, pathname) {
       return json({ ok: true, teacher: t });
     }
     if (method === 'DELETE') {
+      // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
+      // and the student registry are never deleted. The slug is released for reuse.
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
-      teachers.splice(idx, 1);
+      const [removed] = teachers.splice(idx, 1);
+      const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+      archived.unshift({ ...removed, enabled: false, archivedAt: new Date().toISOString() });
+      await kvPut(env, 'teachers:archived', JSON.stringify(archived.slice(0, 200)));
       await kvPut(env, 'teachers', JSON.stringify(teachers));
-      return json({ ok: true });
+      return json({ ok: true, archived: true });
     }
   }
 
@@ -713,9 +758,61 @@ function sanitizeTeacher(body, existing) {
     enabled: body.enabled !== false,
     unlimited: body.unlimited !== false,
     maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3)),
-    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true)
+    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true),
+    // Student limit: a REAL unlimited flag (not a big number). When limited, studentLimit is the
+    // max number of DISTINCT students (by normalized phone) who may register under this teacher.
+    // 0 = registration closed for new students (existing students keep access).
+    studentLimitUnlimited: body.studentLimitUnlimited === undefined
+      ? (existing ? existing.studentLimitUnlimited !== false : true)
+      : body.studentLimitUnlimited !== false,
+    studentLimit: sanitizeStudentLimit(body.studentLimit ?? existing?.studentLimit ?? 0)
   };
 }
+function sanitizeStudentLimit(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(1000000, n);
+}
+function studentLimitOf(t) {
+  if (!t) return { unlimited: true, limit: null };
+  if (t.studentLimitUnlimited !== false) return { unlimited: true, limit: null };
+  return { unlimited: false, limit: sanitizeStudentLimit(t.studentLimit) };
+}
+function teacherAdminSummary(t) {
+  const sl = studentLimitOf(t);
+  return {
+    id: t.id, slug: t.slug, name: t.name, enabled: t.enabled !== false,
+    unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3, offlineMode: t.offlineMode === true,
+    studentLimitUnlimited: sl.unlimited, studentLimit: sl.limit
+  };
+}
+/* Per-teacher distinct-student registry (one DO instance per teacher slug).
+ * Returns { allowed, existing, count } — `allowed:false` only for a NEW student when the limit is reached. */
+async function registerStudent(env, teacher, identity, { enforce }) {
+  const stub = await limiterStub(env, 'students:' + teacher.slug);
+  if (!stub) return null;
+  const sl = studentLimitOf(teacher);
+  const digest = hex(await crypto.subtle.digest('SHA-256', enc.encode(identity)));
+  const body = { key: digest, unlimited: sl.unlimited, limit: sl.limit, enforce: !!enforce };
+  return stub.fetch('https://limiter.internal/students/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  }).then(r => r.json()).catch(() => null);
+}
+async function studentCount(env, teacher) {
+  const stub = await limiterStub(env, 'students:' + teacher.slug);
+  if (!stub) return 0;
+  const st = await stub.fetch('https://limiter.internal/students/count').then(r => r.json()).catch(() => null);
+  return st && Number.isFinite(st.count) ? st.count : 0;
+}
+async function studentLimitStatus(env, teacher) {
+  const sl = studentLimitOf(teacher);
+  const current = await studentCount(env, teacher);
+  return {
+    unlimited: sl.unlimited, limit: sl.limit, current,
+    remaining: sl.unlimited ? null : Math.max(0, sl.limit - current)
+  };
+}
+const STUDENT_LIMIT_MSG = 'اكتمل العدد المسموح به من الطلاب لدى هذا المعلم. تواصل مع المعلم للحصول على مقعد.';
 
 /* ============================ attempt limiter (Durable Object) ============
  * Race-safe per-student attempt counting. Each (teacher, exam, student-identity)
@@ -729,6 +826,28 @@ export class AttemptLimiter {
     const used = (await this.state.storage.get('used')) || 0;
     if (url.pathname === '/count' && request.method === 'GET') {
       return Response.json({ used });
+    }
+    /* ---- per-teacher distinct-student registry (instance = 'students:<slug>') ---- */
+    if (url.pathname === '/students/count' && request.method === 'GET') {
+      return Response.json({ count: (await this.state.storage.get('studentCount')) || 0 });
+    }
+    if (url.pathname === '/students/register' && request.method === 'POST') {
+      let b = null;
+      try { b = await request.json(); } catch {}
+      if (!b || !/^[0-9a-f]{64}$/.test(String(b.key || ''))) return Response.json({ error: 'key required' }, 400);
+      const unlimited = b.unlimited !== false;
+      const limit = Math.max(0, parseInt(b.limit, 10) || 0);
+      const enforce = b.enforce !== false;
+      // Atomic: existing student → always allowed; new student → allowed only if under the limit.
+      const result = await this.state.storage.transaction(async (txn) => {
+        const count = (await txn.get('studentCount')) || 0;
+        if (await txn.get('s:' + b.key)) return { allowed: true, existing: true, count };
+        if (enforce && !unlimited && count >= limit) return { allowed: false, existing: false, count };
+        await txn.put('s:' + b.key, Date.now());
+        await txn.put('studentCount', count + 1);
+        return { allowed: true, existing: false, count: count + 1 };
+      });
+      return Response.json(result);
     }
     if (url.pathname === '/consume' && request.method === 'POST') {
       let limit = 0;

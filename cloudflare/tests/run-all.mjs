@@ -399,9 +399,14 @@ try {
     const del = await jfetch('/api/admin/teachers/' + tid, {
       method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
     });
-    ok('حذف المعلم', del.status === 200);
+    ok('حذف المعلم غير تدميري (يُنقل إلى الأرشيف)', del.status === 200 && del.data.archived === true);
     const gone = await jfetch('/api/teacher/sara');
     ok('الملف المحذوف يعطي 404', gone.status === 404);
+    const listAfter = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    ok('المعلم المحذوف يظهر في الأرشيف ولا يظهر في القائمة النشطة', listAfter.data.archived.some(t => t.id === tid) && !listAfter.data.teachers.some(t => t.id === tid));
+    const restore = await post('/api/admin/teachers/' + tid + '/restore', {}, { Cookie: cookie });
+    ok('استعادة المعلم من الأرشيف (يعود معطّلًا)', restore.status === 200 && restore.data.teacher.slug === 'sara' && restore.data.teacher.enabled === false);
+    await jfetch('/api/admin/teachers/' + tid, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     const defDel = await jfetch('/api/admin/teachers/t_default_mostafa', {
       method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
     });
@@ -592,6 +597,63 @@ try {
       !JSON.stringify(rel.data).includes('"answer"'));
     // cleanup
     for (const id of [dashId, mkB.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+  }
+
+  /* ============ 15. per-teacher STUDENT LIMIT (real unlimited flag, race-safe) ============ */
+  console.log('\n[15] حد الطلاب لكل معلم (علم «غير محدود» حقيقي + ذرية تحت التزامن)');
+  {
+    const ph = (n) => '0106' + String(n).padStart(7, '0');
+    const startAs = (slug, i, examId = 'U1-T1') => post('/api/exam/start', { examId, name: 'طالب ' + i, phone: ph(i), slug });
+    // 15a: limit 2 → 2 accepted, 3rd rejected 429, existing student can re-enter, admin shows Limit/Current/Remaining
+    const mk = await post('/api/admin/teachers', { name: 'حد طلاب', slug: 'stu15', studentLimitUnlimited: false, studentLimit: 2, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد طلاب 2 (studentLimitUnlimited=false, studentLimit=2)', mk.status === 200 && mk.data.teacher.studentLimitUnlimited === false && mk.data.teacher.studentLimit === 2);
+    const s1 = await startAs('stu15', 1), s2 = await startAs('stu15', 2), s3 = await startAs('stu15', 3);
+    ok('الطالبان 1 و2 يُقبلان والثالث يُرفض (429) برسالة واضحة', s1.status === 200 && s2.status === 200 && s3.status === 429 && /اكتمل العدد/.test(s3.data.error));
+    ok('استجابة البدء تعلن الحد/الحالي/المتبقي (2/2/0 بعد الطالب الثاني)', s2.data.students && s2.data.students.limit === 2 && s2.data.students.current === 2 && s2.data.students.remaining === 0);
+    const again = await startAs('stu15', 1, 'T2P-C1-T1');
+    ok('طالب مسجَّل يدخل امتحانًا آخر رغم امتلاء الحد (الحد على الطلاب لا المحاولات)', again.status === 200);
+    const samePhoneOtherName = await post('/api/exam/start', { examId: 'U1-T1', name: 'اسم مختلف', phone: '+2' + ph(1), slug: 'stu15' });
+    ok('نفس الهاتف بصيغة مختلفة واسم مختلف = نفس الطالب (لا مقعد جديد)', samePhoneOtherName.status === 200);
+    const sub3 = await post('/api/exam/submit', { token: s1.data.token, answers: correctPositions('U1-T1', decodeToken(s1.data.token).seed) });
+    ok('تسليم الطالب المسجَّل يعمل بشكل طبيعي', sub3.status === 200 && sub3.data.score === 20);
+    const st = await jfetch('/api/admin/teachers/' + mk.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('لوحة المعلم: Limit 2 / Current 2 / Remaining 0 + الطلاب المسجَّلون = 2', st.status === 200 && st.data.studentLimit.limit === 2 && st.data.studentLimit.current === 2 && st.data.studentLimit.remaining === 0 && st.data.totals.registeredStudents === 2);
+    const lst = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    const me = lst.data.teachers.find(t => t.slug === 'stu15');
+    ok('قائمة المعلمين تحمل studentLimitStatus (limit/current/remaining)', me && me.studentLimitStatus.limit === 2 && me.studentLimitStatus.current === 2 && me.studentLimitStatus.remaining === 0);
+    // raise limit → new student accepted
+    const up = await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'حد طلاب', slug: 'stu15', studentLimitUnlimited: false, studentLimit: 3 }) });
+    const s4 = await startAs('stu15', 3);
+    ok('رفع الحد إلى 3 → الطالب الثالث يُقبل', up.status === 200 && s4.status === 200 && s4.data.students.remaining === 0);
+    // 15b: limit 0 → no new student; 15c: unlimited flag (not a number)
+    const mk0 = await post('/api/admin/teachers', { name: 'حد صفر', slug: 'stu15z', studentLimitUnlimited: false, studentLimit: 0, requirePhone: true }, { Cookie: cookie });
+    const z = await startAs('stu15z', 1);
+    ok('حد 0 = التسجيل مغلق (429)', mk0.status === 200 && z.status === 429);
+    const mkU = await post('/api/admin/teachers', { name: 'غير محدود', slug: 'stu15u', studentLimitUnlimited: true, studentLimit: 0, requirePhone: true }, { Cookie: cookie });
+    const uRes = await Promise.all([1, 2, 3, 4, 5].map(i => startAs('stu15u', i)));
+    ok('غير محدود = علم حقيقي (limit=null) ولا يُرفض أي طالب', mkU.data.teacher.studentLimitUnlimited === true && uRes.every(r => r.status === 200) && uRes[0].data.students.unlimited === true && uRes[0].data.students.limit === null);
+    // 15d: RACE — limit 500, current 499, 6 concurrent NEW students → exactly 1 accepted
+    const mkR = await post('/api/admin/teachers', { name: 'سباق', slug: 'stu15r', studentLimitUnlimited: false, studentLimit: 500, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد 500', mkR.status === 200 && mkR.data.teacher.studentLimit === 500);
+    let filled = 0;
+    for (let b = 0; b < 499; b += 25) {
+      const batch = [];
+      for (let i = b; i < Math.min(499, b + 25); i++) batch.push(startAs('stu15r', 1000 + i));
+      filled += (await Promise.all(batch)).filter(r => r.status === 200).length;
+    }
+    ok('تسجيل 499 طالبًا متمايزًا (Current = 499)', filled === 499, 'filled ' + filled);
+    const race = await Promise.all([1, 2, 3, 4, 5, 6].map(i => startAs('stu15r', 5000 + i)));
+    const acc = race.filter(r => r.status === 200).length, rej = race.filter(r => r.status === 429).length;
+    ok('سباق: حد 500 / الحالي 499 / 6 تسجيلات متزامنة → 1 مقبول + 5 مرفوضة بالضبط', acc === 1 && rej === 5, acc + '/' + rej);
+    const stR = await jfetch('/api/admin/teachers/' + mkR.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('بعد السباق: Current = 500 بالضبط (لا تجاوز)', stR.data.studentLimit.current === 500 && stR.data.studentLimit.remaining === 0);
+    // 15e: slug from body cannot escape another teacher's limit (identity is server-side per slug)
+    const spoof = await post('/api/exam/start', { examId: 'U1-T1', name: 'محتال', phone: ph(9999), slug: 'stu15r', teacherId: 't_default_mostafa' });
+    ok('لا يمكن تجاوز حد المعلم بحقن teacherId من العميل', spoof.status === 429);
+    // cleanup (archive)
+    for (const id of [mk.data.teacher.id, mk0.data.teacher.id, mkU.data.teacher.id, mkR.data.teacher.id]) {
       await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     }
   }
