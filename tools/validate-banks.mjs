@@ -13,9 +13,11 @@
  * Exit code 1 on any failure. Run: node tools/validate-banks.mjs
  */
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import vm from 'node:vm';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
+import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic } from './philo-trainings.mjs';
 
 const D = loadGsData();
 const B = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'cloudflare/src/data/banks.json'), 'utf8'));
@@ -94,8 +96,9 @@ console.log('\n[B] Completeness vs .gs sources');
   // exam count parity with legacy + new
   const legacyCount = Object.keys(D.EXAMS).length + Object.keys(D.PHILO_EXAMS).length + Object.keys(D.PHILO_T2_EXAMS).length + Object.keys(D.PHILO_T2_LOGIC_EXAMS).length;
   const newCount = Object.keys(B.examDefs).length;
-  if (newCount === legacyCount + 2) ok('exams: ' + legacyCount + ' legacy + 2 new = ' + newCount);
-  else fail('exam count mismatch: legacy ' + legacyCount + ', bank ' + newCount);
+  const trainingCount = Object.values(B.exams).filter(e => e.subjectId === 'philosophy' && e.type === 'training' && !e.legacy).length;
+  if (newCount === legacyCount + 2 + trainingCount) ok('exams: ' + legacyCount + ' legacy + 2 comprehensive + ' + trainingCount + ' JSON trainings = ' + newCount);
+  else fail('exam count mismatch: legacy ' + legacyCount + ', trainings ' + trainingCount + ', bank ' + newCount);
 }
 
 /* ---------- C. Question validity ---------- */
@@ -135,9 +138,12 @@ console.log('\n[D] Structure & curriculum mapping');
     }
   };
   walk(B.catalog);
-  const unreached = [...examIds].filter(id => !referenced.has(id));
-  if (unreached.length === 0) ok('all ' + examIds.size + ' exams reachable from catalog');
+  const unreached = [...examIds].filter(id => !referenced.has(id) && !B.exams[id].legacy);
+  const hiddenLegacy = [...examIds].filter(id => B.exams[id].legacy);
+  if (unreached.length === 0) ok('all ' + (examIds.size - hiddenLegacy.length) + ' listed exams reachable from catalog (' + hiddenLegacy.length + ' legacy model exams kept server-side only)');
   else fail('exams not reachable from catalog: ' + unreached.join(', '));
+  if (hiddenLegacy.every(id => !referenced.has(id))) ok('legacy model exams are not listed anywhere in the student catalog');
+  else fail('legacy exams leaked into catalog');
 
   const dangling = [...referenced].filter(id => !examIds.has(id));
   if (dangling.length === 0) ok('no dangling exam references');
@@ -152,11 +158,13 @@ console.log('\n[D] Structure & curriculum mapping');
       if (!e || e.lessonTitle !== l.title || e.lessonNo !== l.no) lessonsOk = false;
     });
   }
-  for (const t of B.catalog.philosophy.terms) for (const u of t.units) for (const ch of u.chapters) {
-    ch.lessons.forEach((l, i) => {
-      if (l.no !== i + 1 || !l.title) lessonsOk = false;
-      const e = B.exams[l.examIds[0]];
-      if (!e || e.lessonTitle !== l.title || e.lessonNo !== l.no) lessonsOk = false;
+  for (const t of B.catalog.philosophy.terms) for (const s of t.sections) {
+    s.topics.forEach((tp, i) => {
+      if (tp.no !== i + 1 || !tp.title || !tp.key) lessonsOk = false;
+      tp.trainings.forEach((tr, j) => {
+        const e = B.exams[tr.examId];
+        if (!e || e.topicTitle !== tp.title || e.topicKey !== tp.key || e.trainingNo !== j + 1 || e.title !== tr.title || e.count !== tr.questionCount) lessonsOk = false;
+      });
     });
   }
   if (lessonsOk) ok('lesson numbering sequential; exam lesson metadata matches catalog (topic # + exact lesson name)');
@@ -225,35 +233,67 @@ console.log('\n[D] Structure & curriculum mapping');
     }
   }
 
-  // official T2 structure (units/chapters) present
-  const t2 = B.catalog.philosophy.terms[1];
-  const expectT2Units = ['الوحدة الأولى: الفلسفة', 'الوحدة الثانية: المنطق'];
-  const expectT2Chapters = [
-    'الفصل الأول: الفلسفة والأخلاق البيئية والبيوطبية',
-    'الفصل الثاني: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد',
-    'الفصل الأول: الاستقراء وتطبيق المنهج التجريبي',
-    'الفصل الثاني: الاستنباط وتطبيقه في العلوم الصورية'
-  ];
-  const gotT2Units = t2.units.map(u => u.title);
-  const gotT2Chapters = t2.units.flatMap(u => u.chapters.map(c => c.title));
-  const logicLessons = t2.units[1].chapters.reduce((n, c) => n + c.lessons.length, 0);
-  if (JSON.stringify(gotT2Units) === JSON.stringify(expectT2Units) &&
-      JSON.stringify(gotT2Chapters) === JSON.stringify(expectT2Chapters) &&
-      logicLessons === 7 && t2.units[1].comprehensiveExamId === 'T2L-COMP')
-    ok('T2 units/chapters/lessons match the source book structure (2 فلسفة chapters + 2 منطق chapters, 7 logic lessons, unit comprehensive present)');
-  else fail('T2 structure mismatch: ' + JSON.stringify({ gotT2Units, gotT2Chapters, logicLessons: t2.units[1] && t2.units[1].lessons.length }));
-
-
-  // official unit/chapter names (T1) present
-  const t1 = B.catalog.philosophy.terms[0];
-  const expectTitles = ['الوحدة الأولى: الفلسفة', 'الوحدة الثانية: المنطق'];
-  const expectChapters = ['الفصل الأول: التفكير الإنساني', 'الفصل الثاني: الفلسفة وطبيعة الموقف الفلسفي',
-    'الفصل الأول: مبادئ المنطق (الحدود - القضايا)', 'الفصل الثاني: الاستدلال (تعريفه - أنواعه)'];
-  const gotUnits = t1.units.map(u => u.title);
-  const gotChapters = t1.units.flatMap(u => u.chapters.map(c => c.title));
-  if (JSON.stringify(gotUnits) === JSON.stringify(expectTitles) && JSON.stringify(gotChapters) === JSON.stringify(expectChapters))
-    ok('T1 units/chapters match the official curriculum book exactly');
-  else fail('T1 structure mismatch: ' + JSON.stringify({ gotUnits, gotChapters }));
+  // ===== Philosophy & Logic PRODUCTION structure: Term → Section → Topic → Training (JSON = source of truth)
+  for (const term of [1, 2]) {
+    const J = loadTrainingJson(REPO_ROOT, term);
+    const jsonIssues = validateTrainingJson(J, term).filter(i => !i.includes('empty option'));
+    if (!jsonIssues.length) ok('T' + term + ' JSON structurally valid (ids unique, 20 q/training, 4 options, keys consistent)');
+    else fail('T' + term + ' JSON issues: ' + jsonIssues.join('; '));
+    const T = B.catalog.philosophy.terms.find(x => x.term === term);
+    if (!T) { fail('term ' + term + ' missing from catalog'); continue; }
+    const catTrainings = T.sections.flatMap(s => s.topics.flatMap(tp => tp.trainings.map(tr => tr.examId)));
+    const jsonIds = J.training_exams.map(t => t.training_id);
+    if (JSON.stringify([...catTrainings].sort()) === JSON.stringify([...jsonIds].sort()) && catTrainings.length === jsonIds.length)
+      ok('T' + term + ': all ' + jsonIds.length + ' JSON trainings present as independent exams (none dropped, none merged)');
+    else fail('T' + term + ' training set mismatch: catalog ' + catTrainings.join(',') + ' vs JSON ' + jsonIds.join(','));
+    const jsonTopics = [...new Set(J.training_exams.map(t => t.subject + '|' + t.topic))];
+    const catTopics = T.sections.flatMap(s => s.topics.map(tp => s.title + '|' + tp.title));
+    if (JSON.stringify(jsonTopics) === JSON.stringify(catTopics)) ok('T' + term + ': ' + catTopics.length + ' topics — exact JSON topic names & order, no invented topics');
+    else fail('T' + term + ' topic mismatch: ' + JSON.stringify({ jsonTopics, catTopics }));
+    // each training: same questions, same order, verbatim text/options (label-stripped), no dup, 4 opts, valid key
+    let okTr = 0;
+    for (const t of J.training_exams) {
+      const e = B.exams[t.training_id], ids = B.examDefs[t.training_id];
+      if (!e || !ids) { fail('missing training exam ' + t.training_id); continue; }
+      if (e.subjectId !== 'philosophy' || e.term !== term || e.type !== 'training' || e.legacy) { fail(t.training_id + ': wrong metadata'); continue; }
+      if (e.topicTitle !== t.topic || e.sectionTitle !== t.subject) { fail(t.training_id + ': topic/section ≠ JSON'); continue; }
+      const expected = t.questions.filter(q => q.options.every(o => stripJsonLabel(o)));
+      if (ids.length !== expected.length || ids.length < 19 || ids.length > 20) { fail(t.training_id + ': ' + ids.length + ' questions (JSON usable ' + expected.length + ')'); continue; }
+      if (new Set(ids).size !== ids.length) { fail(t.training_id + ': duplicate question inside training'); continue; }
+      let good = true;
+      expected.forEach((jq, i) => {
+        const bq = B.questions[ids[i]];
+        if (!bq) { fail(t.training_id + ' q' + (i + 1) + ': unresolved ' + ids[i]); good = false; return; }
+        if (normArabic(bq.text) !== normArabic(cleanQuestionText(jq.question))) { fail(t.training_id + ' q' + (i + 1) + ': text ≠ JSON (' + ids[i] + ')'); good = false; }
+        const jo = jq.options.map(o => normArabic(stripJsonLabel(o)).replace(/ئ/g, 'ي').replace(/ؤ/g, 'و'));
+        const bo = bq.options.map(o => normArabic(o).replace(/ئ/g, 'ي').replace(/ؤ/g, 'و'));
+        if (JSON.stringify(jo) !== JSON.stringify(bo)) { fail(t.training_id + ' q' + (i + 1) + ': options ≠ JSON (' + ids[i] + ')'); good = false; }
+        if (bq.options.length !== 4 || !['A', 'B', 'C', 'D'].includes(bq.answer)) { fail(ids[i] + ': invalid options/key'); good = false; }
+        // key: either identical to JSON, or a documented conflict where the manually verified bank key was kept
+        const jsonAns = normArabic(stripJsonLabel(jq.correct_answer)).replace(/ئ/g, 'ي');
+        const bankAns = normArabic(bq.options['ABCD'.indexOf(bq.answer)]).replace(/ئ/g, 'ي');
+        if (jsonAns !== bankAns && bq.meta.keyStatus !== 'conflict-bank-key-kept') { fail(ids[i] + ': key differs from JSON without documented conflict'); good = false; }
+        if (bq.meta.subjectId !== 'philosophy' || bq.meta.term !== term) { fail(ids[i] + ': wrong subject/term meta'); good = false; }
+      });
+      if (good) okTr++;
+    }
+    if (okTr === J.training_exams.length) ok('T' + term + ': every training = JSON question set, same order, verbatim text/options, 4 options, valid server-side key, no intra-training duplicates');
+    const totalQ = catTrainings.reduce((n, id) => n + B.examDefs[id].length, 0);
+    ok('T' + term + ': ' + catTrainings.length + ' trainings × 20 = ' + totalQ + ' training questions' + (totalQ !== catTrainings.length * 20 ? ' (' + (catTrainings.length * 20 - totalQ) + ' quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)' : ''));
+    // comprehensive exams kept & separated
+    const comps = T.comprehensiveExamIds || [];
+    if (comps.length && comps.every(id => B.exams[id] && /comprehensive/.test(B.exams[id].type) && !catTrainings.includes(id)))
+      ok('T' + term + ': ' + comps.length + ' comprehensive exams preserved in a separate section (' + comps.join(', ') + ')');
+    else fail('T' + term + ' comprehensive exams missing/mixed: ' + comps.join(','));
+  }
+  // no philosophy question is orphaned from every listed exam except legacy-only ones (allowed, documented)
+  {
+    const listed = new Set(Object.values(B.exams).filter(e => !e.legacy).flatMap(e => B.examDefs[e.id]));
+    const newQ = Object.keys(B.questions).filter(id => B.questions[id].meta.source && String(B.questions[id].meta.source).includes('ExamManasa JSON dataset'));
+    const orphanNew = newQ.filter(id => !listed.has(id));
+    if (!orphanNew.length) ok('no orphan JSON-sourced questions (' + newQ.length + ' new questions all referenced by a listed training)');
+    else fail('orphan JSON questions: ' + orphanNew.join(','));
+  }
 
   // every T1/T2 legacy exam id preserved
   const legacyIds = [...Object.keys(D.PHILO_EXAMS), ...Object.keys(D.PHILO_T2_EXAMS), ...Object.keys(D.PHILO_T2_LOGIC_EXAMS), ...Object.keys(D.EXAMS)];
@@ -262,11 +302,25 @@ console.log('\n[D] Structure & curriculum mapping');
   else fail('legacy exam ids lost: ' + missing.join(', '));
 }
 
+/* ---------- D2. Psychology frozen (byte-identical snapshot) ---------- */
+console.log('\n[D2] Psychology unchanged');
+{
+  const psyExams = Object.fromEntries(Object.entries(B.exams).filter(([, e]) => e.subjectId === 'psychology').sort());
+  const psyDefs = Object.fromEntries(Object.keys(psyExams).sort().map(id => [id, B.examDefs[id]]));
+  const psyQ = Object.fromEntries(Object.entries(B.questions).filter(([, q]) => q.meta.subjectId === 'psychology').sort());
+  const snap = JSON.stringify({ catalog: B.catalog.psychology, exams: psyExams, examDefs: psyDefs, questions: psyQ });
+  const hash = crypto.createHash('sha256').update(snap).digest('hex');
+  const EXPECTED = '8851437be88724537693cbf1ad57c0531e36eca4b55dcea102f7c077b44a8198'; // snapshot taken before the philosophy rebuild (2026-09-10)
+  if (hash === EXPECTED) ok('psychology catalog/exams/examDefs/questions byte-identical to pre-rebuild snapshot (sha256 ' + hash.slice(0, 12) + '…)');
+  else fail('PSYCHOLOGY CHANGED — sha256 ' + hash + ' ≠ ' + EXPECTED);
+}
+
 /* ---------- E. No leaks ---------- */
 console.log('\n[E] Public-surface leak check');
 {
   const publicJson = JSON.stringify(B.catalog) + JSON.stringify(B.exams);
   const leaks = [];
+  if (/correct_option|correct_answer|keyStatus|jsonKey/.test(publicJson)) leaks.push('JSON key fields in public data');
   if (publicJson.includes('"answer"')) leaks.push('answers in public data');
   if (publicJson.includes('questionIds')) leaks.push('question lists in public data');
   for (const id of Object.keys(B.questions).slice(0, 50)) {

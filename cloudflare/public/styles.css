@@ -701,3 +701,61 @@ footer.site b { color: var(--muted); }
   body { background: #fff; }
   .rq, .card { box-shadow: none; }
 }
+
+/* ===== الفلسفة والمنطق: الترم → الموضوع → التدريبات (نفس لغة التصميم الحالية) ===== */
+.topics-hint { color: var(--muted); font-size: .84rem; margin: -2px 0 14px; text-align: center; }
+.topic-grid { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); }
+.topic-card {
+  display: flex; align-items: center; gap: 13px; padding: 14px 15px; min-height: 76px;
+  background: #fff; border: 1.5px solid var(--line); border-radius: 15px; color: inherit; text-decoration: none;
+  cursor: pointer; box-shadow: var(--shadow-sm);
+  transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+  -webkit-tap-highlight-color: transparent;
+}
+.topic-card:hover { border-color: var(--primary); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.topic-card:active { transform: scale(.985); background: var(--primary-soft); }
+.topic-card:focus-visible { outline: none; border-color: var(--primary); box-shadow: 0 0 0 3px var(--primary-soft-2); }
+.topic-card .lno {
+  flex: none; width: 54px; height: 54px; border-radius: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, var(--primary-soft), var(--lav)); color: var(--primary-deep);
+}
+.topic-card .lno span { font-size: .6rem; font-weight: 800; color: var(--muted); }
+.topic-card .lno b { font-size: 1.3rem; color: var(--primary-deep); line-height: 1.1; }
+.topic-card .linfo { min-width: 0; flex: 1; }
+.topic-card .lt { font-weight: 800; font-size: .95rem; color: var(--ink); line-height: 1.55; }
+.topic-card .ls { color: var(--muted); font-size: .74rem; margin-top: 3px; }
+.topic-card .lgo {
+  flex: none; width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  border: 1.5px solid var(--line); color: var(--primary); font-weight: 800; transition: all .15s ease;
+}
+.topic-card:hover .lgo { background: var(--primary); color: #fff; border-color: var(--primary); }
+
+.topic-head { text-align: center; padding: 18px 0 6px; }
+.topic-head .kicker { color: var(--primary); font-weight: 800; font-size: .8rem; }
+.topic-head h2 { font-size: 1.35rem; font-weight: 800; margin: 6px 0 2px; color: var(--ink); line-height: 1.5; }
+.topic-head .sub { color: var(--muted); font-size: .85rem; }
+
+.training-grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); }
+.training-card {
+  display: flex; align-items: center; gap: 14px; padding: 16px 16px; min-height: 96px;
+  background: linear-gradient(140deg, #fff, var(--lav) 140%); border: 1.5px solid var(--line); border-radius: 18px;
+  box-shadow: var(--shadow-sm); transition: border-color .15s ease, box-shadow .15s ease, transform .12s ease;
+}
+.training-card:hover { border-color: var(--primary-soft-2); box-shadow: var(--shadow-md); transform: translateY(-1px); }
+.training-card .tc-no {
+  flex: none; width: 50px; height: 50px; border-radius: 14px; display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(145deg, var(--gold), var(--gold-deep)); color: #fff; font-weight: 800; font-size: 1.25rem;
+  box-shadow: 0 6px 14px rgba(201, 154, 46, .28);
+}
+.training-card .tc-body { min-width: 0; flex: 1; }
+.training-card .tc-title { font-weight: 800; font-size: 1.05rem; color: var(--ink); line-height: 1.4; }
+.training-card .tc-meta { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 7px; }
+.training-card .tc-start { flex: none; min-height: 48px; padding: 12px 20px; white-space: nowrap; }
+.topic-nav { display: flex; justify-content: center; margin: 22px 0 8px; }
+
+@media (max-width: 600px) {
+  .topic-grid, .training-grid { grid-template-columns: 1fr; }
+  .training-card { flex-wrap: wrap; padding: 14px; }
+  .training-card .tc-start { flex: 1 1 100%; width: 100%; margin-top: 4px; }
+  .topic-head h2 { font-size: 1.15rem; }
+}
