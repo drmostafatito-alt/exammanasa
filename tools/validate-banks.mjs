@@ -289,7 +289,7 @@ console.log('\n[D] Structure & curriculum mapping');
         const bankAns = normArabic(bq.options['ABCD'.indexOf(bq.answer)]).replace(/ئ/g, 'ي');
         if (jsonAns !== bankAns) {
           const ks = bq.meta.keyStatus;
-          const documented = ks === 'conflict-bank-key-kept' || ks === 'bank-key-kept-json-unverified' || ks === 'bank-confirmed-by-source' ||
+          const documented = ks === 'conflict-bank-key-kept' || ks === 'bank-key-kept-json-unverified' || ks === 'bank-confirmed-by-source' || (ks === 'official-source-decision' && bq.meta.keySource) ||
             (bq.meta.keyEvidence === 'source-other' && jsonKeyEvidence(jq).sourceOption === bq.answer);
           if (!documented) { fail(ids[i] + ': key differs from JSON without documented evidence'); good = false; }
         }
@@ -303,7 +303,9 @@ console.log('\n[D] Structure & curriculum mapping');
     { // key verification summary for this term's production questions
       const qids = [...new Set(catTrainings.flatMap(id => B.examDefs[id]))];
       const nr = qids.filter(q => B.questions[q].meta.verificationStatus === 'needs-review' || B.questions[q].meta.keyStatus === 'conflict-bank-key-kept');
-      ok('T' + term + ': ' + (qids.length - nr.length) + '/' + qids.length + ' production keys verified; ' + nr.length + ' flagged needs-review (listed in AUDIT_PHILOSOPHY_TRAININGS.md, never guessed)');
+      const msg = 'T' + term + ': ' + (qids.length - nr.length) + '/' + qids.length + ' production keys verified; ' + nr.length + ' open (REVIEW_ANSWER_KEYS.md — never guessed)';
+      // STRICT_KEYS=1 turns the remaining open items into a hard failure (production gate)
+      if (nr.length && process.env.STRICT_KEYS) fail(msg); else if (nr.length) warn(msg); else ok(msg);
     }
     ok('T' + term + ': ' + catTrainings.length + ' trainings × 20 = ' + totalQ + ' training questions' + (totalQ !== catTrainings.length * 20 ? ' (' + (catTrainings.length * 20 - totalQ) + ' quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)' : ''));
     // comprehensive exams kept & separated

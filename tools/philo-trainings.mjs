@@ -131,6 +131,25 @@ function tokenSim(a, b) {
   return i / (A.size + B.size - i || 1);
 }
 
+/* ------------------------------------------------------------------ *
+ * data/key-decisions.json — human decisions backed by an official source.
+ * { "decisions": { "<questionId|jsonId>": { "answer": "B", "source": "كتاب الشرح ص 41", "note": "" } },
+ *   "restoreOptions": { "<jsonId>": { "options": ["…","…","…","…"], "source": "كتاب الأسئلة ص 12" } } }
+ * Every entry MUST carry a non-empty `source`; entries without one are rejected.
+ * ------------------------------------------------------------------ */
+export function loadKeyDecisions(repoRoot) {
+  const p = path.join(repoRoot, 'data/key-decisions.json');
+  if (!fs.existsSync(p)) return { decisions: {}, restoreOptions: {} };
+  const d = JSON.parse(fs.readFileSync(p, 'utf8'));
+  for (const [id, v] of Object.entries(d.decisions || {})) {
+    if (!/^[ABCD]$/.test(v.answer || '') || !String(v.source || '').trim()) throw new Error('key-decisions: ' + id + ' needs answer A-D and a non-empty source');
+  }
+  for (const [id, v] of Object.entries(d.restoreOptions || {})) {
+    if (!Array.isArray(v.options) || v.options.length !== 4 || v.options.some(o => !String(o || '').trim()) || !String(v.source || '').trim()) throw new Error('key-decisions.restoreOptions: ' + id + ' needs 4 non-empty options and a source');
+  }
+  return { decisions: d.decisions || {}, restoreOptions: d.restoreOptions || {} };
+}
+
 export function loadTrainingJson(repoRoot, term) {
   const p = path.join(repoRoot, TRAINING_JSON_FILES[term]);
   return JSON.parse(fs.readFileSync(p, 'utf8'));
@@ -195,6 +214,8 @@ export function buildTrainings(ctx) {
     sharedQuestions: [], optionVariantReuse: [], titleRenames: [], skippedComprehensives: [], sourceOverrides: []
   };
 
+  const KD = loadKeyDecisions(repoRoot);
+  report.decisionsApplied = [];
   const terms = [];
   for (const term of [1, 2]) {
     const d = loadTrainingJson(repoRoot, term);
@@ -238,7 +259,14 @@ export function buildTrainings(ctx) {
       const questionIds = [];
       t.questions.forEach((q, i) => {
         const text = cleanQuestionText(q.question);
-        const opts = q.options.map(stripOptionLabel);
+        let opts = q.options.map(stripOptionLabel);
+        if (KD.restoreOptions[q.id]) {
+          const ro = KD.restoreOptions[q.id];
+          // only an EMPTY option may be restored; non-empty options must stay verbatim
+          opts.forEach((o, k) => { if (o && normLoose(o) !== normLoose(stripOptionLabel(ro.options[k]))) throw new Error('restoreOptions ' + q.id + ': option ' + LETTERS[k] + ' differs from JSON — only empty options may be restored'); });
+          opts = ro.options.map(stripOptionLabel);
+          report.decisionsApplied.push({ term, trainingId: t.training_id, id: q.id, kind: 'restoreOption', source: ro.source });
+        }
         const ci = LETTERS.indexOf(q.correct_option);
         const jsonAnswerText = stripOptionLabel(q.correct_answer);
 
@@ -335,6 +363,16 @@ export function buildTrainings(ctx) {
           report.newQuestions.push({ term, trainingId: t.training_id, id: finalId, keyStatus, evidence: ev.status, note: ev.note || '' });
         }
 
+        // human decision backed by an official source overrides everything (documented)
+        const dec = KD.decisions[finalId] || KD.decisions[q.id];
+        if (dec) {
+          const bq = questions[finalId];
+          bq.answer = dec.answer;
+          bq.meta.verificationStatus = 'verified';
+          bq.meta.keyStatus = 'official-source-decision';
+          bq.meta.keySource = dec.source; if (dec.note) bq.meta.keyNote = dec.note;
+          report.decisionsApplied.push({ term, trainingId: t.training_id, id: finalId, kind: 'answer', answer: dec.answer, source: dec.source });
+        }
         if (questionIds.includes(finalId)) throw new Error(t.training_id + ': duplicate question inside training ' + finalId);
         if (qidOwner.has(finalId) && qidOwner.get(finalId) !== t.training_id) {
           stats.shared++;
@@ -397,6 +435,9 @@ export function renderTrainingReport(report, extra) {
   L.push('## أسئلة محجوزة (لا تُعرض للطالب)', '');
   report.quarantined.forEach(q => L.push(`- **${q.jsonId}** (${q.trainingId}): ${q.reason} — «${q.question}…»`));
   if (!report.quarantined.length) L.push('- لا شيء');
+  L.push('', `## قرارات بشرية مدعومة بمصدر رسمي (data/key-decisions.json) (${(report.decisionsApplied || []).length})`, '');
+  (report.decisionsApplied || []).forEach(x => L.push(`- ${x.id} (${x.trainingId}): ${x.kind === 'answer' ? 'المفتاح → ' + x.answer : 'استعادة خيار ناقص'} — المصدر: ${x.source}`));
+  if (!(report.decisionsApplied || []).length) L.push('- لا شيء بعد — انظر REVIEW_ANSWER_KEYS.md');
   L.push('', '## أسئلة مشتركة بين تدريبين (كما وردت في JSON)', '');
   report.sharedQuestions.forEach(s => L.push(`- ${s.questionId} ← ${s.trainings.join(' و ')} (${s.note})`));
   if (!report.sharedQuestions.length) L.push('- لا شيء');
