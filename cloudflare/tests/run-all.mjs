@@ -153,7 +153,7 @@ try {
     const r = await jfetch('/api/catalog');
     const examCount = Object.keys(r.data.exams).length;
     const listed = Object.values(r.data.exams).filter(e => !e.legacy).length;
-    ok('113 امتحانًا في الفهرس (66 معروضًا + 47 نموذجًا قديمًا محفوظًا)', examCount === 113 && listed === 66, 'got ' + examCount + '/' + listed);
+    ok('127 امتحانًا في الفهرس (80 معروضًا + 47 نموذجًا قديمًا محفوظًا)', examCount === 127 && listed === 80, 'got ' + examCount + '/' + listed);
     ok('الفهرس يتضمن مالك المنصة (owner) ببيانات عامة فقط',
       r.data.owner && r.data.owner.name === 'د. مصطفى تيتو' && r.data.owner.slug === 'mostafa' &&
       'specialty' in r.data.owner && !('phone' in r.data.owner) && !('id' in r.data.owner));
@@ -233,18 +233,18 @@ try {
     const lessonsOf = (S, sec, no) => S.t.sections[sec].topics[no].lessons.map(l => l.title);
     ok('الترم الأول: الفلسفة موضوعان (التفكير الإنساني / الفلسفة وطبيعة الموقف الفلسفي) والمنطق موضوعان (مبادئ المنطق / الاستدلال)',
       s1.topics.length === 4 && s1.t.sections[0].topics.map(t => t.title).join('|') === 'التفكير الإنساني|الفلسفة وطبيعة الموقف الفلسفي' && s1.t.sections[1].topics.map(t => t.title).join('|') === 'مبادئ المنطق (الحدود - القضايا)|الاستدلال (تعريفه - أنواعه)');
-    ok('الترم الأول: 17 درسًا بأسماء JSON الحقيقية (3+5 فلسفة، 8+1 منطق) / 17 تدريبًا', s1.lessons.length === 17 && lessonsOf(s1, 0, 0).join('|') === 'التفكير والنشاط العقلي|أساليب التفكير|مهارات التفكير الفلسفي' && lessonsOf(s1, 0, 1).length === 5 && lessonsOf(s1, 1, 0).length === 8 && lessonsOf(s1, 1, 1).join('|') === 'القياس الأرسطي' && s1.trainings.length === 17);
+    ok('الترم الأول: 19 درسًا بأسماء JSON الحقيقية (5+5 فلسفة، 8+1 منطق) / 30 تدريبًا', s1.lessons.length === 19 && lessonsOf(s1, 0, 0).join('|') === 'التفكير والنشاط العقلي|أساليب التفكير|مهارات التفكير الفلسفي|الفلسفة والدين|الفلسفة والعلم' && lessonsOf(s1, 0, 1).length === 5 && lessonsOf(s1, 1, 0).length === 8 && lessonsOf(s1, 1, 1).join('|') === 'القياس الأرسطي' && s1.trainings.length === 30);
     ok('كل درس يحمل اسمًا حقيقيًا (لا «الدرس N» عامًا) ورقمًا متسلسلًا', s1.lessons.concat(s2.lessons).every(l => l.title.trim() && !/^الدرس\s*(الأول|الثاني|الثالث|\d+)$/.test(l.title.trim())) && s1.topics.concat(s2.topics).every(tp => tp.lessons.every((l, i) => l.no === i + 1)));
     ok('الترم الثاني: الفلسفة موضوعان (البيئية والبيوطبية / المهنية والقيم) والمنطق موضوعان (الاستقراء / الاستنباط) — 11 درسًا',
       s2.topics.length === 4 && s2.t.sections[0].topics.map(t => t.title).join('|') === 'الفلسفة والأخلاق البيئية والبيوطبية|الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد' && s2.t.sections[1].topics.map(t => t.title).join('|') === 'الاستقراء وتطبيق المنهج التجريبي|الاستنباط وتطبيقه في العلوم الصورية' && s2.lessons.length === 11 && lessonsOf(s2, 0, 0).length === 3 && lessonsOf(s2, 0, 1).length === 2 && lessonsOf(s2, 1, 0).length === 3 && lessonsOf(s2, 1, 1).length === 3);
-    ok('الترم الأول: 340 سؤالًا في التدريبات (17×20 — لا أسئلة محجوزة بعد استعادة الخيار الناقص بقرار موثق)', s1.q === 340 && s1.trainings.filter(tr => tr.questionCount === 20).length === 17 && s1.trainings.filter(tr => tr.questionCount === 19).length === 0);
-    ok('الترم الثاني: 13 تدريبًا / 260 سؤالًا (13×20)', s2.trainings.length === 13 && s2.q === 260 && s2.trainings.every(tr => tr.questionCount === 20));
+    ok('الترم الأول: 710 أسئلة في التدريبات (30 تدريبًا بأعداد JSON الفعلية 15–58)', s1.q === 710 && s1.trainings.length === 30 && s1.trainings.find(tr => tr.examId === 'T1-PH-RELIGION-01').questionCount === 15 && s1.trainings.find(tr => tr.examId === 'T1-PH-07-T2').questionCount === 34);
+    ok('الترم الثاني: 14 تدريبًا / 319 سؤالًا (بأعداد JSON الفعلية)', s2.trainings.length === 14 && s2.q === 319 && s2.trainings.find(tr => tr.examId === 'T2-PH-BIO-01').questionCount === 21 && s2.trainings.find(tr => tr.examId === 'T2-PH-PRO-T2').questionCount === 20);
     const allTr = s1.trainings.concat(s2.trainings);
-    ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI)', new Set(allTr.map(tr => tr.examId)).size === 30 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
+    ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI — 44 تدريبًا)', new Set(allTr.map(tr => tr.examId)).size === 44 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
     ok('كل تدريب ينتمي لدرس واحد فقط ولا يظهر تحت درس/موضوع آخر', [1, 2].every(term => { const seen = new Set(); return summarize(term).lessons.every(l => l.trainings.every(tr => !seen.has(tr.examId) && seen.add(tr.examId))); }));
     ok('metadata كل تدريب تطابق موضوعه ودرسه (topicKey/lessonKey/lessonTitle/trainingNo/count)', allTr.every(tr => { const e = cat.exams[tr.examId]; return e && e.type === 'training' && !e.legacy && e.count === tr.questionCount && e.title === tr.title; }) &&
       [1, 2].every(term => summarize(term).topics.every(tp => tp.lessons.every(l => l.trainings.every((tr, i) => { const e = cat.exams[tr.examId]; return e.topicKey === tp.key && e.topicTitle === tp.title && e.lessonKey === l.key && e.lessonNo === l.no && e.lessonTitle === l.title && e.trainingNo === i + 1; })))));
-    ok('كل تدريب يحتفظ بـ training_id/الدرس/العنوان/20 سؤالًا (لا دمج ولا تحويل إلى label)', allTr.every(tr => BANKS.examDefs[tr.examId] && BANKS.examDefs[tr.examId].length === tr.questionCount && tr.questionCount >= 19));
+    ok('كل تدريب يحتفظ بـ training_id/الدرس/العنوان/عدد أسئلة JSON الفعلي (لا دمج ولا تحويل إلى label)', allTr.every(tr => BANKS.examDefs[tr.examId] && BANKS.examDefs[tr.examId].length === tr.questionCount && tr.questionCount >= 15));
     ok('الامتحانات الشاملة في قسم منفصل وليست تدريبات (ت1: PHI-COMP, LOG-COMP, PHLO-COMP · ت2: T2L-COMP, T2-TERM-COMP)',
       JSON.stringify(s1.t.comprehensiveExamIds) === JSON.stringify(['PHI-COMP', 'LOG-COMP', 'PHLO-COMP']) && JSON.stringify(s2.t.comprehensiveExamIds) === JSON.stringify(['T2L-COMP', 'T2-TERM-COMP']) &&
       s1.t.comprehensiveExamIds.concat(s2.t.comprehensiveExamIds).every(id => !allTr.some(tr => tr.examId === id)));
@@ -292,7 +292,7 @@ try {
   }
 
   /* ============ 6. perfect-score round-trip: ALL exams ============ */
-  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (113)');
+  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (127)');
   {
     const examIds = Object.keys(BANKS.examDefs);
     let allOk = true, badOnes = [];
@@ -306,7 +306,7 @@ try {
         allOk = false; badOnes.push(`${examId}:${s.status}/${s.data && s.data.score}/${r.data.exam.count}`);
       }
     }
-    ok(examIds.length + '/' + examIds.length + ' امتحانًا (بما فيها 30 تدريب JSON و47 نموذجًا قديمًا): الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk && examIds.length === 113, badOnes.join(', '));
+    ok(examIds.length + '/' + examIds.length + ' امتحانًا (بما فيها 44 تدريب JSON و47 نموذجًا قديمًا): الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk && examIds.length === 127, badOnes.join(', '));
   }
 
   /* ============ 7. zero-score + review ============ */
@@ -416,8 +416,8 @@ try {
     ok('تصدير CSV مع BOM عربي (0xEF 0xBB 0xBF)',
       csvResp.status === 200 && csvBytes[0] === 0xEF && csvBytes[1] === 0xBB && csvBytes[2] === 0xBF && csvText.includes('اسم الطالب'));
     const overview = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
-    ok('نظرة عامة: 113 امتحانًا / 1770 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
-      overview.data.exams === 113 && overview.data.questions === 1770 && overview.data.structure.philosophyTrainings.term1.trainings === 17 && overview.data.structure.philosophyTrainings.term2.trainings === 13 &&
+    ok('نظرة عامة: 127 امتحانًا / 1887 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
+      overview.data.exams === 127 && overview.data.questions === 1887 && overview.data.structure.philosophyTrainings.term1.trainings === 30 && overview.data.structure.philosophyTrainings.term2.trainings === 14 &&
       overview.data.audit.psychology.corrections.length === 8);
     const qs = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('البيئية'), { headers: { Cookie: cookie } });
     ok('بنك الأسئلة: بحث + مفاتيح للمسؤول فقط', qs.status === 200 && qs.data.questions.length > 0 && qs.data.questions[0].answer);
