@@ -502,7 +502,7 @@ trainingTerms.forEach(t => {
   t.comprehensiveExamIds = comps;
 });
 catalog.philosophy.terms = trainingTerms;
-catalog.philosophy.structure = 'term>section>topic>training';
+catalog.philosophy.structure = 'term>section>topic>lesson>training';
 
 // Public exam metadata (no question ids, no answers).
 // difficulty = per-exam distribution of question difficulty (real bank data —
@@ -518,10 +518,11 @@ Object.values(exams).forEach(e => {
   // Training-structure fields (philosophy only) — psychology payload stays byte-identical
   if (e.topicKey) Object.assign(pub, {
     sectionId: e.sectionId, sectionTitle: e.sectionTitle,
-    topicKey: e.topicKey, topicNo: e.topicNo, topicTitle: e.topicTitle, trainingNo: e.trainingNo
+    topicKey: e.topicKey, topicNo: e.topicNo, topicTitle: e.topicTitle,
+    lessonKey: e.lessonKey, trainingNo: e.trainingNo
   });
   if (e.legacy) pub.legacy = true;
-  if (e.questionIds) {
+  if (e.questionIds && e.subjectId !== 'philosophy') { // difficulty levels are no longer student-facing for الفلسفة والمنطق
     const d = { easy: 0, medium: 0, hard: 0 };
     e.questionIds.forEach(qid => { const x = questions[qid].meta.difficulty; if (d[x] !== undefined) d[x]++; });
     if (d.easy + d.medium + d.hard > 0) pub.difficulty = d;
@@ -548,14 +549,14 @@ const listedPhiloExams = Object.values(exams).filter(e => e.subjectId === 'philo
 const trainingStats = {};
 [1, 2].forEach(term => {
   const t = catalog.philosophy.terms.find(x => x.term === term);
+  const allLessons = t.sections.flatMap(s => s.topics.flatMap(tp => tp.lessons));
+  const allTrainings = allLessons.flatMap(l => l.trainings);
   const topics = t.sections.reduce((n, s) => n + s.topics.length, 0);
-  const trainings = t.sections.reduce((n, s) => n + s.topics.reduce((m, tp) => m + tp.trainings.length, 0), 0);
-  const trainingQuestions = t.sections.reduce((n, s) => n + s.topics.reduce((m, tp) => m + tp.trainings.reduce((k, tr) => k + tr.questionCount, 0), 0), 0);
-  trainingStats[term] = { topics, trainings, trainingQuestions, comprehensiveExams: t.comprehensiveExamIds.length };
+  trainingStats[term] = { topics, lessons: allLessons.length, trainings: allTrainings.length, trainingQuestions: allTrainings.reduce((k, tr) => k + tr.questionCount, 0), comprehensiveExams: t.comprehensiveExamIds.length };
 });
 fs.writeFileSync(path.resolve(REPO_ROOT, 'AUDIT_PHILOSOPHY_TRAININGS.md'), renderTrainingReport(trainingReport, [
-  '- الترم الأول: ' + trainingStats[1].topics + ' موضوعًا / ' + trainingStats[1].trainings + ' تدريبًا / ' + trainingStats[1].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[1].comprehensiveExams + ' امتحانات شاملة محفوظة',
-  '- الترم الثاني: ' + trainingStats[2].topics + ' موضوعًا / ' + trainingStats[2].trainings + ' تدريبًا / ' + trainingStats[2].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[2].comprehensiveExams + ' امتحانات شاملة محفوظة',
+  '- الترم الأول: ' + trainingStats[1].topics + ' موضوعات / ' + trainingStats[1].lessons + ' درسًا / ' + trainingStats[1].trainings + ' تدريبًا / ' + trainingStats[1].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[1].comprehensiveExams + ' امتحانات شاملة محفوظة',
+  '- الترم الثاني: ' + trainingStats[2].topics + ' موضوعات / ' + trainingStats[2].lessons + ' درسًا / ' + trainingStats[2].trainings + ' تدريبًا / ' + trainingStats[2].trainingQuestions + ' سؤالًا داخل التدريبات / ' + trainingStats[2].comprehensiveExams + ' امتحانات شاملة محفوظة',
   '- امتحانات النماذج القديمة (' + legacyPhiloTrainingIds.length + ') محفوظة على الخادم فقط (legacy) ولم تعد تُعرض للطالب.',
   '- إجمالي بنك الأسئلة: ' + Object.keys(questions).length + ' (علم النفس ' + Object.keys(questions).filter(id => id.startsWith('PSY-')).length + ' دون تغيير).'
 ]));
@@ -588,7 +589,8 @@ const banks = {
       newQuestionsFromJson: trainingReport.newQuestions.length,
       keyConflictsBankKept: trainingReport.keyConflicts.length,
       quarantined: trainingReport.quarantined.length,
-      needsReview: trainingReport.newQuestions.filter(n => n.keyStatus === 'json-only').length
+      sourceKeyOverrides: trainingReport.sourceOverrides.length,
+      needsReview: trainingReport.newQuestions.filter(n => n.keyStatus === 'json-only').length + trainingReport.keyConflicts.filter(k => k.status === 'conflict-bank-key-kept').length
     }
   },
   audit: {

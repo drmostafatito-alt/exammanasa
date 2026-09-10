@@ -13,7 +13,7 @@
   var S = {
     slug: '', teacher: null, catalog: null, exams: null,
     view: 'home', // home | student | subject | topic | exam | quiz | result
-    sub: null, term: 1, topicKey: null, // topicKey: الموضوع الحالي (الفلسفة والمنطق)
+    sub: null, term: 1, topicKey: null, lessonKey: null, // الموضوع/الدرس الحالي (الفلسفة والمنطق)
     examId: null, session: null,
     answers: [], current: 0, reviewMode: false,
     result: null, resultFilter: 'all',
@@ -146,9 +146,14 @@
     }
     if (parts[0] === 's' && parts[1]) {
       S.sub = parts[1]; S.term = parts[2] ? parseInt(parts[2], 10) || 1 : 1;
-      // مستوى الموضوع: #/s/philosophy/{term}/t/{topicKey} → تدريبات هذا الموضوع فقط
-      if (parts[1] === 'philosophy' && parts[3] === 't' && parts[4]) { S.view = 'topic'; S.topicKey = decodeURIComponent(parts[4]); renderTopic(); return; }
-      S.view = 'subject'; S.topicKey = null; renderSubject(); return;
+      // #/s/philosophy/{term}/t/{topicKey}            → دروس هذا الموضوع فقط
+      // #/s/philosophy/{term}/t/{topicKey}/l/{lessonKey} → تدريبات هذا الدرس فقط
+      if (parts[1] === 'philosophy' && parts[3] === 't' && parts[4]) {
+        S.topicKey = decodeURIComponent(parts[4]);
+        if (parts[5] === 'l' && parts[6]) { S.view = 'lesson'; S.lessonKey = decodeURIComponent(parts[6]); renderLesson(); return; }
+        S.view = 'topic'; S.lessonKey = null; renderTopic(); return;
+      }
+      S.view = 'subject'; S.topicKey = null; S.lessonKey = null; renderSubject(); return;
     }
     if (parts[0] === 'e' && parts[1]) { S.view = 'exam'; S.examId = parts[1]; renderExamInfo(); return; }
     S.view = 'home'; renderHome(); return;
@@ -200,7 +205,7 @@
     }
     var ph = S.catalog.philosophy;
     var phTopics = 0, phTrainings = 0;
-    ph.terms.forEach(function (t) { (t.sections || []).forEach(function (sec) { sec.topics.forEach(function (tp) { phTopics++; phTrainings += tp.trainings.length; }); }); });
+    ph.terms.forEach(function (t) { (t.sections || []).forEach(function (sec) { sec.topics.forEach(function (tp) { phTopics++; tp.lessons.forEach(function (l) { phTrainings += l.trainings.length; }); }); }); });
     return {
       subjectId: 'philosophy', icon: '📚', cls: 'philosophy',
       grade: 'الصف الأول الثانوي', subject: 'الفلسفة والمنطق',
@@ -469,20 +474,31 @@
       '<button class="tab ' + (S.term === 2 ? 'active' : '') + '" onclick="go(\'#/s/philosophy/2\')">الترم الثاني</button></div>';
   }
   function topicHash(tp) { return '#/s/philosophy/' + S.term + '/t/' + encodeURIComponent(tp.key); }
+  function lessonHash(tp, l) { return topicHash(tp) + '/l/' + encodeURIComponent(l.key); }
   function findTopic(term, key) {
     var found = null;
     (term.sections || []).forEach(function (sec) { sec.topics.forEach(function (tp) { if (tp.key === key) found = { section: sec, topic: tp }; }); });
     return found;
   }
-  /* بطاقة موضوع — تفتح صفحة الموضوع (تدريباته فقط) */
+  function topicTrainings(tp) { var out = []; tp.lessons.forEach(function (l) { out = out.concat(l.trainings); }); return out; }
+  function countWord(n, one, few) { return n + ' ' + (n === 1 ? one : few); }
+  /* بطاقة موضوع (الموضوع الأول/الثاني) — تفتح صفحة دروس الموضوع */
   function topicCard(tp) {
-    var n = tp.trainings.length;
-    var qs = tp.trainings.reduce(function (s, tr) { return s + tr.questionCount; }, 0);
+    var trs = topicTrainings(tp);
     return '<a class="topic-card" href="' + topicHash(tp) + '" role="button">' +
       '<div class="lno"><span>الموضوع</span><b>' + tp.no + '</b></div>' +
       '<div class="linfo"><div class="lt">' + esc(tp.title) + '</div>' +
-      '<div class="ls"><span>' + n + (n === 1 ? ' تدريب' : ' تدريبات') + ' · ' + qs + ' سؤالًا · اختيار من متعدد</span></div></div>' +
+      '<div class="ls"><span>' + countWord(tp.lessons.length, 'درس', 'دروس') + ' · ' + countWord(trs.length, 'تدريب', 'تدريبات') + '</span></div></div>' +
       '<span class="lgo" aria-hidden="true">‹</span></a>';
+  }
+  /* بطاقة درس — رقم الدرس + الاسم الحقيقي + عدد التدريبات + عرض التدريبات */
+  function lessonCard(tp, l) {
+    var n = l.trainings.length;
+    return '<a class="topic-card lesson-card" href="' + lessonHash(tp, l) + '" role="button" aria-label="الدرس ' + l.no + ' — ' + esc(l.title) + '">' +
+      '<div class="lno"><span>الدرس</span><b>' + l.no + '</b></div>' +
+      '<div class="linfo"><div class="lt">الدرس ' + l.no + ' — ' + esc(l.title) + '</div>' +
+      '<div class="ls"><span>' + countWord(n, 'تدريب', 'تدريبات') + ' · كل تدريب 20 سؤالًا</span></div></div>' +
+      '<span class="lgo lgo-text" aria-hidden="true">عرض التدريبات ‹</span></a>';
   }
   /* قسم الامتحانات الشاملة — منفصل عن التدريبات */
   function comprehensiveSection(term) {
@@ -495,7 +511,7 @@
     });
     return html + '</div>';
   }
-  /* بطاقة تدريب كبيرة — اسم التدريب + عدد الأسئلة + زر ابدأ الامتحان */
+  /* بطاقة تدريب كبيرة — اسم التدريب + عدد الأسئلة + زر ابدأ الامتحان (بلا مستويات صعوبة) */
   function trainingCard(tr, idx) {
     var e = S.exams[tr.examId];
     if (!e) return '';
@@ -503,14 +519,16 @@
       '<div class="tc-no">' + (idx + 1) + '</div>' +
       '<div class="tc-body">' +
       '<div class="tc-title">' + esc(tr.title) + '</div>' +
-      '<div class="tc-meta"><span class="badge green">' + tr.questionCount + ' سؤالًا</span><span class="badge">اختيار من متعدد</span>' + difficultyBadge(e) + '</div>' +
+      '<div class="tc-meta"><span class="badge green">' + tr.questionCount + ' سؤالًا</span><span class="badge">اختيار من متعدد</span></div>' +
       '</div>' +
       '<button type="button" class="btn tc-start" onclick="go(\'#/e/' + e.id + '\')">ابدأ الامتحان</button>' +
       '</div>';
   }
+  function currentTerm() { return S.catalog.philosophy.terms.filter(function (t) { return t.term === S.term; })[0]; }
+  /* صفحة الموضوع: دروس هذا الموضوع فقط */
   function renderTopic() {
     var sub2 = S.catalog.philosophy;
-    var term = sub2.terms.filter(function (t) { return t.term === S.term; })[0];
+    var term = currentTerm();
     var hit = term ? findTopic(term, S.topicKey) : null;
     if (!hit) { go('#/s/philosophy/' + (S.term || 1)); return; }
     var tp = hit.topic;
@@ -518,19 +536,51 @@
       ['الرئيسية', "go('#/')"],
       [sub2.name, "go('#/s/philosophy/" + S.term + "')"],
       [term.label, "go('#/s/philosophy/" + S.term + "')"],
-      [tp.title]
+      [hit.section.title + ' — الموضوع ' + tp.no]
     ]);
     html += '<div class="topic-head">' +
       '<div class="kicker">' + esc(term.label) + ' · ' + esc(hit.section.title) + ' · الموضوع ' + tp.no + '</div>' +
       '<h2>' + esc(tp.title) + '</h2>' +
-      '<div class="sub">' + tp.trainings.length + (tp.trainings.length === 1 ? ' تدريب' : ' تدريبات') + ' — كل تدريب امتحان مستقل بذاته</div>' +
+      '<div class="sub">' + countWord(tp.lessons.length, 'درس', 'دروس') + ' · ' + countWord(topicTrainings(tp).length, 'تدريب', 'تدريبات') + ' — اختر الدرس لعرض تدريباته</div>' +
       '</div>';
-    html += '<div class="section-title"><h3>تدريبات الموضوع</h3><span class="count">' + tp.trainings.length + '</span></div>';
-    html += '<div class="training-grid">';
-    tp.trainings.forEach(function (tr, i) { html += trainingCard(tr, i); });
+    html += '<div class="section-title"><h3>دروس الموضوع</h3><span class="count">' + tp.lessons.length + '</span></div>';
+    html += '<div class="topic-grid">';
+    tp.lessons.forEach(function (l) { html += lessonCard(tp, l); });
     html += '</div>';
     html += '<div class="topic-nav">' +
       '<button class="btn small ghost" onclick="go(\'#/s/philosophy/' + S.term + '\')">‹ العودة إلى موضوعات ' + esc(term.label) + '</button>' +
+      '</div>';
+    app.innerHTML = html;
+    try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { }
+  }
+  /* صفحة الدرس: تدريبات هذا الدرس فقط */
+  function renderLesson() {
+    var sub2 = S.catalog.philosophy;
+    var term = currentTerm();
+    var hit = term ? findTopic(term, S.topicKey) : null;
+    if (!hit) { go('#/s/philosophy/' + (S.term || 1)); return; }
+    var tp = hit.topic;
+    var l = tp.lessons.filter(function (x) { return x.key === S.lessonKey; })[0];
+    if (!l) { go(topicHash(tp)); return; }
+    var html = crumb([
+      ['الرئيسية', "go('#/')"],
+      [sub2.name, "go('#/s/philosophy/" + S.term + "')"],
+      [term.label, "go('#/s/philosophy/" + S.term + "')"],
+      ['الموضوع ' + tp.no, "go('" + topicHash(tp) + "')"],
+      ['الدرس ' + l.no]
+    ]);
+    html += '<div class="topic-head">' +
+      '<div class="kicker">' + esc(term.label) + ' · ' + esc(hit.section.title) + ' · الموضوع ' + tp.no + ': ' + esc(tp.title) + '</div>' +
+      '<h2>الدرس ' + l.no + ' — ' + esc(l.title) + '</h2>' +
+      '<div class="sub">' + countWord(l.trainings.length, 'تدريب', 'تدريبات') + ' — كل تدريب امتحان مستقل بذاته</div>' +
+      '</div>';
+    html += '<div class="section-title"><h3>تدريبات الدرس</h3><span class="count">' + l.trainings.length + '</span></div>';
+    html += '<div class="training-grid">';
+    l.trainings.forEach(function (tr, i) { html += trainingCard(tr, i); });
+    html += '</div>';
+    html += '<div class="topic-nav">' +
+      '<button class="btn small ghost" onclick="go(\'' + topicHash(tp) + '\')">‹ العودة إلى دروس الموضوع ' + tp.no + '</button>' +
+      '<button class="btn small ghost" onclick="go(\'#/s/philosophy/' + S.term + '\')">‹ العودة إلى ' + esc(term.label) + '</button>' +
       '</div>';
     app.innerHTML = html;
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { }
@@ -562,7 +612,7 @@
       html2 += termTabs();
       var term = sub2.terms.filter(function (t) { return t.term === S.term; })[0];
       if (!term) { app.innerHTML = html2 + '<div class="empty">لا توجد بيانات لهذا الترم.</div>'; return; }
-      html2 += '<p class="topics-hint">اختر الموضوع لعرض تدريباته — كل تدريب امتحان مستقل من 20 سؤالًا.</p>';
+      html2 += '<p class="topics-hint">اختر الموضوع ثم الدرس لعرض تدريباته — كل تدريب امتحان مستقل من 20 سؤالًا.</p>';
       (term.sections || []).forEach(function (sec) {
         html2 += '<div class="unit-card">' +
           '<div class="unit-head"><div class="uno">✦</div><h4>' + esc(sec.title) + '</h4>' +
@@ -583,7 +633,7 @@
     if (e.type === 'subject-comprehensive') return 'شامل المنهج كاملًا';
     if (e.type === 'term-comprehensive') return 'شامل ' + (e.term === 1 ? 'الترم الأول' : 'الترم الثاني') + ' كاملًا';
     if (e.type === 'unit-comprehensive' || e.type === 'comprehensive') return 'شامل الوحدة: ' + (e.unitTitle || '');
-    if (e.topicKey) return 'الموضوع ' + e.topicNo + ' — ' + e.topicTitle;
+    if (e.topicKey) return 'الموضوع ' + e.topicNo + ' — ' + e.topicTitle + ' · الدرس ' + e.lessonNo + ' — ' + e.lessonTitle;
     return 'الموضوع ' + (e.lessonNo || '') + (e.lessonTitle ? ' — ' + e.lessonTitle : '');
   }
 
@@ -595,7 +645,7 @@
       ['الرئيسية', "go('#/')"],
       [sub.name, "go('#/s/" + e.subjectId + (e.subjectId === 'philosophy' && e.term ? '/' + e.term : '') + "')"]
     ];
-    if (e.topicKey) crumbs.push([e.topicTitle, "go('#/s/philosophy/" + e.term + "/t/" + encodeURIComponent(e.topicKey) + "')"], [e.title]);
+    if (e.topicKey) crumbs.push(['الموضوع ' + e.topicNo, "go('#/s/philosophy/" + e.term + "/t/" + encodeURIComponent(e.topicKey) + "')"], ['الدرس ' + e.lessonNo, "go('" + lessonHashFor(e) + "')"], [e.title]);
     else crumbs.push([e.type === 'topic' || e.type === 'training' ? 'الموضوع ' + e.lessonNo : 'الامتحان الشامل']);
     var html = crumb(crumbs);
     var diffRow = e.difficulty
@@ -606,8 +656,8 @@
     var phoneOptional = !!(S.teacher && S.teacher.requirePhone === false);
     html += '<div class="exam-head">' +
       '<div class="kicker">' + (e.topicKey ? esc(e.term === 1 ? 'الترم الأول' : 'الترم الثاني') + ' · ' : '') + esc(e.unitTitle || '') + (e.chapterTitle ? ' · ' + esc(e.chapterTitle) : '') + '</div>' +
-      '<h2>' + (e.topicKey ? esc(e.topicTitle) + ' — ' : '') + esc(e.title) + '</h2>' +
-      (e.topicKey ? '<div class="sub">الموضوع ' + e.topicNo + ' · ' + esc(e.title) + '</div>' :
+      '<h2>' + (e.topicKey ? 'الدرس ' + e.lessonNo + ' — ' + esc(e.lessonTitle) + ' — ' : '') + esc(e.title) + '</h2>' +
+      (e.topicKey ? '<div class="sub">الموضوع ' + e.topicNo + ': ' + esc(e.topicTitle) + ' · ' + esc(e.title) + '</div>' :
         (e.lessonTitle && (e.type === 'topic' || e.type === 'training') ? '<div class="sub">الدرس: ' + esc(e.lessonTitle) + '</div>' : '')) +
       '</div>' +
       '<div class="exam-facts">' +
@@ -822,9 +872,10 @@
   }
 
   /* ---------------- النتيجة ومراجعة الأسئلة ---------------- */
+  function lessonHashFor(meta) { return '#/s/philosophy/' + meta.term + '/t/' + encodeURIComponent(meta.topicKey) + '/l/' + encodeURIComponent(meta.lessonKey); }
   function backHashFor(ex) {
     var meta = S.exams[ex.id] || ex;
-    if (meta.topicKey) return '#/s/philosophy/' + meta.term + '/t/' + encodeURIComponent(meta.topicKey);
+    if (meta.topicKey) return lessonHashFor(meta);
     return '#/s/' + ex.subjectId + (ex.term ? '/' + ex.term : '');
   }
   function renderResult() {

@@ -17,7 +17,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import vm from 'node:vm';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
-import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic } from './philo-trainings.mjs';
+import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic, OFFICIAL_TOPICS, jsonKeyEvidence } from './philo-trainings.mjs';
 
 const D = loadGsData();
 const B = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, 'cloudflare/src/data/banks.json'), 'utf8'));
@@ -161,9 +161,12 @@ console.log('\n[D] Structure & curriculum mapping');
   for (const t of B.catalog.philosophy.terms) for (const s of t.sections) {
     s.topics.forEach((tp, i) => {
       if (tp.no !== i + 1 || !tp.title || !tp.key) lessonsOk = false;
-      tp.trainings.forEach((tr, j) => {
-        const e = B.exams[tr.examId];
-        if (!e || e.topicTitle !== tp.title || e.topicKey !== tp.key || e.trainingNo !== j + 1 || e.title !== tr.title || e.count !== tr.questionCount) lessonsOk = false;
+      tp.lessons.forEach((l, k) => {
+        if (l.no !== k + 1 || !l.title || !l.key) lessonsOk = false;
+        l.trainings.forEach((tr, j) => {
+          const e = B.exams[tr.examId];
+          if (!e || e.topicTitle !== tp.title || e.topicKey !== tp.key || e.lessonKey !== l.key || e.lessonNo !== l.no || e.lessonTitle !== l.title || e.trainingNo !== j + 1 || e.title !== tr.title || e.count !== tr.questionCount) lessonsOk = false;
+        });
       });
     });
   }
@@ -241,22 +244,34 @@ console.log('\n[D] Structure & curriculum mapping');
     else fail('T' + term + ' JSON issues: ' + jsonIssues.join('; '));
     const T = B.catalog.philosophy.terms.find(x => x.term === term);
     if (!T) { fail('term ' + term + ' missing from catalog'); continue; }
-    const catTrainings = T.sections.flatMap(s => s.topics.flatMap(tp => tp.trainings.map(tr => tr.examId)));
+    const catTrainings = T.sections.flatMap(s => s.topics.flatMap(tp => tp.lessons.flatMap(l => l.trainings.map(tr => tr.examId))));
+    // official structure: exactly 2 topics per section; lesson titles = JSON topic strings verbatim; every training under exactly one lesson
+    const twoTopics = T.sections.length === 2 && T.sections.every(s => s.topics.length === 2 && s.topics.every((tp, i) => tp.title === OFFICIAL_TOPICS[term][s.id][i].title));
+    if (twoTopics) ok('T' + term + ': الفلسفة 2 موضوعات + المنطق 2 موضوعات (official chapter titles)');
+    else fail('T' + term + ': topic structure ≠ 2+2 official topics');
+    const seenTr = new Set(); let oneLesson = true;
+    T.sections.forEach(s => s.topics.forEach(tp => tp.lessons.forEach(l => l.trainings.forEach(tr => { if (seenTr.has(tr.examId)) oneLesson = false; seenTr.add(tr.examId); }))));
+    if (oneLesson) ok('T' + term + ': every training appears under exactly one lesson (no cross-lesson leakage)');
+    else fail('T' + term + ': a training appears under more than one lesson');
+    const genericLesson = T.sections.flatMap(s => s.topics.flatMap(tp => tp.lessons)).filter(l => /^الدرس\s*(الأول|الثاني|الثالث|\d+)$/.test(l.title.trim()) || !l.title.trim());
+    if (!genericLesson.length) ok('T' + term + ': all lesson titles are real names from the source (no generic «الدرس N»)');
+    else fail('T' + term + ': generic lesson titles: ' + genericLesson.map(l => l.key).join(','));
     const jsonIds = J.training_exams.map(t => t.training_id);
     if (JSON.stringify([...catTrainings].sort()) === JSON.stringify([...jsonIds].sort()) && catTrainings.length === jsonIds.length)
       ok('T' + term + ': all ' + jsonIds.length + ' JSON trainings present as independent exams (none dropped, none merged)');
     else fail('T' + term + ' training set mismatch: catalog ' + catTrainings.join(',') + ' vs JSON ' + jsonIds.join(','));
-    const jsonTopics = [...new Set(J.training_exams.map(t => t.subject + '|' + t.topic))];
-    const catTopics = T.sections.flatMap(s => s.topics.map(tp => s.title + '|' + tp.title));
-    if (JSON.stringify(jsonTopics) === JSON.stringify(catTopics)) ok('T' + term + ': ' + catTopics.length + ' topics — exact JSON topic names & order, no invented topics');
-    else fail('T' + term + ' topic mismatch: ' + JSON.stringify({ jsonTopics, catTopics }));
+    const jsonLessons = [...new Set(J.training_exams.map(t => t.subject + '|' + t.topic))];
+    const catLessons = T.sections.flatMap(s => s.topics.flatMap(tp => tp.lessons.map(l => s.title + '|' + l.title)));
+    if (JSON.stringify(jsonLessons) === JSON.stringify(catLessons)) ok('T' + term + ': ' + catLessons.length + ' lessons — exact JSON lesson names & source order, no invented lessons');
+    else fail('T' + term + ' lesson mismatch: ' + JSON.stringify({ jsonLessons, catLessons }));
     // each training: same questions, same order, verbatim text/options (label-stripped), no dup, 4 opts, valid key
     let okTr = 0;
     for (const t of J.training_exams) {
       const e = B.exams[t.training_id], ids = B.examDefs[t.training_id];
       if (!e || !ids) { fail('missing training exam ' + t.training_id); continue; }
       if (e.subjectId !== 'philosophy' || e.term !== term || e.type !== 'training' || e.legacy) { fail(t.training_id + ': wrong metadata'); continue; }
-      if (e.topicTitle !== t.topic || e.sectionTitle !== t.subject) { fail(t.training_id + ': topic/section ≠ JSON'); continue; }
+      if (e.lessonTitle !== t.topic || e.sectionTitle !== t.subject) { fail(t.training_id + ': lesson/section ≠ JSON'); continue; }
+      if ('difficulty' in e) { fail(t.training_id + ': difficulty exposed to students'); continue; }
       const expected = t.questions.filter(q => q.options.every(o => stripJsonLabel(o)));
       if (ids.length !== expected.length || ids.length < 19 || ids.length > 20) { fail(t.training_id + ': ' + ids.length + ' questions (JSON usable ' + expected.length + ')'); continue; }
       if (new Set(ids).size !== ids.length) { fail(t.training_id + ': duplicate question inside training'); continue; }
@@ -272,13 +287,24 @@ console.log('\n[D] Structure & curriculum mapping');
         // key: either identical to JSON, or a documented conflict where the manually verified bank key was kept
         const jsonAns = normArabic(stripJsonLabel(jq.correct_answer)).replace(/ئ/g, 'ي');
         const bankAns = normArabic(bq.options['ABCD'.indexOf(bq.answer)]).replace(/ئ/g, 'ي');
-        if (jsonAns !== bankAns && bq.meta.keyStatus !== 'conflict-bank-key-kept') { fail(ids[i] + ': key differs from JSON without documented conflict'); good = false; }
+        if (jsonAns !== bankAns) {
+          const ks = bq.meta.keyStatus;
+          const documented = ks === 'conflict-bank-key-kept' || ks === 'bank-key-kept-json-unverified' || ks === 'bank-confirmed-by-source' ||
+            (bq.meta.keyEvidence === 'source-other' && jsonKeyEvidence(jq).sourceOption === bq.answer);
+          if (!documented) { fail(ids[i] + ': key differs from JSON without documented evidence'); good = false; }
+        }
+        if (bq.meta.verificationStatus !== 'verified' && bq.meta.verificationStatus !== 'needs-review') { fail(ids[i] + ': unknown verificationStatus'); good = false; }
         if (bq.meta.subjectId !== 'philosophy' || bq.meta.term !== term) { fail(ids[i] + ': wrong subject/term meta'); good = false; }
       });
       if (good) okTr++;
     }
     if (okTr === J.training_exams.length) ok('T' + term + ': every training = JSON question set, same order, verbatim text/options, 4 options, valid server-side key, no intra-training duplicates');
     const totalQ = catTrainings.reduce((n, id) => n + B.examDefs[id].length, 0);
+    { // key verification summary for this term's production questions
+      const qids = [...new Set(catTrainings.flatMap(id => B.examDefs[id]))];
+      const nr = qids.filter(q => B.questions[q].meta.verificationStatus === 'needs-review' || B.questions[q].meta.keyStatus === 'conflict-bank-key-kept');
+      ok('T' + term + ': ' + (qids.length - nr.length) + '/' + qids.length + ' production keys verified; ' + nr.length + ' flagged needs-review (listed in AUDIT_PHILOSOPHY_TRAININGS.md, never guessed)');
+    }
     ok('T' + term + ': ' + catTrainings.length + ' trainings × 20 = ' + totalQ + ' training questions' + (totalQ !== catTrainings.length * 20 ? ' (' + (catTrainings.length * 20 - totalQ) + ' quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)' : ''));
     // comprehensive exams kept & separated
     const comps = T.comprehensiveExamIds || [];

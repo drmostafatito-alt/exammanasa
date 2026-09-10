@@ -759,3 +759,13 @@ footer.site b { color: var(--muted); }
   .training-card .tc-start { flex: 1 1 100%; width: 100%; margin-top: 4px; }
   .topic-head h2 { font-size: 1.15rem; }
 }
+
+/* بطاقة الدرس داخل الموضوع (نفس بطاقة الموضوع + نص «عرض التدريبات») */
+.lesson-card { min-height: 84px; }
+.lesson-card .lno { background: linear-gradient(145deg, var(--gold-soft, #fbf3e1), var(--lav)); }
+.lesson-card .lgo.lgo-text { width: auto; height: auto; border-radius: 999px; padding: 8px 12px; font-size: .78rem; white-space: nowrap; }
+.topic-nav { gap: 10px; flex-wrap: wrap; }
+@media (max-width: 600px) {
+  .lesson-card { flex-wrap: wrap; }
+  .lesson-card .lgo.lgo-text { flex: 1 1 100%; text-align: center; margin-top: 2px; }
+}

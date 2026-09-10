@@ -4,7 +4,28 @@
 
 ## الترم الأول
 
-- الموضوعات: الفلسفة 8 + المنطق 9 = 17
+- الموضوعات الرسمية: الفلسفة 2 + المنطق 2 = 4 — الدروس: الفلسفة 8 + المنطق 9
+  - الفلسفة / الموضوع 1: التفكير الإنساني
+    - الدرس 1 — التفكير والنشاط العقلي: T1-PH-01 (20)
+    - الدرس 2 — أساليب التفكير: T1-PH-02 (20)
+    - الدرس 3 — مهارات التفكير الفلسفي: T1-PH-03 (20)
+  - الفلسفة / الموضوع 2: الفلسفة وطبيعة الموقف الفلسفي
+    - الدرس 1 — نشأة الفلسفة وتعريفاتها: T1-PH-04 (19)
+    - الدرس 2 — مباحث الفلسفة الأساسية والفرعية: T1-PH-05 (20)
+    - الدرس 3 — أهمية الفلسفة: T1-PH-06 (20)
+    - الدرس 4 — خصائص وتحديات الموقف الفلسفي: T1-PH-07 (20)
+    - الدرس 5 — الشك والنقد والحوار والتحليل والتركيب: T1-PH-08 (20)
+  - المنطق / الموضوع 1: مبادئ المنطق (الحدود - القضايا)
+    - الدرس 1 — فوائد علم المنطق: T1-LG-01 (20)
+    - الدرس 2 — عوامل الوقوع في أخطاء التفكير: T1-LG-02 (20)
+    - الدرس 3 — الحدود المنطقية: T1-LG-03 (20)
+    - الدرس 4 — المفهوم والماصدق: T1-LG-04 (20)
+    - الدرس 5 — الكليات الخمس: T1-LG-05 (20)
+    - الدرس 6 — القضايا وأنواعها: T1-LG-06 (20)
+    - الدرس 7 — التقسيم الرباعي والاستغراق: T1-LG-07 (20)
+    - الدرس 8 — مربع أرسطو: T1-LG-08 (20)
+  - المنطق / الموضوع 2: الاستدلال (تعريفه - أنواعه)
+    - الدرس 1 — القياس الأرسطي: T1-LG-09 (20)
 - التدريبات: 17 — الأسئلة داخل التدريبات: 339
 - أسئلة أعيد استخدامها من البنك المركزي (نص + خيارات متطابقة): 214
 - أسئلة أُضيفت إلى البنك من JSON (غير موجودة سابقًا): 125
@@ -15,7 +36,22 @@
 
 ## الترم الثاني
 
-- الموضوعات: الفلسفة 5 + المنطق 6 = 11
+- الموضوعات الرسمية: الفلسفة 2 + المنطق 2 = 4 — الدروس: الفلسفة 5 + المنطق 6
+  - الفلسفة / الموضوع 1: الفلسفة والأخلاق البيئية والبيوطبية
+    - الدرس 1 — الفلسفة البيئية: T2-PH-ENV-01 (20)، T2-PH-ENV-02 (20)
+    - الدرس 2 — الأخلاق البيوطبية: T2-PH-BIO-01 (20)
+    - الدرس 3 — الأخلاق الطبية الحديثة والموافقة المستنيرة: T2-PH-MED-01 (20)
+  - الفلسفة / الموضوع 2: الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد
+    - الدرس 1 — الأخلاق المهنية: T2-PH-PRO-01 (20)
+    - الدرس 2 — القيم والتفلسف: T2-PH-VAL-01 (20)، T2-PH-VAL-02 (20)
+  - المنطق / الموضوع 1: الاستقراء وتطبيق المنهج التجريبي
+    - الدرس 1 — الاستقراء وتطبيقه في العلوم الطبيعية: T2-LG-IND-01 (20)
+    - الدرس 2 — منهج بيكون: الجانب السلبي والإيجابي: T2-LG-BACON (20)
+    - الدرس 3 — الاستقراء وتطبيق المنهج التجريبي: T2-LG-MODERN (20)
+  - المنطق / الموضوع 2: الاستنباط وتطبيقه في العلوم الصورية
+    - الدرس 1 — الاستنباط والمنطق الرمزي: T2-LG-DED-01 (20)
+    - الدرس 2 — معنى الاستنباط وتطبيقه في العلوم الصورية: T2-LG-DED-02 (20)
+    - الدرس 3 — المنطق والذكاء الاصطناعي: T2-LG-AI (20)
 - التدريبات: 13 — الأسئلة داخل التدريبات: 260
 - أسئلة أعيد استخدامها من البنك المركزي (نص + خيارات متطابقة): 165
 - أسئلة أُضيفت إلى البنك من JSON (غير موجودة سابقًا): 95
@@ -26,8 +62,8 @@
 
 ## الملخص الإنتاجي
 
-- الترم الأول: 17 موضوعًا / 17 تدريبًا / 339 سؤالًا داخل التدريبات / 3 امتحانات شاملة محفوظة
-- الترم الثاني: 11 موضوعًا / 13 تدريبًا / 260 سؤالًا داخل التدريبات / 2 امتحانات شاملة محفوظة
+- الترم الأول: 4 موضوعات / 17 درسًا / 17 تدريبًا / 339 سؤالًا داخل التدريبات / 3 امتحانات شاملة محفوظة
+- الترم الثاني: 4 موضوعات / 11 درسًا / 13 تدريبًا / 260 سؤالًا داخل التدريبات / 2 امتحانات شاملة محفوظة
 - امتحانات النماذج القديمة (47) محفوظة على الخادم فقط (legacy) ولم تعد تُعرض للطالب.
 - إجمالي بنك الأسئلة: 1769 (علم النفس 474 دون تغيير).
 
@@ -97,308 +133,324 @@
 - معنى-الاستنباط-وتطبيقه-في-العلوم-الصورية-COMP: 100% of its questions are the topic training questions (verified) — duplicate exam not created
 - المنطق-والذكاء-الاصطناعي-COMP: 100% of its questions are the topic training questions (verified) — duplicate exam not created
 
-## أسئلة جديدة بمفتاح JSON فقط — تحتاج مراجعة بشرية (203)
+## تصحيحات مفاتيح مدعومة بالمصدر (نص مفتاح الإجابة في المصدر يسمّي خيارًا غير correct_option في JSON) (2)
 
-| الترم | التدريب | معرف السؤال | الحالة |
-|---|---|---|---|
-| 1 | T1-PH-04 | T1-PH-04-Q14 | json-only |
-| 1 | T1-PH-04 | T1-PH-04-Q19 | json-only |
-| 1 | T1-PH-06 | T1-PH-06-Q13 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q01 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q02 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q03 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q04 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q05 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q06 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q07 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q08 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q09 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q10 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q11 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q12 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q13 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q14 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q15 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q16 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q17 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q18 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q19 | json-only |
-| 1 | T1-PH-08 | T1-PH-08-Q20 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q01 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q02 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q03 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q04 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q05 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q06 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q07 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q08 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q09 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q10 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q11 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q12 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q13 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q14 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q15 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q16 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q17 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q18 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q19 | json-only |
-| 1 | T1-LG-01 | T1-LG-01-Q20 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q01 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q02 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q03 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q04 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q05 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q06 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q07 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q08 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q09 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q10 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q11 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q12 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q13 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q14 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q15 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q16 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q17 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q18 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q19 | json-only |
-| 1 | T1-LG-02 | T1-LG-02-Q20 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q01 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q02 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q03 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q04 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q05 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q06 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q07 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q08 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q09 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q10 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q11 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q12 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q13 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q14 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q15 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q16 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q17 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q18 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q19 | json-only |
-| 1 | T1-LG-04 | T1-LG-04-Q20 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q01 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q02 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q03 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q04 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q05 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q06 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q07 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q08 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q09 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q10 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q11 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q12 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q13 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q14 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q15 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q16 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q17 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q18 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q19 | json-only |
-| 1 | T1-LG-05 | T1-LG-05-Q20 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q01 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q02 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q03 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q04 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q05 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q06 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q07 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q08 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q09 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q10 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q11 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q12 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q13 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q14 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q15 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q16 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q17 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q18 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q19 | json-only |
-| 1 | T1-LG-06 | T1-LG-06-Q20 | json-only |
-| 1 | T1-LG-07 | T1-LG-07-Q02 | json-only |
-| 1 | T1-LG-09 | T1-LG-09-Q11 | json-only |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q03 | json-only |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q15 | json-only |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q16 | json-only |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q17 | json-corroborated |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q19 | json-corroborated |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q01 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q02 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q03 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q04 | json-corroborated |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q05 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q06 | json-corroborated |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q07 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q08 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q09 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q10 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q11 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q12 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q13 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q14 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q15 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q16 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q17 | json-only |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q19 | json-corroborated |
-| 2 | T2-LG-BACON | T2-LG-BACON-Q20 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q01 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q02 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q03 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q04 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q05 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q06 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q07 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q08 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q09 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q10 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q11 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q12 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q13 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q14 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q15 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q16 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q17 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q18 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q19 | json-only |
-| 2 | T2-LG-MODERN | T2-LG-MODERN-Q20 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q01 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q02 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q03 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q04 | json-corroborated |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q05 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q06 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q07 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q09 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q10 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q11 | json-corroborated |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q12 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q13 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q14 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q15 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q01 | json-corroborated |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q02 | json-corroborated |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q03 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q04 | json-only |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q05 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q01 | json-corroborated |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q02 | json-corroborated |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q03 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q04 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q05 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q06 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q07 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q08 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q09 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q10 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q11 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q12 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q13 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q14 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q15 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q16 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q17 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q18 | json-only |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q19 | json-corroborated |
-| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q20 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q01 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q02 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q03 | json-corroborated |
-| 2 | T2-LG-AI | T2-LG-AI-Q04 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q05 | json-corroborated |
-| 2 | T2-LG-AI | T2-LG-AI-Q06 | json-corroborated |
-| 2 | T2-LG-AI | T2-LG-AI-Q07 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q09 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q10 | json-corroborated |
-| 2 | T2-LG-AI | T2-LG-AI-Q12 | json-only |
-| 2 | T2-LG-AI | T2-LG-AI-Q19 | json-corroborated |
-| 2 | T2-LG-AI | T2-LG-AI-Q20 | json-only |
+- **T2-LG-DED-02-Q06** (T2-LG-DED-02): JSON A → المصدر C — answer_key_text = «ق ← ل»  
+  ««إذا كان الرجل يعمل فهو مستقل مادياً»، تشير القضية السابقة إلى أحد أنواع القضايا المنطقية الذي يعبر عنها رمزياً بـ ............»
+- **T2-LG-DED-02-Q12** (T2-LG-DED-02): JSON B → المصدر D — answer_key_text = «ق ↔ ل»  
+  «يمكن شرح أمر ما ببساطة إذا وفقط إذا فهمته جيداً، يوظف ما سبق إحدى القضايا المنطقية التي يعبر عنها بالصياغة الرمزية ............»
+
+## أسئلة أُضيفت من JSON (220) — التحقق من المفتاح حسب دليل المصدر
+
+- مطابقة حرفية لنص مفتاح المصدر: 173
+- مطابقة قريبة (score ≥ 0.9 أو اختلاف لاحقة/بادئة): 19
+- صُحح حسب مفتاح المصدر: 2
+- **غير مؤكد — يحتاج مراجعة بشرية: 26**
+
+| الترم | التدريب | معرف السؤال | الحالة | الدليل | ملاحظة |
+|---|---|---|---|---|---|
+| 1 | T1-PH-04 | T1-PH-04-Q14 | json-only | unverified | answer_match_score = 0.287 |
+| 1 | T1-PH-04 | T1-PH-04-Q19 | json-only | unverified | answer_match_score = 0.221 |
+| 1 | T1-PH-06 | T1-PH-06-Q13 | json-only | unverified | answer_match_score = 0.667 |
+| 1 | T1-PH-08 | T1-PH-08-Q01 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q02 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q03 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q04 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q05 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q06 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q07 | json-only | unverified | answer_match_score = 0.262 |
+| 1 | T1-PH-08 | T1-PH-08-Q08 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q09 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q10 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q11 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-PH-08 | T1-PH-08-Q12 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q13 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q14 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q15 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q16 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q17 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q18 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q19 | json-source | source-exact |  |
+| 1 | T1-PH-08 | T1-PH-08-Q20 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q01 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q03 | json-only | unverified | answer_match_score = 0.293 |
+| 1 | T1-LG-01 | T1-LG-01-Q04 | json-only | unverified | answer_match_score = 0.35 |
+| 1 | T1-LG-01 | T1-LG-01-Q05 | json-only | unverified | answer_match_score = 0.75 |
+| 1 | T1-LG-01 | T1-LG-01-Q06 | json-only | unverified | answer_match_score = 0.241 |
+| 1 | T1-LG-01 | T1-LG-01-Q07 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q08 | json-only | unverified | answer_match_score = 0.304 |
+| 1 | T1-LG-01 | T1-LG-01-Q09 | json-only | unverified | answer_match_score = 0.341 |
+| 1 | T1-LG-01 | T1-LG-01-Q10 | json-only | unverified | answer_match_score = 0.376 |
+| 1 | T1-LG-01 | T1-LG-01-Q11 | json-only | unverified | answer_match_score = 0.56 |
+| 1 | T1-LG-01 | T1-LG-01-Q12 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q13 | json-only | unverified | answer_match_score = 0.307 |
+| 1 | T1-LG-01 | T1-LG-01-Q14 | json-only | unverified | answer_match_score = 0.302 |
+| 1 | T1-LG-01 | T1-LG-01-Q15 | json-source | source-exact |  |
+| 1 | T1-LG-01 | T1-LG-01-Q16 | json-only | unverified | answer_match_score = 0.504 |
+| 1 | T1-LG-01 | T1-LG-01-Q17 | json-only | unverified | answer_match_score = 0.643 |
+| 1 | T1-LG-01 | T1-LG-01-Q18 | json-only | unverified | answer_match_score = 0.538 |
+| 1 | T1-LG-01 | T1-LG-01-Q19 | json-only | unverified | answer_match_score = 0.286 |
+| 1 | T1-LG-01 | T1-LG-01-Q20 | json-only | unverified | answer_match_score = 0.131 |
+| 1 | T1-LG-02 | T1-LG-02-Q01 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q03 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q04 | json-only | unverified | answer_match_score = 0.363 |
+| 1 | T1-LG-02 | T1-LG-02-Q05 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q06 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q07 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q08 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q09 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q10 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q11 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q12 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q13 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q14 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q15 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q16 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q17 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q18 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q19 | json-source | source-exact |  |
+| 1 | T1-LG-02 | T1-LG-02-Q20 | json-only | unverified | answer_match_score = 0.338 |
+| 1 | T1-LG-04 | T1-LG-04-Q01 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q03 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q04 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q05 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-04 | T1-LG-04-Q06 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q07 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q08 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q09 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q10 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q11 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q12 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q13 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q14 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q15 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-04 | T1-LG-04-Q16 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q17 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q18 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q19 | json-source | source-exact |  |
+| 1 | T1-LG-04 | T1-LG-04-Q20 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q01 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q03 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q04 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q05 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q06 | json-only | unverified | answer_match_score = 0.42 |
+| 1 | T1-LG-05 | T1-LG-05-Q07 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q08 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q09 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-05 | T1-LG-05-Q10 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q11 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q12 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q13 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q14 | json-only | unverified | answer_match_score = 0.525 |
+| 1 | T1-LG-05 | T1-LG-05-Q15 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q16 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q17 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q18 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q19 | json-source | source-exact |  |
+| 1 | T1-LG-05 | T1-LG-05-Q20 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q01 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q03 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q04 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q05 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-06 | T1-LG-06-Q06 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q07 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q08 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q09 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q10 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q11 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q12 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q13 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q14 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q15 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-06 | T1-LG-06-Q16 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q17 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q18 | json-source | source-exact |  |
+| 1 | T1-LG-06 | T1-LG-06-Q19 | json-source | source-near | answer_match_score = 0.92 |
+| 1 | T1-LG-06 | T1-LG-06-Q20 | json-source | source-exact |  |
+| 1 | T1-LG-07 | T1-LG-07-Q02 | json-source | source-exact |  |
+| 1 | T1-LG-09 | T1-LG-09-Q11 | json-source | source-exact |  |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q03 | json-only | unverified | answer_key_text = «الناقص» لا يطابق أي خيار |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q15 | json-only | unverified | answer_key_text = «ذاكرت الدرس الأول وجدته سهل... إذن من المرجح كل الدروس سهلة» لا يطابق أي خيار |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q16 | json-source | source-exact |  |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q17 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q19 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q01 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q02 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q03 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q04 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q05 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q06 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q07 | json-source | source-near | answer_key_text = «الطبيعة العامة للذهن البشري (أوهام القبيلة)» |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q08 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q09 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q10 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q11 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q12 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q13 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q14 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q15 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q16 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q17 | json-source | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q19 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-BACON | T2-LG-BACON-Q20 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q01 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q02 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q03 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q04 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q05 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q06 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q07 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q08 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q09 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q10 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q11 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q12 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q13 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q14 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q15 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q16 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q17 | json-source | source-near | answer_key_text = «خضوع الباحث للطبيعة (التجربة السلبية)» |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q18 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q19 | json-source | source-exact |  |
+| 2 | T2-LG-MODERN | T2-LG-MODERN-Q20 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q01 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q02 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q03 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q04 | json-source-corroborated | source-near | answer_key_text = «مستمد من موضوعها (تحصيل حاصل)» |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q05 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q06 | json-source | source-near | answer_key_text = «مستمد من موضوعها (النتائج من المقدمات)» |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q07 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q09 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q10 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q11 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q12 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q13 | json-source | source-near | answer_key_text = «البديهيات الواضحة بذاتها» |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q14 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q15 | json-source | source-near | answer_key_text = «النظريات (المبرهنات) (ص 45 - الذكاء الاصطناعي)» |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q01 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q02 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q03 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q04 | json-source | source-exact |  |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-TOPUP-Q05 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q01 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q02 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q03 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q04 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q05 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q06 | json-source | source-other | answer_key_text = «ق ← ل» |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q07 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q08 | json-source | source-near | answer_key_text = «الذكاء الاصطناعي (أو الشبكات العصبية)» |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q09 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q10 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q11 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q12 | json-source | source-other | answer_key_text = «ق ↔ ل» |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q13 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q14 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q15 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q16 | json-only | unverified | answer_key_text = «المنطق غير الرتيب (أو المرن حسب السياق للمتغيرات)» لا يطابق أي خيار |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q17 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q18 | json-source | source-exact |  |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q19 | json-source-corroborated | source-near | answer_key_text = «جوتفريد ليبنتز (أو أ جورج بول)» |
+| 2 | T2-LG-DED-02 | T2-LG-DED-02-Q20 | json-source | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q01 | json-source | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q02 | json-source | source-near | answer_key_text = «للعمليات الذهنية (الاتجاه السيكولوجي)» |
+| 2 | T2-LG-AI | T2-LG-AI-Q03 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q04 | json-source | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q05 | json-source-corroborated | source-near | answer_key_text = «متعدد القيم (المرن)» |
+| 2 | T2-LG-AI | T2-LG-AI-Q06 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q07 | json-source | source-near | answer_key_text = «المرن (متعدد القيم)» |
+| 2 | T2-LG-AI | T2-LG-AI-Q09 | json-source | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q10 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q12 | json-source | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q19 | json-source-corroborated | source-exact |  |
+| 2 | T2-LG-AI | T2-LG-AI-Q20 | json-source | source-near | answer_key_text = «تصميم الروبوت الحتمي (أو تمثيل المعرفة بالمنطق)» |
 
 ## تعارضات مفاتيح الإجابة — احتُفظ بمفتاح البنك المُدقَّق يدويًا (71)
 
 > مفاتيح البنك مُوثَّقة في AUDIT_PHILOSOPHY.md / AUDIT_PHILOSOPHY_TERM2.md / AUDIT_PHILOSOPHY_TERM2_LOGIC.md. مفاتيح JSON نتجت عن مطابقة آلية (`answer_match_score`). لم يُغيَّر أي مفتاح بالتخمين؛ هذه القائمة للمراجعة مقابل نموذج الإجابة الرسمي.
 
-| الترم | التدريب | JSON id | Bank id | مفتاح JSON | مفتاح البنك (المعتمد) | score |
-|---|---|---|---|---|---|---|
-| 1 | T1-PH-01 | T1-PH-01-Q01 | PL-0003 | B — تنظيم التفكير | A — التخطيط للمستقبل | 1 |
-| 1 | T1-PH-01 | T1-PH-01-Q08 | PL-0017 | D — تنظيم التفكير | C — التخطيط للمستقبل | 1 |
-| 1 | T1-PH-01 | T1-PH-01-Q17 | PL-0035 | B — الصحة النفسية | C — القدرة على النقد والتقويم | 1 |
-| 1 | T1-PH-03 | T1-PH-03-Q05 | PL-0332 | B — الإشراق | A — التحقق | 1 |
-| 1 | T1-PH-03 | T1-PH-03-Q07 | PL-0336 | D — الإعداد | A — التحقق | 1 |
-| 1 | T1-PH-03 | T1-PH-03-Q10 | PL-0342 | C — إصدار الأحكام والقرارات المستنيرة | A — تحليل البيانات والمعلومات | 0.92 |
-| 1 | T1-PH-03 | T1-PH-03-Q18 | PL-0358 | D — الطلاقة | C — المرونة | 1 |
-| 1 | T1-PH-03 | T1-PH-03-Q19 | PL-0360 | B — الإشراق | A — التحقق | 0.4 |
-| 1 | T1-PH-04 | T1-PH-04-Q05 | PL-0531 | C — وجهة نظر متعصبة | A — علم كلي يحقق المتعة العقلية | 0.206 |
-| 1 | T1-PH-04 | T1-PH-04-Q12 | PL-0545 | C — علم المعرفة الكلية | B — ترتبط بالقضايا الحياتية | 0.392 |
-| 1 | T1-PH-04 | T1-PH-04-Q20 | PL-0561 | B — المبادئ الأولى | A — المعرفة الجزئية الحسية | 1 |
-| 1 | T1-PH-05 | T1-PH-05-Q01 | PL-0661 | A — القيم | D — الوجود | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q02 | PL-0663 | A — الأكسيولوجيا | B — الأبستمولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q03 | PL-0665 | A — القيم | B — القانون | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q05 | PL-0669 | A — الأبستمولوجيا | B — الأكسيولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q09 | PL-0677 | A — الأنثروبولوجيا | D — الأكسيولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q10 | PL-0679 | A — الأنثروبولوجيا | C — الأبستمولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q11 | PL-0681 | A — التاريخ | C — المعرفة | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q12 | PL-0683 | A — الجمال | B — المنطق | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q13 | PL-0685 | A — الوجود | D — الأكسيولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q14 | PL-0687 | A — الأنطولوجيا | D — المعرفة | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q15 | PL-0689 | A — التمييز بين الجميل والقبيح | C — التمييز بين الفضيلة والرذيلة | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q16 | PL-0691 | A — القيم | D — الأنطولوجيا | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q17 | PL-0693 | A — أسس وقواعد ومعايير الجمال | D — ما ينبغى أن يكون عليه الفعل الخير | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q18 | PL-0695 | A — المبادئ الحاكمة لحركة التاريخ | D — الوجود في صورته الكلية | 0.92 |
-| 1 | T1-PH-05 | T1-PH-05-Q19 | PL-0697 | A — المعرفة | D — القانون | 0.92 |
-| 1 | T1-PH-06 | T1-PH-06-Q16 | PL-0815 | C — تجاهل مشكلات الوجود والارتقاء بالمجتمع ككل | D — مواجهة المشكلات ورسم الإطار الفكرى | 0.573 |
-| 1 | T1-PH-07 | T1-PH-07-Q03 | PL-0886 | D — الصبر والتروي | A — اليقظة والبصيرة | 0.45 |
-| 1 | T1-PH-07 | T1-PH-07-Q05 | PL-0890 | D — اليوناني | A — الراهن | 1 |
-| 1 | T1-PH-07 | T1-PH-07-Q06 | PL-0892 | C — الوسيط | B — الحديث | 1 |
-| 1 | T1-PH-07 | T1-PH-07-Q07 | PL-0894 | B — الحديث | C — الوسيط | 1 |
-| 1 | T1-PH-07 | T1-PH-07-Q09 | PL-0898 | B — الحديث | C — الوسيط | 1 |
-| 1 | T1-PH-07 | T1-PH-07-Q11 | PL-0902 | B — الخضوع للمألوف والمعتاد | A — الافتقار للشجاعة الفكرية | 0.454 |
-| 1 | T1-PH-07 | T1-PH-07-Q20 | PL-0920 | D — التساؤل | C — الاتساق | 0.35 |
-| 1 | T1-LG-03 | T1-LG-03-Q01 | PL-1434 | D — كلي | A — جزئي | 0.92 |
-| 1 | T1-LG-03 | T1-LG-03-Q02 | PL-1436 | C — الكلي | D — الجزئي | 1 |
-| 1 | T1-LG-03 | T1-LG-03-Q09 | PL-1450 | C — جمعي | A — جزئي | 0.255 |
-| 1 | T1-LG-03 | T1-LG-03-Q20 | PL-1472 | A — تقابل | D — اقتران | 0.28 |
-| 1 | T1-LG-07 | T1-LG-07-Q04 | PL-1859 | A — تحليلية | B — تأليفية | 0.92 |
-| 1 | T1-LG-07 | T1-LG-07-Q14 | PL-1879 | B — المركبة | D — التأليفية | 0.4 |
-| 1 | T1-LG-07 | T1-LG-07-Q15 | PL-1881 | B — المركبة | D — التأليفية | 0.525 |
-| 1 | T1-LG-08 | T1-LG-08-Q10 | PL-2092 | C — كذبت (ك م) | D — صدقت (ك  م) | 1 |
-| 1 | T1-LG-08 | T1-LG-08-Q13 | PL-2098 | A — كذب الجزء يضمن بالضرورة كذب الكل | D — كذب الكل لا يعني بالضرورة كذب البعض | 1 |
-| 1 | T1-LG-08 | T1-LG-08-Q14 | PL-2100 | A — قليل من الشجر الذى يولد معوج ينمو باستقامة صادقة | D — كل شجرة تولد معوجة تنمو باستقامة كاذبة | 0.92 |
-| 1 | T1-LG-08 | T1-LG-08-Q19 | PL-2110 | C — التناقض | B — التداخل | 1 |
-| 1 | T1-LG-08 | T1-LG-08-Q20 | PL-2112 | B — تداخل | C — تناقض | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q01 | PL-2204 | B — نحكم على الكل من خلال الجزء | C — ما نحكم به على الكل نحكم به على الجزء | 0.205 |
-| 1 | T1-LG-09 | T1-LG-09-Q08 | PL-2218 | D — غير منتج لأن النتيجة لا تلزم عن المقدمتين | A — منتج لأن النتيجة فيه لازمة عن المقدمتين | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q09 | PL-2220 | D — المقدمتين سالبتين متفقتين في الكم | C — النتيجة موجبة رغم سلب إحدى المقدمات | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q12 | PL-2226 | B — التركيب | A — الكيف | 0.292 |
-| 1 | T1-LG-09 | T1-LG-09-Q13 | PL-2228 | B — يتكون من مقدمتين جزئيتين | C — يتكون من أربع حدود | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q14 | PL-2230 | C — المقدمة الكبرى سالبة | A — المقدمة الكبرى جزئية | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q15 | PL-2232 | B — غير مستغرق في المقدمتين | D — مستغرق في المقدمة الكبرى | 1 |
-| 1 | T1-LG-09 | T1-LG-09-Q16 | PL-2234 | D — المقدمة الصغرى جزئية | C — المقدمة الصغرى سالبة | 0.144 |
-| 1 | T1-LG-09 | T1-LG-09-Q20 | PL-2242 | A — كل الشباب رياضيين | D — بعض الشباب رياضيين | 1 |
-| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q05 | PLT2-0005 | C — الاصطلاحى | B — الإجرائى | — |
-| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q07 | PLT2-0007 | B — القهر والاستبداد | D — التفسير والتوظيف | — |
-| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q15 | PLT2-0015 | B — القهر والاستبداد | A — الاستغلال والسيطرة | — |
-| 2 | T2-PH-BIO-01 | T2-PH-BIO-01-Q04 | PLT2-0071 | D — زراعة الأعضاء | C — ماهية الإنسان | — |
-| 2 | T2-PH-BIO-01 | T2-PH-BIO-01-Q11 | PLT2-0078 | A — وضع خريطة علاج تحترم وتقدر حق المريض | C — الفرق الطبية التى تتخذ القرار فى القضايا الشائكة | — |
-| 2 | T2-PH-MED-01 | T2-PH-MED-01-Q11 | PLT2-0116 | C — الطواعية | A — الموافقة | — |
-| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q01 | PLT2-0130 | A — تحليل الواقع الثقافى واستخلاص القيم | D — تحديد مبادئ الالتزام بالسلوك الوظيفى | — |
-| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q12 | PLT2-0141 | B — تكوين انطباع جيد عند المتعاملين مع المؤسسة | C — المساهمة فى تحسين الأداء وزيادة الإنتاج | — |
-| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q15 | PLT2-0144 | C — تحليل الواقع الثقافى واستخلاص القيم | D — تحديد الأسس والقواعد المحددة لأداء أعمال المؤسسة | — |
-| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q07 | PLT2-0205 | D — النفعى | A — المادى | — |
-| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q12 | PLT2-0210 | C — البحث لمعرفة العلل الأولى | B — القدرة على الانفتاح وتقبل الغير | — |
-| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q14 | PLT2-0212 | D — اختيار الفعل عن روية وتدبر | B — التسليم المتفهم للفكر المخالف | — |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q02 | PLT2L-002 | D — التام | B — الناقص | — |
-| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q12 | PLT2L-012 | D — الاستقراء التام | C — الاستقراء الناقص | — |
-| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q08 | PLT2L-134 | C — التعريفات | B — اللامبرهنات | — |
-| 2 | T2-LG-AI | T2-LG-AI-Q17 | PLT2L-189 | C — المنطق الرتيب | B — العقل الاصطناعي | — |
+- مفتاح البنك أكده نص مفتاح المصدر (JSON correct_option خاطئ): 0
+- مفتاح JSON مطابقة آلية ضعيفة/غير مؤكدة → احتُفظ بمفتاح البنك المُدقَّق: 40
+- **تعارض حقيقي (مفتاح المصدر يسمّي خيار JSON حرفيًا بينما البنك مُدقَّق على خيار آخر) — احتُفظ بالبنك ويحتاج مراجعة بشرية: 31**
+
+| الترم | التدريب | JSON id | Bank id | مفتاح JSON | مفتاح البنك (المعتمد) | الحالة | الدليل |
+|---|---|---|---|---|---|---|---|
+| 1 | T1-PH-01 | T1-PH-01-Q01 | PL-0003 | B — تنظيم التفكير | A — التخطيط للمستقبل | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-01 | T1-PH-01-Q08 | PL-0017 | D — تنظيم التفكير | C — التخطيط للمستقبل | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-01 | T1-PH-01-Q17 | PL-0035 | B — الصحة النفسية | C — القدرة على النقد والتقويم | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-03 | T1-PH-03-Q05 | PL-0332 | B — الإشراق | A — التحقق | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-03 | T1-PH-03-Q07 | PL-0336 | D — الإعداد | A — التحقق | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-03 | T1-PH-03-Q10 | PL-0342 | C — إصدار الأحكام والقرارات المستنيرة | A — تحليل البيانات والمعلومات | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-03 | T1-PH-03-Q18 | PL-0358 | D — الطلاقة | C — المرونة | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-03 | T1-PH-03-Q19 | PL-0360 | B — الإشراق | A — التحقق | bank-key-kept-json-unverified | unverified — answer_match_score = 0.4 (score 0.4) |
+| 1 | T1-PH-04 | T1-PH-04-Q05 | PL-0531 | C — وجهة نظر متعصبة | A — علم كلي يحقق المتعة العقلية | bank-key-kept-json-unverified | unverified — answer_match_score = 0.206 (score 0.206) |
+| 1 | T1-PH-04 | T1-PH-04-Q12 | PL-0545 | C — علم المعرفة الكلية | B — ترتبط بالقضايا الحياتية | bank-key-kept-json-unverified | unverified — answer_match_score = 0.392 (score 0.392) |
+| 1 | T1-PH-04 | T1-PH-04-Q20 | PL-0561 | B — المبادئ الأولى | A — المعرفة الجزئية الحسية | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-05 | T1-PH-05-Q01 | PL-0661 | A — القيم | D — الوجود | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q02 | PL-0663 | A — الأكسيولوجيا | B — الأبستمولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q03 | PL-0665 | A — القيم | B — القانون | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q05 | PL-0669 | A — الأبستمولوجيا | B — الأكسيولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q09 | PL-0677 | A — الأنثروبولوجيا | D — الأكسيولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q10 | PL-0679 | A — الأنثروبولوجيا | C — الأبستمولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q11 | PL-0681 | A — التاريخ | C — المعرفة | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q12 | PL-0683 | A — الجمال | B — المنطق | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q13 | PL-0685 | A — الوجود | D — الأكسيولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q14 | PL-0687 | A — الأنطولوجيا | D — المعرفة | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q15 | PL-0689 | A — التمييز بين الجميل والقبيح | C — التمييز بين الفضيلة والرذيلة | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q16 | PL-0691 | A — القيم | D — الأنطولوجيا | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q17 | PL-0693 | A — أسس وقواعد ومعايير الجمال | D — ما ينبغى أن يكون عليه الفعل الخير | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q18 | PL-0695 | A — المبادئ الحاكمة لحركة التاريخ | D — الوجود في صورته الكلية | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-05 | T1-PH-05-Q19 | PL-0697 | A — المعرفة | D — القانون | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-PH-06 | T1-PH-06-Q16 | PL-0815 | C — تجاهل مشكلات الوجود والارتقاء بالمجتمع ككل | D — مواجهة المشكلات ورسم الإطار الفكرى | bank-key-kept-json-unverified | unverified — answer_match_score = 0.573 (score 0.573) |
+| 1 | T1-PH-07 | T1-PH-07-Q03 | PL-0886 | D — الصبر والتروي | A — اليقظة والبصيرة | bank-key-kept-json-unverified | unverified — answer_match_score = 0.45 (score 0.45) |
+| 1 | T1-PH-07 | T1-PH-07-Q05 | PL-0890 | D — اليوناني | A — الراهن | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-07 | T1-PH-07-Q06 | PL-0892 | C — الوسيط | B — الحديث | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-07 | T1-PH-07-Q07 | PL-0894 | B — الحديث | C — الوسيط | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-07 | T1-PH-07-Q09 | PL-0898 | B — الحديث | C — الوسيط | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-PH-07 | T1-PH-07-Q11 | PL-0902 | B — الخضوع للمألوف والمعتاد | A — الافتقار للشجاعة الفكرية | bank-key-kept-json-unverified | unverified — answer_match_score = 0.454 (score 0.454) |
+| 1 | T1-PH-07 | T1-PH-07-Q20 | PL-0920 | D — التساؤل | C — الاتساق | bank-key-kept-json-unverified | unverified — answer_match_score = 0.35 (score 0.35) |
+| 1 | T1-LG-03 | T1-LG-03-Q01 | PL-1434 | D — كلي | A — جزئي | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-LG-03 | T1-LG-03-Q02 | PL-1436 | C — الكلي | D — الجزئي | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-03 | T1-LG-03-Q09 | PL-1450 | C — جمعي | A — جزئي | bank-key-kept-json-unverified | unverified — answer_match_score = 0.255 (score 0.255) |
+| 1 | T1-LG-03 | T1-LG-03-Q20 | PL-1472 | A — تقابل | D — اقتران | bank-key-kept-json-unverified | unverified — answer_match_score = 0.28 (score 0.28) |
+| 1 | T1-LG-07 | T1-LG-07-Q04 | PL-1859 | A — تحليلية | B — تأليفية | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-LG-07 | T1-LG-07-Q14 | PL-1879 | B — المركبة | D — التأليفية | bank-key-kept-json-unverified | unverified — answer_match_score = 0.4 (score 0.4) |
+| 1 | T1-LG-07 | T1-LG-07-Q15 | PL-1881 | B — المركبة | D — التأليفية | bank-key-kept-json-unverified | unverified — answer_match_score = 0.525 (score 0.525) |
+| 1 | T1-LG-08 | T1-LG-08-Q10 | PL-2092 | C — كذبت (ك م) | D — صدقت (ك  م) | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-08 | T1-LG-08-Q13 | PL-2098 | A — كذب الجزء يضمن بالضرورة كذب الكل | D — كذب الكل لا يعني بالضرورة كذب البعض | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-08 | T1-LG-08-Q14 | PL-2100 | A — قليل من الشجر الذى يولد معوج ينمو باستقامة صادقة | D — كل شجرة تولد معوجة تنمو باستقامة كاذبة | bank-key-kept-json-unverified | source-near — answer_match_score = 0.92 (score 0.92) |
+| 1 | T1-LG-08 | T1-LG-08-Q19 | PL-2110 | C — التناقض | B — التداخل | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-08 | T1-LG-08-Q20 | PL-2112 | B — تداخل | C — تناقض | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q01 | PL-2204 | B — نحكم على الكل من خلال الجزء | C — ما نحكم به على الكل نحكم به على الجزء | bank-key-kept-json-unverified | unverified — answer_match_score = 0.205 (score 0.205) |
+| 1 | T1-LG-09 | T1-LG-09-Q08 | PL-2218 | D — غير منتج لأن النتيجة لا تلزم عن المقدمتين | A — منتج لأن النتيجة فيه لازمة عن المقدمتين | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q09 | PL-2220 | D — المقدمتين سالبتين متفقتين في الكم | C — النتيجة موجبة رغم سلب إحدى المقدمات | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q12 | PL-2226 | B — التركيب | A — الكيف | bank-key-kept-json-unverified | unverified — answer_match_score = 0.292 (score 0.292) |
+| 1 | T1-LG-09 | T1-LG-09-Q13 | PL-2228 | B — يتكون من مقدمتين جزئيتين | C — يتكون من أربع حدود | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q14 | PL-2230 | C — المقدمة الكبرى سالبة | A — المقدمة الكبرى جزئية | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q15 | PL-2232 | B — غير مستغرق في المقدمتين | D — مستغرق في المقدمة الكبرى | conflict-bank-key-kept | source-exact (score 1) |
+| 1 | T1-LG-09 | T1-LG-09-Q16 | PL-2234 | D — المقدمة الصغرى جزئية | C — المقدمة الصغرى سالبة | bank-key-kept-json-unverified | unverified — answer_match_score = 0.144 (score 0.144) |
+| 1 | T1-LG-09 | T1-LG-09-Q20 | PL-2242 | A — كل الشباب رياضيين | D — بعض الشباب رياضيين | conflict-bank-key-kept | source-exact (score 1) |
+| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q05 | PLT2-0005 | C — الاصطلاحى | B — الإجرائى | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q07 | PLT2-0007 | B — القهر والاستبداد | D — التفسير والتوظيف | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-ENV-01 | T2-PH-ENV-01-Q15 | PLT2-0015 | B — القهر والاستبداد | A — الاستغلال والسيطرة | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-BIO-01 | T2-PH-BIO-01-Q04 | PLT2-0071 | D — زراعة الأعضاء | C — ماهية الإنسان | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-BIO-01 | T2-PH-BIO-01-Q11 | PLT2-0078 | A — وضع خريطة علاج تحترم وتقدر حق المريض | C — الفرق الطبية التى تتخذ القرار فى القضايا الشائكة | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-MED-01 | T2-PH-MED-01-Q11 | PLT2-0116 | C — الطواعية | A — الموافقة | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q01 | PLT2-0130 | A — تحليل الواقع الثقافى واستخلاص القيم | D — تحديد مبادئ الالتزام بالسلوك الوظيفى | conflict-bank-key-kept | source-exact |
+| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q12 | PLT2-0141 | B — تكوين انطباع جيد عند المتعاملين مع المؤسسة | C — المساهمة فى تحسين الأداء وزيادة الإنتاج | bank-key-kept-json-unverified | source-near — answer_key_text = «تكوين انطباع جيد عند المتعاملين» |
+| 2 | T2-PH-PRO-01 | T2-PH-PRO-01-Q15 | PLT2-0144 | C — تحليل الواقع الثقافى واستخلاص القيم | D — تحديد الأسس والقواعد المحددة لأداء أعمال المؤسسة | bank-key-kept-json-unverified | unverified — answer_key_text = «وضع أسس ميثاق أخلاق المهنة» لا يطابق أي خيار |
+| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q07 | PLT2-0205 | D — النفعى | A — المادى | bank-key-kept-json-unverified | unverified — answer_key_text = «التطابق» لا يطابق أي خيار |
+| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q12 | PLT2-0210 | C — البحث لمعرفة العلل الأولى | B — القدرة على الانفتاح وتقبل الغير | bank-key-kept-json-unverified | unverified — answer_key_text = «التسامح الفكري» لا يطابق أي خيار |
+| 2 | T2-PH-VAL-02 | T2-PH-VAL-02-Q14 | PLT2-0212 | D — اختيار الفعل عن روية وتدبر | B — التسليم المتفهم للفكر المخالف | conflict-bank-key-kept | source-exact |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q02 | PLT2L-002 | D — التام | B — الناقص | bank-key-kept-json-unverified | source-near — answer_key_text = «التام (أو الإحصائي إذا اعتبرنا حصر أجزاء المثلث)» |
+| 2 | T2-LG-IND-01 | T2-LG-IND-01-Q12 | PLT2L-012 | D — الاستقراء التام | C — الاستقراء الناقص | conflict-bank-key-kept | source-exact |
+| 2 | T2-LG-DED-01 | T2-LG-DED-01-Q08 | PLT2L-134 | C — التعريفات | B — اللامبرهنات | bank-key-kept-json-unverified | unverified — answer_key_text = «البديهيات» لا يطابق أي خيار |
+| 2 | T2-LG-AI | T2-LG-AI-Q17 | PLT2L-189 | C — المنطق الرتيب | B — العقل الاصطناعي | bank-key-kept-json-unverified | source-near — answer_key_text = «المنطق الرتيب (أو نظم خبيرة)» |
 
 ### نصوص أسئلة التعارض
 

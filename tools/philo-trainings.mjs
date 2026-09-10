@@ -39,6 +39,65 @@ import path from 'node:path';
 
 const LETTERS = 'ABCD';
 
+/* ------------------------------------------------------------------ *
+ * OFFICIAL TOPIC MAPPING (2 topics per section per term)
+ * Source: official curriculum chapters (كتاب الشرح — same titles the legacy
+ * catalog used and that verified bank questions carry in meta.chapter).
+ * A JSON "topic" is a LESSON; it is assigned to its official topic by
+ *  (a) the chapter tag of the verified bank questions reused inside the
+ *      training, and (b) the source-document paragraph order for trainings
+ *      whose questions were JSON-only. Nothing here is invented: lesson
+ *      titles are the JSON topic strings verbatim.
+ * ------------------------------------------------------------------ */
+export const OFFICIAL_TOPICS = {
+  1: {
+    philosophy: [
+      { no: 1, title: 'التفكير الإنساني', trainingIds: ['T1-PH-01', 'T1-PH-02', 'T1-PH-03'] },
+      { no: 2, title: 'الفلسفة وطبيعة الموقف الفلسفي', trainingIds: ['T1-PH-04', 'T1-PH-05', 'T1-PH-06', 'T1-PH-07', 'T1-PH-08'] }
+    ],
+    logic: [
+      { no: 1, title: 'مبادئ المنطق (الحدود - القضايا)', trainingIds: ['T1-LG-01', 'T1-LG-02', 'T1-LG-03', 'T1-LG-04', 'T1-LG-05', 'T1-LG-06', 'T1-LG-07', 'T1-LG-08'] },
+      { no: 2, title: 'الاستدلال (تعريفه - أنواعه)', trainingIds: ['T1-LG-09'] }
+    ]
+  },
+  2: {
+    philosophy: [
+      { no: 1, title: 'الفلسفة والأخلاق البيئية والبيوطبية', trainingIds: ['T2-PH-ENV-01', 'T2-PH-ENV-02', 'T2-PH-BIO-01', 'T2-PH-MED-01'] },
+      { no: 2, title: 'الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد', trainingIds: ['T2-PH-PRO-01', 'T2-PH-VAL-01', 'T2-PH-VAL-02'] }
+    ],
+    logic: [
+      { no: 1, title: 'الاستقراء وتطبيق المنهج التجريبي', trainingIds: ['T2-LG-IND-01', 'T2-LG-BACON', 'T2-LG-MODERN'] },
+      { no: 2, title: 'الاستنباط وتطبيقه في العلوم الصورية', trainingIds: ['T2-LG-DED-01', 'T2-LG-DED-02', 'T2-LG-AI'] }
+    ]
+  }
+};
+
+/* Evidence-based key status for a JSON question (never a guess):
+ *  - Term 1 carries answer_match_score (1.0 = answer text found verbatim in the
+ *    source answer key); Term 2 carries answer_key_text (the source key text).
+ *  Returns { status, note }:
+ *    'source-exact'  : source key text == chosen option           → verified
+ *    'source-near'   : score ≥ 0.9 / key text is a prefix variant → verified (near)
+ *    'source-other'  : source key text names a DIFFERENT option    → source wins
+ *    'unverified'    : key text matches no option / low score      → needs review */
+export function jsonKeyEvidence(q) {
+  const opts = q.options.map(o => normLoose(stripOptionLabel(o)));
+  const ci = LETTERS.indexOf(q.correct_option);
+  const chosen = opts[ci];
+  if (q.answer_key_text !== undefined) {
+    const akt = normLoose(stripOptionLabel(q.answer_key_text));
+    if (akt && akt === chosen) return { status: 'source-exact' };
+    const other = opts.findIndex((o, k) => k !== ci && o && o === akt);
+    if (other >= 0) return { status: 'source-other', sourceOption: LETTERS[other], note: 'answer_key_text = «' + q.answer_key_text + '»' };
+    if (akt && chosen && (akt.startsWith(chosen) || chosen.startsWith(akt))) return { status: 'source-near', note: 'answer_key_text = «' + q.answer_key_text + '»' };
+    return { status: 'unverified', note: 'answer_key_text = «' + q.answer_key_text + '» لا يطابق أي خيار' };
+  }
+  const sc = q.answer_match_score;
+  if (sc === 1) return { status: 'source-exact' };
+  if (sc >= 0.9) return { status: 'source-near', note: 'answer_match_score = ' + sc };
+  return { status: 'unverified', note: 'answer_match_score = ' + sc };
+}
+
 export const TRAINING_JSON_FILES = {
   1: 'data/ExamManasa_Term1_Philosophy_Logic_ExamData.json',
   2: 'data/ExamManasa_Term2_Philosophy_Logic_ExamData.json'
@@ -133,7 +192,7 @@ export function buildTrainings(ctx) {
 
   const report = {
     terms: {}, keyConflicts: [], newQuestions: [], corroborated: [], quarantined: [],
-    sharedQuestions: [], optionVariantReuse: [], titleRenames: [], skippedComprehensives: []
+    sharedQuestions: [], optionVariantReuse: [], titleRenames: [], skippedComprehensives: [], sourceOverrides: []
   };
 
   const terms = [];
@@ -145,23 +204,32 @@ export function buildTrainings(ctx) {
       { id: 'logic', title: 'المنطق', topics: [] }
     ];
     const secOf = { 'الفلسفة': sections[0], 'المنطق': sections[1] };
-    const stats = { trainings: 0, questions: 0, reused: 0, added: 0, keyConflicts: 0, quarantined: 0, shared: 0 };
+    const stats = { trainings: 0, questions: 0, reused: 0, added: 0, keyConflicts: 0, quarantined: 0, shared: 0, sourceOverrides: 0 };
     const qidOwner = new Map(); // question id -> first training that used it (to detect sharing)
-    const topicIndex = new Map(); // section|topic -> topic entry
+    const lessonIndex = new Map(); // topicKey|lessonTitle -> lesson entry
+    // official 2-topic skeleton
+    const topicOfTraining = new Map();
+    sections.forEach(sec => {
+      OFFICIAL_TOPICS[term][sec.id].forEach(ot => {
+        const topic = { no: ot.no, key: term + '-' + (sec.id === 'philosophy' ? 'ph' : 'lg') + '-' + ot.no, title: ot.title, lessons: [] };
+        sec.topics.push(topic);
+        ot.trainingIds.forEach(id => topicOfTraining.set(id, { sec, topic }));
+      });
+    });
+    const unmapped = d.training_exams.filter(t => !topicOfTraining.has(t.training_id)).map(t => t.training_id);
+    if (unmapped.length) throw new Error('term ' + term + ': trainings not mapped to an official topic: ' + unmapped.join(', '));
+    d.training_exams.forEach(t => { if (topicOfTraining.get(t.training_id).sec !== secOf[t.subject]) throw new Error(t.training_id + ': official topic section ≠ JSON subject'); });
 
     d.training_exams.forEach((t) => {
-      const sec = secOf[t.subject];
-      const tkey = sec.id + '|' + t.topic;
-      let topic = topicIndex.get(tkey);
-      if (!topic) {
-        const no = sec.topics.length + 1;
-        topic = {
-          no, key: term + '-' + (sec.id === 'philosophy' ? 'ph' : 'lg') + '-' + no,
-          title: String(t.topic).trim(), trainings: []
-        };
-        sec.topics.push(topic); topicIndex.set(tkey, topic);
+      const { sec, topic } = topicOfTraining.get(t.training_id);
+      const lkey = topic.key + '|' + String(t.topic).trim();
+      let lesson = lessonIndex.get(lkey);
+      if (!lesson) {
+        const no = topic.lessons.length + 1;
+        lesson = { no, key: topic.key + '-' + no, title: String(t.topic).trim(), trainings: [] };
+        topic.lessons.push(lesson); lessonIndex.set(lkey, lesson);
       }
-      const trainingNo = topic.trainings.length + 1;
+      const trainingNo = lesson.trainings.length + 1;
       const displayTitle = 'تدريب ' + trainingNo;
       if (String(t.training_title).trim() !== displayTitle) {
         report.titleRenames.push({ trainingId: t.training_id, source: t.training_title, display: displayTitle });
@@ -200,15 +268,26 @@ export function buildTrainings(ctx) {
           const bankAnswerText = bq.options[LETTERS.indexOf(bq.answer)];
           if (normLoose(bankAnswerText) === normLoose(jsonAnswerText)) keyStatus = 'verified';
           else {
-            keyStatus = 'conflict-bank-key-kept';
+            // JSON disagrees with the manually verified bank key. Decide by SOURCE evidence:
+            //  - source key text names the BANK option → bank confirmed by source (verified)
+            //  - source key text names the JSON option verbatim → genuine source-vs-bank conflict → bank kept, needs review
+            //  - otherwise JSON key is an automated fuzzy guess → bank kept (verified against the bank audit)
+            const ev = jsonKeyEvidence(q);
+            const bankIdx = LETTERS.indexOf(bq.answer);
+            const sourceNamesBank = ev.status === 'source-other' && ev.sourceOption === bq.answer;
+            if (sourceNamesBank) keyStatus = 'bank-confirmed-by-source';
+            else if (ev.status === 'source-exact') keyStatus = 'conflict-bank-key-kept';
+            else keyStatus = 'bank-key-kept-json-unverified';
             stats.keyConflicts++;
             report.keyConflicts.push({
-              term, trainingId: t.training_id, jsonId: q.id, bankId,
+              term, trainingId: t.training_id, jsonId: q.id, bankId, status: keyStatus,
               question: text, options: bq.options,
               jsonKey: q.correct_option + ' — ' + jsonAnswerText,
               bankKey: bq.answer + ' — ' + bankAnswerText,
-              jsonScore: q.answer_match_score === undefined ? null : q.answer_match_score
+              jsonScore: q.answer_match_score === undefined ? null : q.answer_match_score,
+              evidence: ev.status, note: ev.note || ''
             });
+            void bankIdx;
           }
           if (reuseKind === 'option-variant') report.optionVariantReuse.push({ jsonId: q.id, bankId, jsonOptions: opts, bankOptions: bq.options });
           // provenance: record JSON linkage on the shared bank question
@@ -228,9 +307,18 @@ export function buildTrainings(ctx) {
             corroborated = normLoose(bq.options[LETTERS.indexOf(bq.answer)]) === normLoose(jsonAnswerText);
             report.corroborated.push({ jsonId: q.id, similarBankId: best, similarity: +bs.toFixed(2), sameAnswer: corroborated });
           }
-          keyStatus = corroborated ? 'json-corroborated' : 'json-only';
+          const ev = jsonKeyEvidence(q);
+          let answer = LETTERS[ci];
+          if (ev.status === 'source-other') {
+            // the source answer key names a different option than JSON's correct_option → source wins (documented)
+            answer = ev.sourceOption; stats.sourceOverrides++;
+            report.sourceOverrides.push({ term, trainingId: t.training_id, id: q.id, jsonOption: q.correct_option, sourceOption: ev.sourceOption, note: ev.note, question: text });
+          }
+          keyStatus = ev.status === 'source-exact' || ev.status === 'source-near' || ev.status === 'source-other'
+            ? (corroborated ? 'json-source-corroborated' : 'json-source')
+            : (corroborated ? 'json-corroborated' : 'json-only');
           questions[finalId] = {
-            text, options: opts, answer: LETTERS[ci],
+            text, options: opts, answer,
             meta: {
               subject: 'الفلسفة والمنطق', subjectId: 'philosophy', term,
               unit: '', section: t.subject, chapter: '', training: displayTitle,
@@ -239,12 +327,12 @@ export function buildTrainings(ctx) {
               source: d.source_document + ' (ExamManasa JSON dataset — ' + q.id + ')',
               sourceQuestionIndex: q.source_question_index ?? null,
               sourceParagraph: q.source_paragraph ?? null,
-              verificationStatus: corroborated ? 'verified' : 'needs-review',
-              keyStatus, grade: 'أولى ثانوي', academicYear: '2027'
+              verificationStatus: (keyStatus === 'json-only') ? 'needs-review' : 'verified',
+              keyStatus, keyEvidence: ev.status, keyNote: ev.note || '', grade: 'أولى ثانوي', academicYear: '2027'
             }
           };
           stats.added++;
-          report.newQuestions.push({ term, trainingId: t.training_id, id: finalId, keyStatus });
+          report.newQuestions.push({ term, trainingId: t.training_id, id: finalId, keyStatus, evidence: ev.status, note: ev.note || '' });
         }
 
         if (questionIds.includes(finalId)) throw new Error(t.training_id + ': duplicate question inside training ' + finalId);
@@ -261,19 +349,20 @@ export function buildTrainings(ctx) {
         title: displayTitle,
         sectionId: sec.id, sectionTitle: sec.title,
         topicKey: topic.key, topicNo: topic.no, topicTitle: topic.title,
+        lessonKey: lesson.key, lessonNo: lesson.no, lessonTitle: lesson.title,
         trainingNo, sourceTrainingTitle: String(t.training_title).trim(),
         sourcePoolSize: t.source_pool_size ?? null,
         // backwards-compatible fields used by the Worker's session/result payloads
-        lessonNo: topic.no, lessonTitle: topic.title, chapterTitle: null, unitTitle: sec.title,
+        chapterTitle: topic.title, unitTitle: sec.title,
         training: displayTitle, variant: 1, questionIds
       };
-      topic.trainings.push({ examId: t.training_id, title: displayTitle, questionCount: questionIds.length });
+      lesson.trainings.push({ examId: t.training_id, title: displayTitle, questionCount: questionIds.length });
       stats.trainings++; stats.questions += questionIds.length;
     });
 
     (d.topic_comprehensive_exams || []).forEach(c => report.skippedComprehensives.push({ term, examId: c.exam_id, topic: c.topic, reason: '100% of its questions are the topic training questions (verified) — duplicate exam not created' }));
 
-    report.terms[term] = { issues, stats, topics: sections.map(s => ({ section: s.title, count: s.topics.length })) };
+    report.terms[term] = { issues, stats, topics: sections.map(s => ({ section: s.title, count: s.topics.length, lessons: s.topics.reduce((n, tp) => n + tp.lessons.length, 0) })), structure: sections };
     terms.push({
       term, label: term === 1 ? 'الترم الأول' : 'الترم الثاني',
       sections: sections.filter(s => s.topics.length),
@@ -291,7 +380,11 @@ export function renderTrainingReport(report, extra) {
   for (const term of [1, 2]) {
     const t = report.terms[term]; if (!t) continue;
     L.push(`## الترم ${term === 1 ? 'الأول' : 'الثاني'}`, '');
-    L.push(`- الموضوعات: ${t.topics.map(x => x.section + ' ' + x.count).join(' + ')} = ${t.topics.reduce((n, x) => n + x.count, 0)}`);
+    L.push(`- الموضوعات الرسمية: ${t.topics.map(x => x.section + ' ' + x.count).join(' + ')} = ${t.topics.reduce((n, x) => n + x.count, 0)} — الدروس: ${t.topics.map(x => x.section + ' ' + x.lessons).join(' + ')}`);
+    t.structure.forEach(sec => sec.topics.forEach(tp => {
+      L.push(`  - ${sec.title} / الموضوع ${tp.no}: ${tp.title}`);
+      tp.lessons.forEach(l => L.push(`    - الدرس ${l.no} — ${l.title}: ${l.trainings.map(tr => tr.examId + ' (' + tr.questionCount + ')').join('، ')}`));
+    }));
     L.push(`- التدريبات: ${t.stats.trainings} — الأسئلة داخل التدريبات: ${t.stats.questions}`);
     L.push(`- أسئلة أعيد استخدامها من البنك المركزي (نص + خيارات متطابقة): ${t.stats.reused}`);
     L.push(`- أسئلة أُضيفت إلى البنك من JSON (غير موجودة سابقًا): ${t.stats.added}`);
@@ -314,13 +407,25 @@ export function renderTrainingReport(report, extra) {
   report.titleRenames.forEach(r => L.push(`- ${r.trainingId}: «${r.source}» → «${r.display}»`));
   L.push('', '## امتحانات شاملة في JSON لم تُنشأ (نسخ مطابقة لأسئلة التدريب)', '');
   report.skippedComprehensives.forEach(c => L.push(`- ${c.examId}: ${c.reason}`));
-  L.push('', `## أسئلة جديدة بمفتاح JSON فقط — تحتاج مراجعة بشرية (${report.newQuestions.filter(n => n.keyStatus === 'json-only').length})`, '');
-  L.push('| الترم | التدريب | معرف السؤال | الحالة |', '|---|---|---|---|');
-  report.newQuestions.forEach(n => L.push(`| ${n.term} | ${n.trainingId} | ${n.id} | ${n.keyStatus} |`));
+  L.push('', `## تصحيحات مفاتيح مدعومة بالمصدر (نص مفتاح الإجابة في المصدر يسمّي خيارًا غير correct_option في JSON) (${report.sourceOverrides.length})`, '');
+  report.sourceOverrides.forEach(o => L.push(`- **${o.id}** (${o.trainingId}): JSON ${o.jsonOption} → المصدر ${o.sourceOption} — ${o.note}  \n  «${o.question}»`));
+  if (!report.sourceOverrides.length) L.push('- لا شيء');
+  const nq = report.newQuestions;
+  L.push('', `## أسئلة أُضيفت من JSON (${nq.length}) — التحقق من المفتاح حسب دليل المصدر`, '');
+  L.push(`- مطابقة حرفية لنص مفتاح المصدر: ${nq.filter(n => n.evidence === 'source-exact').length}`);
+  L.push(`- مطابقة قريبة (score ≥ 0.9 أو اختلاف لاحقة/بادئة): ${nq.filter(n => n.evidence === 'source-near').length}`);
+  L.push(`- صُحح حسب مفتاح المصدر: ${nq.filter(n => n.evidence === 'source-other').length}`);
+  L.push(`- **غير مؤكد — يحتاج مراجعة بشرية: ${nq.filter(n => n.evidence === 'unverified').length}**`, '');
+  L.push('| الترم | التدريب | معرف السؤال | الحالة | الدليل | ملاحظة |', '|---|---|---|---|---|---|');
+  nq.forEach(n => L.push(`| ${n.term} | ${n.trainingId} | ${n.id} | ${n.keyStatus} | ${n.evidence} | ${n.note} |`));
   L.push('', `## تعارضات مفاتيح الإجابة — احتُفظ بمفتاح البنك المُدقَّق يدويًا (${report.keyConflicts.length})`, '');
   L.push('> مفاتيح البنك مُوثَّقة في AUDIT_PHILOSOPHY.md / AUDIT_PHILOSOPHY_TERM2.md / AUDIT_PHILOSOPHY_TERM2_LOGIC.md. مفاتيح JSON نتجت عن مطابقة آلية (`answer_match_score`). لم يُغيَّر أي مفتاح بالتخمين؛ هذه القائمة للمراجعة مقابل نموذج الإجابة الرسمي.', '');
-  L.push('| الترم | التدريب | JSON id | Bank id | مفتاح JSON | مفتاح البنك (المعتمد) | score |', '|---|---|---|---|---|---|---|');
-  report.keyConflicts.forEach(k => L.push(`| ${k.term} | ${k.trainingId} | ${k.jsonId} | ${k.bankId} | ${k.jsonKey} | ${k.bankKey} | ${k.jsonScore ?? '—'} |`));
+  const kc = report.keyConflicts;
+  L.push(`- مفتاح البنك أكده نص مفتاح المصدر (JSON correct_option خاطئ): ${kc.filter(k => k.status === 'bank-confirmed-by-source').length}`);
+  L.push(`- مفتاح JSON مطابقة آلية ضعيفة/غير مؤكدة → احتُفظ بمفتاح البنك المُدقَّق: ${kc.filter(k => k.status === 'bank-key-kept-json-unverified').length}`);
+  L.push(`- **تعارض حقيقي (مفتاح المصدر يسمّي خيار JSON حرفيًا بينما البنك مُدقَّق على خيار آخر) — احتُفظ بالبنك ويحتاج مراجعة بشرية: ${kc.filter(k => k.status === 'conflict-bank-key-kept').length}**`, '');
+  L.push('| الترم | التدريب | JSON id | Bank id | مفتاح JSON | مفتاح البنك (المعتمد) | الحالة | الدليل |', '|---|---|---|---|---|---|---|---|');
+  kc.forEach(k => L.push(`| ${k.term} | ${k.trainingId} | ${k.jsonId} | ${k.bankId} | ${k.jsonKey} | ${k.bankKey} | ${k.status} | ${k.evidence}${k.note ? ' — ' + k.note : ''}${k.jsonScore != null ? ' (score ' + k.jsonScore + ')' : ''} |`));
   L.push('', '### نصوص أسئلة التعارض', '');
   report.keyConflicts.forEach(k => L.push(`- **${k.jsonId} / ${k.bankId}**: ${k.question}  \n  الخيارات: ${k.options.join(' | ')}`));
   return L.join('\n') + '\n';

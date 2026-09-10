@@ -169,8 +169,8 @@
         kv('فلسفة ت2', a.philosophyTerm2.questions + ' سؤالًا — ' + a.philosophyTerm2.verified + ' موثق + ' + a.philosophyTerm2.authored + ' مؤلَّف · ' + a.philosophyTerm2.corrected + ' تصحيح مفتاح') +
         (a.philosophyTerm2Logic ? kv('منطق ت2', a.philosophyTerm2Logic.questions + ' سؤالًا — ' + a.philosophyTerm2Logic.verified + ' موثق + ' + a.philosophyTerm2Logic.authored + ' مؤلَّف · ' + a.philosophyTerm2Logic.excluded + ' معزول (موثق الأسباب)') : '') +
         (d.structure && d.structure.philosophyTrainings ? kv('تدريبات الفلسفة والمنطق (JSON)',
-          'ت1: ' + d.structure.philosophyTrainings.term1.topics + ' موضوعًا / ' + d.structure.philosophyTrainings.term1.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term1.trainingQuestions + ' سؤالًا · ' +
-          'ت2: ' + d.structure.philosophyTrainings.term2.topics + ' موضوعًا / ' + d.structure.philosophyTrainings.term2.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term2.trainingQuestions + ' سؤالًا · ' +
+          'ت1: ' + d.structure.philosophyTrainings.term1.topics + ' موضوعات / ' + d.structure.philosophyTrainings.term1.lessons + ' درسًا / ' + d.structure.philosophyTrainings.term1.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term1.trainingQuestions + ' سؤالًا · ' +
+          'ت2: ' + d.structure.philosophyTrainings.term2.topics + ' موضوعات / ' + d.structure.philosophyTrainings.term2.lessons + ' درسًا / ' + d.structure.philosophyTrainings.term2.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term2.trainingQuestions + ' سؤالًا · ' +
           d.structure.philosophyTrainings.newQuestionsFromJson + ' سؤالًا جديدًا من JSON · ' + d.structure.philosophyTrainings.keyConflictsBankKept + ' تعارض مفتاح (احتُفظ بمفتاح البنك المُدقَّق) · ' +
           d.structure.philosophyTrainings.needsReview + ' يحتاج مراجعة · ' + d.structure.philosophyTrainings.legacyHiddenExams + ' نموذجًا قديمًا مخفيًا') : '') +
         kv('مستبعد', (a.philosophyTerm1.excluded || 0) + ' (ت1) + ' + (a.philosophyTerm2.excluded || 0) + ' (فلسفة ت2) + ' + ((a.philosophyTerm2Logic && a.philosophyTerm2Logic.excluded) || 0) + ' (منطق ت2) سؤالًا معزولًا') +
@@ -334,17 +334,20 @@
         html += '<div class="card" style="border-color:var(--accent)">' + treeRow('شامل عام', 'الامتحان الشامل — المنهج كاملًا', exams[cat.subjectComprehensiveExamId].count) + '</div>';
       } else {
         cat.terms.forEach(function (term) {
-          var tCount = 0; term.sections.forEach(function (sec) { sec.topics.forEach(function (tp) { tCount += tp.trainings.length; }); });
+          var tCount = 0; term.sections.forEach(function (sec) { sec.topics.forEach(function (tp) { tp.lessons.forEach(function (l) { tCount += l.trainings.length; }); }); });
           html += '<div class="section-title" style="margin-top:18px"><h3>' + esc(term.label) + '</h3><span class="count">' + tCount + ' تدريبًا</span></div>';
           term.sections.forEach(function (sec) {
             html += '<div class="card" style="margin-bottom:12px"><div style="font-weight:800;color:var(--primary-deep)">' + esc(sec.title) + ' — ' + sec.topics.length + ' موضوعات</div>';
             sec.topics.forEach(function (tp) {
-              html += '<div style="font-weight:700;font-size:.88rem;margin:10px 0 6px">الموضوع ' + tp.no + ': ' + esc(tp.title) + '</div><div class="grid" style="gap:8px">';
-              tp.trainings.forEach(function (tr) {
-                var e = exams[tr.examId];
-                html += treeRow(tr.title, tp.title, e.count, e.id);
+              html += '<div style="font-weight:800;font-size:.92rem;margin:12px 0 4px">الموضوع ' + tp.no + ': ' + esc(tp.title) + ' <span class="badge">' + tp.lessons.length + ' دروس</span></div>';
+              tp.lessons.forEach(function (l) {
+                html += '<div style="font-weight:700;font-size:.85rem;margin:8px 8px 6px;color:var(--muted)">الدرس ' + l.no + ' — ' + esc(l.title) + ' (' + l.trainings.length + ' تدريب)</div><div class="grid" style="gap:8px">';
+                l.trainings.forEach(function (tr) {
+                  var e = exams[tr.examId];
+                  html += treeRow(tr.title, 'الدرس ' + l.no + ' — ' + l.title, e.count, e.id);
+                });
+                html += '</div>';
               });
-              html += '</div>';
             });
             html += '</div>';
           });
@@ -430,7 +433,7 @@
         '<tr><th>المعرف</th><th>العنوان</th><th>الموضوع</th><th>المادة</th><th>الترم</th><th>النوع</th><th>الأسئلة</th><th>الحالة</th></tr>' +
         rows.map(function (e) {
           return '<tr><td dir="ltr" style="font-size:.72rem">' + esc(e.id) + '</td><td>' + esc(e.title) + '</td>' +
-            '<td>' + esc(e.topicTitle || e.lessonTitle || '—') + '</td>' +
+            '<td>' + esc(e.topicKey ? ('الموضوع ' + e.topicNo + ' / الدرس ' + e.lessonNo + ' — ' + e.lessonTitle) : (e.lessonTitle || '—')) + '</td>' +
             '<td>' + (e.subjectId === 'psychology' ? 'علم النفس' : (e.sectionTitle ? 'الفلسفة والمنطق — ' + e.sectionTitle : 'الفلسفة')) + '</td>' +
             '<td>' + (e.term || '—') + '</td><td>' + typeLabel(e.type) + '</td><td>' + e.count + '</td>' +
             '<td>' + (e.legacy ? '<span class="badge">قديم — غير معروض</span>' : '<span class="badge green">نشط</span>') + '</td></tr>';
