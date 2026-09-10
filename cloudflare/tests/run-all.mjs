@@ -14,6 +14,7 @@
  *  10. النتائج و CSV
  *  11. تكافؤ خلط الخيارات مع خوارزمية تطبيق GAS الأصلي (Code.gs)
  *  12. حدود المحاولات لكل معلم (خادم + عدّاد ذري) وتوحيد أرقام الهواتف
+ *  13. وضع عدم الاتصال (عقد الخادم: صلاحية 72 ساعة + علَم offline)
  *
  * Usage: npm test   (from cloudflare/)
  */
@@ -530,6 +531,22 @@ try {
     for (const id of [mk.data.teacher.id, mk2.data.teacher.id, mk3.data.teacher.id]) {
       await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     }
+  }
+
+  /* ============ 13. offline mode (server contract) ============ */
+  console.log('\n[13] وضع عدم الاتصال (عقد الخادم)');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم أوفلاين', slug: 'offline13', offlineMode: true }, { Cookie: cookie });
+    ok('إنشاء معلم بوضع عدم الاتصال', mk.status === 200 && mk.data.teacher.offlineMode === true);
+    const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب أوفلاين', phone: '01013131313', slug: 'offline13' });
+    const tk = decodeToken(s.data.token);
+    ok('جلسة الأوفلاين: offline.enabled + صلاحية 72 ساعة', s.status === 200 && s.data.offline && s.data.offline.enabled === true && (tk.exp - tk.iss) === 72 * 3600 && !isNaN(Date.parse(s.data.offline.expiresAt)));
+    const s2 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب عادي', phone: '01014141414', slug: 'mostafa' });
+    const tk2 = decodeToken(s2.data.token);
+    ok('الجلسة العادية: offline.enabled=false + صلاحية 6 ساعات', s2.data.offline && s2.data.offline.enabled === false && (tk2.exp - tk2.iss) === 6 * 3600);
+    const sub = await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', tk.seed) });
+    ok('تسليم جلسة الأوفلاين يعمل (الإجابة دون اتصال + التسليم عند الاتصال)', sub.status === 200 && sub.data.score === 20);
+    await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
   console.log('\n══════════════════════════════');

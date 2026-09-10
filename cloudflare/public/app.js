@@ -72,6 +72,7 @@
         if (raw) { var st = JSON.parse(raw); if (st && st.name) S.student = st; }
       } catch (e) { }
       renderBrand();
+      flushOfflineSubmits();
       route();
     }).catch(function (e) {
       app.innerHTML = '<div class="card" style="text-align:center;padding:44px;margin-top:20px">' +
@@ -701,6 +702,7 @@
       body: JSON.stringify({ examId: S.examId, name: name, phone: phone, slug: S.slug })
     }).then(function (data) {
       S.session = data;
+      S.result = null; S.resultFilter = 'all';
       S.answers = new Array(data.questions.length).fill(null);
       S.current = 0;
       S.reviewMode = false;
@@ -743,6 +745,8 @@
     var q = S.session.questions[S.current];
     var total = S.session.questions.length;
     var done = answeredCount();
+    var offlineBanner = (typeof navigator !== 'undefined' && navigator.onLine === false)
+      ? '<div class="rv-note warn">' + WARN_SVG + '<span>أنت دون اتصال — إجاباتك محفوظة على جهازك وستُسلَّم تلقائيًا عند عودة الإنترنت.</span></div>' : '';
     var html =
       '<div class="quiz-top">' +
       '<div class="row"><div class="qnum">السؤال <em>' + (S.current + 1) + '</em> من ' + total + '</div>' +
@@ -752,6 +756,7 @@
         var cls = 'nchip' + (S.answers[i] !== null ? ' answered' : '') + (i === S.current ? ' current' : '');
         return '<button class="' + cls + '" onclick="jumpQ(' + i + ')" aria-label="سؤال ' + (i + 1) + '">' + (i + 1) + '</button>';
       }).join('') + '</div></div>' +
+      offlineBanner +
       '<div class="qcard card">' +
       '<div class="qtext"><span class="qn">' + (S.current + 1) + '</span>' + esc(q.text) + '</div>' +
       '<div class="opts">' + q.options.map(function (opt, i) {
@@ -822,6 +827,54 @@
   function jumpFromReview(i) { S.reviewMode = false; S.current = i; renderQuiz(); }
   function backToQuiz() { S.reviewMode = false; renderQuiz(); }
 
+  /* ---------------- التسليم دون اتصال: طابور محلي + إرسال تلقائي ----------------
+   * الطالب يجيب دون إنترنت (إجاباته في sessionStorage أثناء التنقل)، وعند
+   * التسليم دون اتصال يُحفظ (التوكن + الإجابات) في localStorage ويُرسل تلقائيًا
+   * عند عودة الاتصال أو في الزيارة التالية. التصحيح يبقى على الخادم دائمًا. */
+  var PENDING_KEY = 'exammanasa_pending_submits';
+  function pendingList() {
+    try { var l = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); return Array.isArray(l) ? l : []; }
+    catch (e) { return []; }
+  }
+  function pendingSave(l) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(l)); } catch (e) { } }
+  function queueOfflineSubmit() {
+    if (!S.session) return;
+    var l = pendingList().filter(function (p) { return p.token !== S.session.token; });
+    l.push({ token: S.session.token, answers: S.answers.slice(), examId: S.examId, ts: Date.now() });
+    pendingSave(l);
+    toastMsg('لا يوجد اتصال بالإنترنت — حُفظت إجاباتك وستُسلَّم تلقائيًا عند عودة الاتصال.');
+  }
+  function flushOfflineSubmits() {
+    var l = pendingList();
+    if (!l.length) return Promise.resolve([]);
+    var done = [];
+    var chain = Promise.resolve();
+    l.forEach(function (p) {
+      chain = chain.then(function () {
+        return api('/api/exam/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ token: p.token, answers: p.answers })
+        }).then(function (res) {
+          done.push(p.token);
+          if (S.session && S.session.token === p.token && !S.result) {
+            S.result = res; S.view = 'result'; S.reviewMode = false; clearDraft();
+            go('#/result'); renderResult();
+          } else { toastMsg('تم تسليم امتحان معلّق بنجاح.'); }
+        }).catch(function (e) {
+          if (e instanceof TypeError) return; // فشل شبكة حقيقي → يبقى في الطابور
+          done.push(p.token); // رفض نهائي من الخادم → إسقاط مع تنبيه
+          toastMsg('تعذّر تسليم امتحان معلّق: ' + e.message, true);
+        });
+      });
+    });
+    return chain.then(function () {
+      pendingSave(pendingList().filter(function (p) { return done.indexOf(p.token) === -1; }));
+      return done;
+    });
+  }
+  window.addEventListener('online', function () { flushOfflineSubmits(); });
+
   function submitExam() {
     var missing = missingList();
     if (missing.length) {
@@ -830,6 +883,7 @@
       renderQuiz();
       return;
     }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { queueOfflineSubmit(); return; }
     var btn = $('submitBtn');
     btn.disabled = true;
     btn.textContent = 'جارٍ التصحيح…';
@@ -936,6 +990,7 @@
   window.backToQuiz = backToQuiz;
   window.jumpFromReview = jumpFromReview;
   window.submitExam = submitExam;
+  window.__offline = { queue: queueOfflineSubmit, flush: flushOfflineSubmits, list: pendingList };
   window.filterResult = filterResult;
 
   loadAll();

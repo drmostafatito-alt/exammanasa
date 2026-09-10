@@ -21,6 +21,7 @@
 import BANKS from './data/banks.json';
 
 const SESSION_TTL_SECONDS = 6 * 3600;      // 6 ساعات — مطابق لتطبيق GAS
+const OFFLINE_TTL_SECONDS = 72 * 3600;     // 72 ساعة لجلسات معلمي وضع عدم الاتصال
 const ADMIN_SESSION_TTL = 8 * 3600;
 const RESERVED_SLUGS = new Set([
   'api', 'admin', 'assets', 'static', 'favicon.ico', 'favicon.svg', 'robots.txt',
@@ -251,10 +252,12 @@ async function handleApi(request, env, ctx, pathname) {
 
     const seed = Math.floor(Math.random() * 2147483646) + 1;
     const nonce = randomHex(12);
+    const offlineMode = teacher && teacher.offlineMode === true;
+    const ttl = offlineMode ? OFFLINE_TTL_SECONDS : SESSION_TTL_SECONDS;
+    const iss = Math.floor(Date.now() / 1000);
     const token = await signToken({
       t: 'exam', examId, seed, nonce, name, phone: normPhone,
-      slug, iss: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
+      slug, iss, exp: iss + ttl
     }, secret);
 
     const questions = ids.map((qid, i) => {
@@ -266,6 +269,7 @@ async function handleApi(request, env, ctx, pathname) {
     return json({
       token,
       ...(attemptsInfo ? { attempts: attemptsInfo } : {}),
+      offline: { enabled: offlineMode, expiresAt: new Date((iss + ttl) * 1000).toISOString() },
       exam: {
         id: examId, title: examMeta.title, count: examMeta.count,
         lessonTitle: examMeta.lessonTitle, lessonNo: examMeta.lessonNo,
@@ -665,7 +669,8 @@ function sanitizeTeacher(body, existing) {
     requirePhone: body.requirePhone !== false,
     enabled: body.enabled !== false,
     unlimited: body.unlimited !== false,
-    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3))
+    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3)),
+    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true)
   };
 }
 

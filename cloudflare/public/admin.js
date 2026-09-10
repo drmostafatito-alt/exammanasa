@@ -227,7 +227,7 @@
   function editTeacher(id) {
     var t = id ? A.teachers.filter(function (x) { return x.id === id; })[0] : null;
     var isNew = !t;
-    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, requirePhone: true, enabled: true };
+    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, requirePhone: true, enabled: true, unlimited: true, maxAttempts: 3, offlineMode: false };
     var overlay = document.createElement('div');
     overlay.className = 'modal-bg';
     overlay.innerHTML =
@@ -250,6 +250,13 @@
       '<span class="switch"><input type="checkbox" id="tReqPhone"' + (t.requirePhone ? ' checked' : '') + '><i></i></span></label>' +
       '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">مفعّل' +
       '<span class="switch"><input type="checkbox" id="tEnabled"' + (t.enabled ? ' checked' : '') + '><i></i></span></label></div>' +
+      '<div style="display:flex;gap:18px;align-items:center;margin:10px 0;flex-wrap:wrap">' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">محاولات غير محدودة' +
+      '<span class="switch"><input type="checkbox" id="tUnlimited"' + (t.unlimited !== false ? ' checked' : '') + '><i></i></span></label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">الحد الأقصى للمحاولات' +
+      '<input id="tMaxAtt" type="number" min="1" max="50" value="' + (t.maxAttempts || 3) + '" style="width:70px"></label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">وضع عدم الاتصال (صلاحية 72 ساعة)' +
+      '<span class="switch"><input type="checkbox" id="tOffMode"' + (t.offlineMode ? ' checked' : '') + '><i></i></span></label></div>' +
       '<div id="tErr" style="color:var(--bad);font-size:.8rem;min-height:1.2em"></div>' +
       '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إلغاء</button>' +
       '<button class="btn" id="tSave" onclick="saveTeacher(\'' + (id || '') + '\')">حفظ</button></div>' +
@@ -289,7 +296,10 @@
       socialLinks: { whatsapp: $('tWhats').value.trim(), facebook: $('tFb').value.trim(), tiktok: $('tTt').value.trim() },
       photo: A.pendingPhoto || undefined,
       requirePhone: $('tReqPhone').checked,
-      enabled: $('tEnabled').checked
+      enabled: $('tEnabled').checked,
+      unlimited: $('tUnlimited').checked,
+      maxAttempts: parseInt($('tMaxAtt').value, 10) || 3,
+      offlineMode: $('tOffMode').checked
     };
     $('tSave').disabled = true;
     api(id ? '/api/admin/teachers/' + id : '/api/admin/teachers', {

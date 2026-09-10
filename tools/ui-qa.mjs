@@ -330,6 +330,12 @@ console.log('\n[5] قاعدة منع التسليم الناقص — تحديد 
   });
   const badBody = await bad.json().catch(() => ({}));
   ok('الخادم يرفض التسليم الناقص (400) مع قائمة الأسئلة غير المُجابة', bad.status === 400 && Array.isArray(badBody.unanswered) && badBody.unanswered.includes(1));
+  // G: طابور التسليم دون اتصال — حفظ محلي ثم إرسال تلقائي يعرض النتيجة
+  W.__offline.queue();
+  ok('الطابور دون اتصال: يُحفظ التسليم في localStorage', W.__offline.list().length === 1 && (W.localStorage.getItem('exammanasa_pending_submits') || '').includes(W.S.session.token.slice(0, 24)));
+  await W.__offline.flush();
+  await sleep(300);
+  ok('إرسال الطابور: يُسلَّم للخادم ويعرض النتيجة ويُفرَّغ الطابور', W.__offline.list().length === 0 && W.S.view === 'result' && !!W.S.result && W.S.result.total === W.S.session.questions.length);
   harvestClasses(doc);
 }
 
