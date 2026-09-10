@@ -15,6 +15,7 @@
  *  11. تكافؤ خلط الخيارات مع خوارزمية تطبيق GAS الأصلي (Code.gs)
  *  12. حدود المحاولات لكل معلم (خادم + عدّاد ذري) وتوحيد أرقام الهواتف
  *  13. وضع عدم الاتصال (عقد الخادم: صلاحية 72 ساعة + علَم offline)
+ *  14. لوحة المعلم لكل معلم + أمان التسجيل (رفض المعلم المعطّل، تجاهل حقن الدرجة) وعدم تسريب المفاتيح
  *
  * Usage: npm test   (from cloudflare/)
  */
@@ -547,6 +548,52 @@ try {
     const sub = await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', tk.seed) });
     ok('تسليم جلسة الأوفلاين يعمل (الإجابة دون اتصال + التسليم عند الاتصال)', sub.status === 200 && sub.data.score === 20);
     await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 14. teacher dashboard + registration/API security ============ */
+  console.log('\n[14] لوحة المعلم وأمان التسجيل');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم اللوحة', slug: 'dash14', phone: '+20 011-2222 3333' }, { Cookie: cookie });
+    ok('إنشاء معلم + توحيد هاتف المعلم للصيغة المعيارية', mk.status === 200 && mk.data.teacher.phone === '01122223333', mk.data.teacher && mk.data.teacher.phone);
+    const dashId = mk.data.teacher.id;
+    // submit 1: U1-T1 perfect (100) + submit 2: T2P-C1-T1 all-wrong (0)
+    const s1 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب لوحة 1', phone: '01015151515', slug: 'dash14' });
+    await post('/api/exam/submit', { token: s1.data.token, answers: correctPositions('U1-T1', decodeToken(s1.data.token).seed) });
+    const s2 = await post('/api/exam/start', { examId: 'T2P-C1-T1', name: 'طالب لوحة 2', phone: '01016161616', slug: 'dash14' });
+    await post('/api/exam/submit', { token: s2.data.token, answers: wrongPositions('T2P-C1-T1', decodeToken(s2.data.token).seed) });
+    await new Promise(r => setTimeout(r, 800)); // waitUntil persist
+    const stats = await jfetch('/api/admin/teachers/' + dashId + '/stats', { headers: { Cookie: cookie } });
+    ok('لوحة المعلم: إجماليات صحيحة (2 نتيجة / طالبان / متوسط 50 / نجاح 50%)',
+      stats.status === 200 && stats.data.totals.results === 2 && stats.data.totals.students === 2 &&
+      stats.data.totals.avgPercentage === 50 && stats.data.totals.passRate === 50);
+    ok('تفصيل حسب الامتحان (امتحانان × محاولة) + الأحدث (2)',
+      stats.data.perExam.length === 2 && stats.data.perExam.every(e => e.attempts === 1) && stats.data.recent.length === 2);
+    const mkB = await post('/api/admin/teachers', { name: 'معلم عزل', slug: 'dash14b' }, { Cookie: cookie });
+    const statsB = await jfetch('/api/admin/teachers/' + mkB.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('عزل اللوحات: معلم آخر لا يرى نتائج الأول (0)', statsB.status === 200 && statsB.data.totals.results === 0);
+    const noAuth = await jfetch('/api/admin/teachers/' + dashId + '/stats');
+    ok('لوحة المعلم محمية بدون جلسة (401)', noAuth.status === 401);
+    // disabled teacher: new sessions rejected
+    await jfetch('/api/admin/teachers/' + mkB.data.teacher.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم عزل', slug: 'dash14b', enabled: false })
+    });
+    const disStart = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01017171717', slug: 'dash14b' });
+    ok('رفض بدء جلسة جديدة لمعلم معطّل (403)', disStart.status === 403);
+    // server ignores client-injected score (no localStorage/client trust)
+    const v = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب حقن', phone: '01018181818', slug: 'mostafa' });
+    const inj = await post('/api/exam/submit', { token: v.data.token, answers: wrongPositions('U1-T1', decodeToken(v.data.token).seed), score: 9999, percentage: 100, pass: true });
+    ok('الخادم يتجاهل الدرجة المحقونة من العميل (صفر محسوب خادميًا)', inj.status === 200 && inj.data.score === 0 && inj.data.percentage === 0 && inj.data.pass === false);
+    // no key leak on a NEW training session
+    const rel = await post('/api/exam/start', { examId: 'T1-PH-RELIGION-01', name: 'طالب دين', phone: '01019191919', slug: 'mostafa' });
+    ok('جلسة تدريب جديد (دين 15 سؤالًا): حقول السؤال نص/خيارات فقط بلا مفاتيح',
+      rel.status === 200 && rel.data.questions.length === 15 &&
+      rel.data.questions.every(q => JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['id', 'no', 'options', 'text'])) &&
+      !JSON.stringify(rel.data).includes('"answer"'));
+    // cleanup
+    for (const id of [dashId, mkB.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
   }
 
   console.log('\n══════════════════════════════');

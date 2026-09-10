@@ -211,11 +211,42 @@
             '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
             '<button class="btn small ghost" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ الرابط</button>' +
             '<button class="btn small" onclick="editTeacher(\'' + esc(t.id) + '\')">تعديل</button>' +
+            '<button class="btn small ghost" onclick="teacherDash(\'' + esc(t.id) + '\')">لوحة المعلم</button>' +
             (t.isDefault ? '' : '<button class="btn small danger" onclick="deleteTeacher(\'' + esc(t.id) + '\')">حذف</button>') +
             '</div></div></div>';
         }).join('') + '</div>';
       A.teachers = d.teachers;
     }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+
+  /* لوحة المعلم: إجماليات + تفصيل حسب الامتحان + أحدث النتائج (من فهرس المعلم في KV) */
+  function teacherDash(id) {
+    var t = A.teachers.filter(function (x) { return x.id === id; })[0] || { name: '' };
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.innerHTML =
+      '<div class="modal" style="max-width:640px">' +
+      '<h3>لوحة المعلم: ' + esc(t.name) + '</h3>' +
+      '<div id="tdBody"><div class="empty"><div class="spin"></div></div></div>' +
+      '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إغلاق</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    api('/api/admin/teachers/' + id + '/stats').then(function (d) {
+      var h = '<div class="stat-grid">' +
+        stat(d.totals.results, 'نتيجة') + stat(d.totals.students, 'طالبًا') +
+        stat(d.totals.avgPercentage + '%', 'متوسط النسب') + stat(d.totals.passRate + '%', 'نسبة النجاح') + '</div>';
+      h += '<div class="section-title"><h3>حسب الامتحان</h3></div>';
+      h += d.perExam.length ? '<div style="overflow-x:auto"><table class="tbl"><tr><th>الامتحان</th><th>المحاولات</th><th>المتوسط</th></tr>' +
+        d.perExam.map(function (e) {
+          return '<tr><td style="font-size:.8rem">' + esc(e.title) + '</td><td>' + e.attempts + '</td><td>' + e.avgPercentage + '%</td></tr>';
+        }).join('') + '</table></div>' : '<div class="empty">لا نتائج بعد.</div>';
+      h += '<div class="section-title"><h3>أحدث النتائج</h3></div>';
+      h += d.recent.length ? '<div style="overflow-x:auto"><table class="tbl"><tr><th>الطالب</th><th>الامتحان</th><th>الدرجة</th></tr>' +
+        d.recent.map(function (r) {
+          return '<tr><td>' + esc(r.name) + '</td><td style="font-size:.78rem">' + esc(r.examLabel) + '</td><td><b>' + r.score + '/' + r.total + '</b></td></tr>';
+        }).join('') + '</table></div>' : '';
+      $('tdBody').innerHTML = h;
+    }).catch(function (e) { $('tdBody').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
   }
 
   function copyLink(slug) {
@@ -487,6 +518,7 @@
   window.saveTeacher = saveTeacher;
   window.deleteTeacher = deleteTeacher;
   window.copyLink = copyLink;
+  window.teacherDash = teacherDash;
   window.bankFilter = bankFilter;
   window.bankPage = bankPage;
 

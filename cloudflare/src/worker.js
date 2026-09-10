@@ -234,6 +234,7 @@ async function handleApi(request, env, ctx, pathname) {
     const slug = String(body.slug || '');
     const teachers = await getTeachers(env);
     const teacher = teachers.find(x => x.slug === slug) || null;
+    if (teacher && teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
     if (!rawPhone && teacher && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
     // read-only limit pre-check (atomic enforcement happens at submit time)
     const limit = teacherLimit(teacher);
@@ -388,9 +389,19 @@ async function handleApi(request, env, ctx, pathname) {
           const recent = await env.PLATFORM_KV.get('results:recent').catch(() => null);
           let list = [];
           try { list = recent ? JSON.parse(recent) : []; } catch {}
-          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
+          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
           if (list.length > 100) list = list.slice(0, 100);
           await env.PLATFORM_KV.put('results:recent', JSON.stringify(list)).catch(() => {});
+          // per-teacher index (powers the teacher dashboard; bank/exams stay shared)
+          const tslug = result.teacherSlug || '';
+          if (tslug) {
+            const tprev = await env.PLATFORM_KV.get('results:teacher:' + tslug).catch(() => null);
+            let tlist = [];
+            try { tlist = tprev ? JSON.parse(tprev) : []; } catch {}
+            tlist.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage });
+            if (tlist.length > 100) tlist = tlist.slice(0, 100);
+            await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(tlist)).catch(() => {});
+          }
         }
       } catch { /* storage failure must not lose the student's result response */ }
 
@@ -564,6 +575,29 @@ async function handleAdmin(request, env, ctx, pathname) {
     await kvPut(env, 'teachers', JSON.stringify(teachers));
     return json({ ok: true, teacher: t });
   }
+  /* ---------- teacher dashboard (per-teacher results index) ---------- */
+  const statsMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/stats$/);
+  if (statsMatch && method === 'GET') {
+    const teachers = await getTeachers(env);
+    const t = teachers.find(x => x.id === statsMatch[1]);
+    if (!t) return fail('المعلم غير موجود.', 404);
+    const tlist = await kvGetJson(env, 'results:teacher:' + t.slug).catch(() => null) || [];
+    const students = new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size;
+    const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
+    const pass = tlist.filter(r => r.percentage >= 50).length;
+    const perExam = {};
+    tlist.forEach(r => {
+      const k = r.examId || r.examLabel;
+      perExam[k] = perExam[k] || { examId: r.examId || '', title: r.examLabel || '', attempts: 0, sum: 0 };
+      perExam[k].attempts++; perExam[k].sum += r.percentage;
+    });
+    return json({
+      teacher: { id: t.id, slug: t.slug, name: t.name, enabled: t.enabled !== false, unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3, offlineMode: t.offlineMode === true },
+      totals: { results: tlist.length, students, avgPercentage: avg, passRate: tlist.length ? Math.round(pass / tlist.length * 10000) / 100 : 0 },
+      perExam: Object.values(perExam).map(e => ({ examId: e.examId, title: e.title, attempts: e.attempts, avgPercentage: Math.round(e.sum / e.attempts * 100) / 100 })).sort((a, b) => b.attempts - a.attempts),
+      recent: tlist.slice(0, 10)
+    });
+  }
   const tMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)$/);
   if (tMatch) {
     const teachers = await getTeachers(env);
@@ -653,8 +687,12 @@ function sanitizeTeacher(body, existing) {
     if (v && !/^https?:\/\//i.test(v)) throw new Error('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
     social[k] = v;
   }
-  const phone = String(body.phone || '').trim();
-  if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) throw new Error('رقم هاتف المعلم غير صالح.');
+  let phone = String(body.phone || '').trim();
+  if (phone) {
+    const np = normalizePhone(phone);
+    phone = isValidEgMobile(np) ? np : phone.replace(/[\s\-.()]/g, '');
+    if (!/^[0-9+]{4,25}$/.test(phone)) throw new Error('رقم هاتف المعلم غير صالح.');
+  }
   let photo = String(body.photo || existing?.photo || '');
   if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw new Error('صورة غير صالحة.');
   if (photo && photo.length > 2.5 * 1024 * 1024) throw new Error('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
