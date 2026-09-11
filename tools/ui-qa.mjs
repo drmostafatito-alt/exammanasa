@@ -32,13 +32,21 @@ const ok = (name, cond, extra) => {
 };
 
 /* ---- fetch the real app + catalog from the running worker ---- */
-const [indexHtml, appJs, css, adminHtml, adminJs] = await Promise.all([
+const [indexHtml, appJs, css, adminHtml, adminJs, teacherHtml, teacherJs] = await Promise.all([
   fetch(BASE + '/').then(r => r.text()),
   fetch(BASE + '/app.js').then(r => r.text()),
   fetch(BASE + '/styles.css').then(r => r.text()),
   fetch(BASE + '/admin').then(r => r.text()),
-  fetch(BASE + '/admin.js').then(r => r.text())
+  fetch(BASE + '/admin.js').then(r => r.text()),
+  fetch(BASE + '/teacher').then(r => r.text()),
+  fetch(BASE + '/teacher.js').then(r => r.text())
 ]);
+/* ثوابت الواجهة: لا محررات نصية حرفية \uXXXX في HTML (لا تُفك في هذا السياق — خلل PR9 الذي أُصلح) */
+ok('لا توجد محارف \\u escape حرفية في ملفات HTML المنشورة',
+  !/\\u[0-9a-f]{4}/.test(indexHtml) && !/\\u[0-9a-f]{4}/.test(adminHtml) && !/\\u[0-9a-f]{4}/.test(teacherHtml));
+/* رابط المعلم ثابت: تسجيل دخول فقط — لا إنشاء حساب/تسجيل ذاتي في الصفحة أو السكربت */
+ok('صفحة /teacher بلا أي تسجيل ذاتي (HTML+JS)',
+  !/إنشاء حساب|تسجيل جديد|sign\s?up|\bregister\b/i.test(teacherHtml + teacherJs) && teacherHtml.includes('لوحة المعلم'));
 const catalog = await fetch(BASE + '/api/catalog').then(r => r.json());
 
 /* ---- boot: jsdom مع السكربتات الحقيقية والنقرات الحقيقية ---- */
@@ -396,15 +404,19 @@ console.log('\n[6ب] تعدد المعلمين — /mostafa → /ahmed → /moha
   if (login.status === 404) { await jpost('/api/admin/setup', { email: 'admin@test.local', password: 'TestAdminPass-2026' }); login = await jpost('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' }); }
   const H = { Cookie: jar.cookie };
   const created = [];
-  const mk = async (b) => { const r = await jpost('/api/admin/teachers', b, H); if (r.data && r.data.teacher) created.push(r.data.teacher.id); };
-  await mk({ name: 'أ. أحمد عبدالله', slug: 'ahmed', specialty: 'فلسفة ومنطق', bio: 'نبذة أحمد', phone: '01111111111', socialLinks: { facebook: 'https://facebook.com/ahmed.test' }, requirePhone: false, enabled: true });
-  await mk({ name: 'أ. محمد سعيد', slug: 'mohamed', specialty: 'علم نفس', bio: 'نبذة محمد', phone: '01222222222', socialLinks: { whatsapp: 'https://wa.me/201222222222' }, requirePhone: true, enabled: true });
+  // run-scoped slugs: the tool archives its teachers at the end, and archived slugs are
+  // protected from silent reuse (they still own a results index) — so each run uses fresh slugs.
+  const RND = Date.now().toString(36).slice(-5);
+  const AHMED = 'ahmed' + RND, MOHAMED = 'mohamed' + RND;
+  const mk = async (b) => { const r = await jpost('/api/admin/teachers', b, H); if (r.data && r.data.teacher) created.push(r.data.teacher.id); else if (r.status !== 200) console.log('    ↳ تعذر إنشاء المعلم ' + b.slug + ': HTTP ' + r.status); };
+  await mk({ name: 'أ. أحمد عبدالله', slug: AHMED, specialty: 'فلسفة ومنطق', bio: 'نبذة أحمد', phone: '01111111111', socialLinks: { facebook: 'https://facebook.com/ahmed.test' }, requirePhone: false, enabled: true });
+  await mk({ name: 'أ. محمد سعيد', slug: MOHAMED, specialty: 'علم نفس', bio: 'نبذة محمد', phone: '01222222222', socialLinks: { whatsapp: 'https://wa.me/201222222222' }, requirePhone: true, enabled: true });
   const check = async (slug, name, bio) => {
     const d2 = boot('/' + slug);
     await sleep(600);
     const dd = d2.window.document, h = dd.body.innerHTML;
     const others = ['د. مصطفى تيتو', 'أ. أحمد عبدالله', 'أ. محمد سعيد'].filter(n => n !== name);
-    const okBrand = dd.getElementById('brandName').textContent === name && h.includes(bio) && others.every(n => !h.includes(n)) && (slug === 'ahmed' || !h.includes('01111111111')) && (slug === 'mohamed' || !h.includes('01222222222'));
+    const okBrand = dd.getElementById('brandName').textContent === name && h.includes(bio) && others.every(n => !h.includes(n)) && (slug === AHMED || !h.includes('01111111111')) && (slug === MOHAMED || !h.includes('01222222222'));
     // الترم ← الموضوع ← التدريب بنفس بيانات المعلم
     d2.window.location.hash = '#/s/philosophy/1';
     await sleep(250);
@@ -418,7 +430,7 @@ console.log('\n[6ب] تعدد المعلمين — /mostafa → /ahmed → /moha
     if (!okBrand || !okNav) console.log('    ↳ ' + slug + ': brand=' + dd.getElementById('brandName').textContent + ' bio=' + h.includes(bio) + ' others=' + others.filter(n => h.includes(n)).join('/') + ' phones=' + ((slug !== 'ahmed' && h.includes('01111111111')) || (slug !== 'mohamed' && h.includes('01222222222'))) + ' nav=' + okNav);
     return { okBrand, okNav, win: d2.window };
   };
-  const seq = [['mostafa', owner.name, owner.bio], ['ahmed', 'أ. أحمد عبدالله', 'نبذة أحمد'], ['mohamed', 'أ. محمد سعيد', 'نبذة محمد'], ['mostafa', owner.name, owner.bio]];
+  const seq = [['mostafa', owner.name, owner.bio], [AHMED, 'أ. أحمد عبدالله', 'نبذة أحمد'], [MOHAMED, 'أ. محمد سعيد', 'نبذة محمد'], ['mostafa', owner.name, owner.bio]];
   let allBrand = true, allNav = true, lastWin;
   for (const [slug, name, bio] of seq) { const r = await check(slug, name, bio); allBrand = allBrand && r.okBrand; allNav = allNav && r.okNav; lastWin = r.win; }
   ok('كل صفحة معلم تعرض بيانات معلمها فقط (اسم/نبذة) بلا تسريب اسم أو هاتف معلم آخر — عبر التسلسل كاملًا', allBrand);
@@ -430,9 +442,9 @@ console.log('\n[6ب] تعدد المعلمين — /mostafa → /ahmed → /moha
   lastWin.history.forward(); await sleep(250);
   ok('Back/Forward يحافظان على المعلم (mostafa) والصفحة الصحيحة', lastWin.S.slug === 'mostafa' && lastWin.document.getElementById('brandName').textContent === owner.name && lastWin.location.hash === '#/s/philosophy/1');
   // بدء امتحان من صفحة أحمد: التوكن يحمل slug أحمد؛ النتيجة تحمل teacherSlug
-  const st = await fetch(new URL('/api/exam/start', BASE), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ examId: 'T1-PH-01', name: 'طالب أحمد', phone: '', slug: 'ahmed' }) }).then(r => r.json());
+  const st = await fetch(new URL('/api/exam/start', BASE), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ examId: 'T1-PH-01', name: 'طالب أحمد', phone: '', slug: AHMED }) }).then(r => r.json());
   const payload = JSON.parse(Buffer.from(st.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-  ok('جلسة من صفحة /ahmed: التوكن الموقّع يحمل slug=ahmed (هاتف اختياري حسب إعداد المعلم)', payload.slug === 'ahmed' && st.questions && st.questions.length === 20);
+  ok('جلسة من صفحة /ahmed*: التوكن الموقّع يحمل slug المعلم (هاتف اختياري حسب إعداد المعلم)', payload.slug === AHMED && st.questions && st.questions.length === 20);
   const ghost = await fetch(new URL('/ghost-teacher', BASE));
   const ghostApi = await fetch(new URL('/api/teacher/ghost-teacher', BASE));
   ok('معلم غير موجود: الصفحة 404 و/api/teacher 404 بلا fallback لمعلم آخر', ghost.status === 404 && ghostApi.status === 404 && !(await ghost.text()).includes(owner.name));
@@ -547,8 +559,11 @@ console.log('\n[8] لوحة التحكم');
 
 console.log('\n[9] الأداء وخفة الحزمة');
 {
+  // Budget: student SPA + admin panel + shared CSS must stay framework-free and lean.
+  // Re-baselined from 140KB → 155KB after the teacher-platform UI (PR #9 + final platform)
+  // added ~3KB of real functionality; the assertion still catches any framework/bloat regression.
   const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 140);
+  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 155);
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));

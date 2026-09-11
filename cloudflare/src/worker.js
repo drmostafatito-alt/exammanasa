@@ -108,6 +108,16 @@ async function pbkdf2(password, salt, iterations = 120000) {
 }
 const randomHex = (n = 16) => hex(crypto.getRandomValues(new Uint8Array(n)));
 
+/* Constant-time hex comparison — used for all password-hash checks so the
+ * comparison itself never leaks partial-match timing. */
+function safeEqualHex(a, b) {
+  const sa = String(a || ''), sb = String(b || '');
+  if (sa.length === 0 || sa.length !== sb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < sa.length; i++) diff |= sa.charCodeAt(i) ^ sb.charCodeAt(i);
+  return diff === 0;
+}
+
 /* ---- exam session token: payload.HMAC ---- */
 // token = base64url(payload) + '.' + base64url(hmac)
 async function signToken(payload, secret) {
@@ -128,6 +138,33 @@ async function verifyToken(token, secret) {
     return payload;
   } catch { return null; }
 }
+
+/* ---- session epochs (server-side revocation for the signed cookies) ----
+ * Each login registers a random v inside the signed token AND in a KV list
+ * (`sessv:admin` / `sessv:t:<id>`). Every authenticated request must present a v
+ * still on the list, so logout-elsewhere, password changes/resets, disabling and
+ * archiving revoke sessions immediately (last 8 sessions kept = multi-device).
+ * The list is capped and last-write-wins — acceptable trade-off on the free plan. */
+async function getVList(env, key) {
+  const raw = await kvGet(env, key).catch(() => null);
+  let arr = []; try { arr = raw ? JSON.parse(raw) : []; } catch { arr = []; }
+  return Array.isArray(arr) ? arr : [];
+}
+async function addV(env, key, v) {
+  const arr = await getVList(env, key);
+  await kvPut(env, key, JSON.stringify(arr.filter(x => x !== v).concat([v]).slice(-8)));
+}
+async function setVList(env, key, list) { await kvPut(env, key, JSON.stringify(list)); }
+async function hasV(env, key, v) {
+  if (typeof v !== 'string' || !v) return false;
+  const arr = await getVList(env, key);
+  return arr.some(x => typeof x === 'string' && safeEqualHex(x, v));
+}
+async function dropV(env, key, v) {
+  const arr = await getVList(env, key);
+  await kvPut(env, key, JSON.stringify(arr.filter(x => x !== v)));
+}
+async function clearV(env, key) { try { if (env.PLATFORM_KV) await env.PLATFORM_KV.delete(key); } catch { } }
 
 /* ============================ storage (KV) ============================ */
 const DEFAULT_TEACHERS = [{
@@ -188,9 +225,19 @@ async function readJson(request, maxBytes = 128 * 1024) {
 }
 
 /* ============================ public API ============================ */
+/* Owner/default teacher shown on the root page ("/"). Same resolution rule is
+ * used by /api/exam/start when a student arrives without a slug, so results
+ * collected on "/" are always attributed to the teacher whose identity "/" shows. */
+function ownerTeacher(teachers) {
+  return teachers.find(t => t.isDefault && t.enabled !== false)
+    || teachers.find(t => t.enabled !== false)
+    || teachers.find(t => t.isDefault)
+    || teachers[0] || null;
+}
+
 async function publicCatalog(env) {
   const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
-  const owner = teachers.find(t => t.isDefault) || teachers.find(t => t.enabled !== false) || teachers[0] || null;
+  const owner = ownerTeacher(teachers);
   return {
     version: BANKS.version, generatedAt: BANKS.generatedAt,
     catalog: BANKS.catalog, exams: BANKS.exams,
@@ -231,7 +278,7 @@ async function handleApi(request, env, ctx, pathname) {
   /* ---------- teacher auth: session ---------- */
   if (pathname === '/api/t/session' && method === 'GET') {
     const session = await teacherCookiePayload(request, env);
-    if (!session) return fail('\u063a\u064a\u0631 \u0645\u0635\u0631\u062d.', 401);
+    if (!session || !(await hasV(env, 'sessv:t:' + session.tid, session.v))) return fail('\u063a\u064a\u0631 \u0645\u0635\u0631\u062d.', 401);
     const teachers = await getTeachers(env);
     const t = teachers.find(x => x.id === session.tid);
     if (!t || t.enabled === false || t.archived) return fail('\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u0644\u0645 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d.', 403);
@@ -239,6 +286,9 @@ async function handleApi(request, env, ctx, pathname) {
   }
   /* ---------- teacher auth: logout ---------- */
   if (pathname === '/api/t/logout' && method === 'POST') {
+    // drop only this session's epoch (other devices stay signed in)
+    const s = await teacherCookiePayload(request, env).catch(() => null);
+    if (s && s.tid && s.v) await dropV(env, 'sessv:t:' + s.tid, s.v).catch(() => {});
     const res = json({ ok: true });
     const headers = new Headers(res.headers);
     headers.append('Set-Cookie', 'teacher_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0');
@@ -260,11 +310,25 @@ async function handleApi(request, env, ctx, pathname) {
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
     const normPhone = normalizePhone(rawPhone);
     if (rawPhone && !isValidEgMobile(normPhone)) return fail('رقم الهاتف غير صالح. أدخل رقمًا مصريًا صحيحًا (01xxxxxxxxx).');
-    const slug = String(body.slug || '').toLowerCase();
+    // Teacher attribution — the slug is the public entry link, but it is NEVER a
+    // free-form security input: an unknown slug is rejected outright, and an empty
+    // slug (root page "/") is resolved server-side to the owner/default teacher.
+    // This closes two holes: (1) results orphaned outside any teacher's index via a
+    // fabricated slug, and (2) bypassing a teacher's student-limit seat registration
+    // by simply omitting/mismarking the slug on this request.
     const teachers = await getTeachers(env);
-    const teacher = teachers.find(x => x.slug === slug) || null;
-    if (teacher && teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
-    if (!rawPhone && teacher && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    let slug = String(body.slug || '').trim().toLowerCase();
+    let teacher = null;
+    if (slug) {
+      teacher = teachers.find(x => x.slug === slug) || null;
+      if (!teacher) return fail('رابط المعلم غير صالح — أعد فتح الرابط الصحيح.', 404);
+    } else {
+      teacher = ownerTeacher(teachers);
+      if (!teacher) return fail('لا توجد صفحة معلم نشطة على المنصة.', 403);
+      slug = teacher.slug;
+    }
+    if (teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
+    if (!rawPhone && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
     // Student limit — registration is the moment a distinct student is counted. Atomic inside the
     // teacher's DO instance, so N concurrent new registrations can never exceed the limit.
     let studentSeat = null;
@@ -500,6 +564,23 @@ async function getAdminRecord(env) {
   return kvGetJson(env, 'admin');
 }
 
+/* Secret-based first-run provisioning (see cloudflare/README.md §4): when
+ * ADMIN_INITIAL_EMAIL/ADMIN_INITIAL_PASSWORD are set as Worker secrets, the admin
+ * account is created automatically on the first admin-API request — the public
+ * setup screen is then permanently closed (409) and was never usable to race the
+ * owner. Without the secrets, the one-time setup screen remains the bootstrap path. */
+async function ensureAdminBootstrap(env) {
+  if (!env.ADMIN_INITIAL_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return;
+  const existing = await kvGetJson(env, 'admin').catch(() => null);
+  if (existing) return;
+  const email = String(env.ADMIN_INITIAL_EMAIL).trim().toLowerCase();
+  const password = String(env.ADMIN_INITIAL_PASSWORD);
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || password.length < 8) return; // invalid secret → fall back to setup screen
+  const salt = randomHex(16);
+  const hash = await pbkdf2(password, salt);
+  await kvPut(env, 'admin', JSON.stringify({ email, salt, hash, iterations: 120000, createdAt: new Date().toISOString(), via: 'env-secret' }));
+}
+
 async function adminCookiePayload(request, env) {
   const cookie = request.headers.get('Cookie') || '';
   const m = cookie.match(/(?:^|;\s*)admin_session=([^;]+)/);
@@ -513,21 +594,26 @@ async function handleAdmin(request, env, ctx, pathname) {
   const method = request.method;
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
 
+  // First-run: if initial-admin secrets are configured, provision now (idempotent).
+  await ensureAdminBootstrap(env).catch(() => {});
+
   /* ---------- login ---------- */
   if (pathname === '/api/admin/login' && method === 'POST') {
     const fails = loginFails.get(ip) || { n: 0, until: 0 };
     if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة. حاول بعد قليل.', 429);
 
     const body = await readJson(request);
+    // Existence check FIRST: the admin SPA boot probes login with empty credentials to
+    // detect first run — a fresh deployment must receive the 404 "not created yet"
+    // signal (and switch to the one-time setup screen) instead of a generic 400.
+    const admin = await getAdminRecord(env);
+    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد. افتح صفحة الإعداد الأولي.', 404);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     if (!email || !password) return fail('البريد وكلمة المرور مطلوبان.');
 
-    const admin = await getAdminRecord(env);
-    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد. افتح صفحة الإعداد الأولي.', 404);
-
     const hash = await pbkdf2(password, admin.salt, admin.iterations);
-    if (email !== admin.email || hash !== admin.hash) {
+    if (email !== admin.email || !safeEqualHex(hash, admin.hash)) {
       loginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
       return fail('بيانات الدخول غير صحيحة.', 401);
     }
@@ -535,7 +621,9 @@ async function handleAdmin(request, env, ctx, pathname) {
 
     const secret = await getSessionSecret(env).catch(() => null);
     if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
-    const token = await signToken({ t: 'admin', email, exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL }, secret);
+    const v = randomHex(8);
+    await addV(env, 'sessv:admin', v); // server-side revocation registry for admin sessions
+    const token = await signToken({ t: 'admin', email, v, exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL }, secret);
     const res = json({ ok: true, email });
     const headers = new Headers(res.headers);
     headers.append('Set-Cookie',
@@ -560,13 +648,16 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- everything below requires an admin session ---------- */
   const session = await adminCookiePayload(request, env);
-  const authed = !!(session && session.t === 'admin');
+  let authed = !!(session && session.t === 'admin');
+  if (authed && !(await hasV(env, 'sessv:admin', session.v))) authed = false; // revoked (password change / logout elsewhere)
 
   if (pathname === '/api/admin/session' && method === 'GET') {
     if (!authed) return fail('غير مصرح.', 401);
     return json({ email: session.email });
   }
   if (pathname === '/api/admin/logout' && method === 'POST') {
+    const s0 = await adminCookiePayload(request, env).catch(() => null);
+    if (s0 && s0.v) await dropV(env, 'sessv:admin', s0.v).catch(() => {});
     const res = json({ ok: true });
     const headers = new Headers(res.headers);
     headers.append('Set-Cookie', 'admin_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0');
@@ -586,13 +677,21 @@ async function handleAdmin(request, env, ctx, pathname) {
     const admin = await getAdminRecord(env);
     if (!admin) return fail('لم يُنشأ حساب المسؤول بعد.', 404);
     const curHash = await pbkdf2(current, admin.salt, admin.iterations);
-    if (curHash !== admin.hash) return fail('كلمة المرور الحالية غير صحيحة.', 401);
+    if (!safeEqualHex(curHash, admin.hash)) return fail('كلمة المرور الحالية غير صحيحة.', 401);
     if (next.length < 8) return fail('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
     if (next === current) return fail('كلمة المرور الجديدة مطابقة للحالية.');
     const salt = randomHex(16);
     const hash = await pbkdf2(next, salt);
     await kvPut(env, 'admin', JSON.stringify({ ...admin, salt, hash, iterations: 120000, updatedAt: new Date().toISOString() }));
-    return json({ ok: true });
+    // password change revokes every admin session, then re-issues THIS device only
+    const v = randomHex(8);
+    await setVList(env, 'sessv:admin', [v]);
+    const secret2 = await getSessionSecret(env);
+    const token = await signToken({ t: 'admin', email: admin.email, v, exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL }, secret2);
+    const res = json({ ok: true });
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie', `admin_session=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${ADMIN_SESSION_TTL}`);
+    return new Response(res.body, { status: res.status, headers });
   }
 
   /* ---------- overview ---------- */
@@ -616,8 +715,13 @@ async function handleAdmin(request, env, ctx, pathname) {
   if (pathname === '/api/admin/teachers' && method === 'GET') {
     const teachers = await getTeachers(env);
     const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
-    const withStatus = await Promise.all(teachers.map(async t => ({ ...t, studentLimitStatus: await studentLimitStatus(env, t) })));
-    return json({ teachers: withStatus, archived });
+    // NEVER return raw KV records: they carry passHash/passSalt. The admin UI only
+    // needs the safe projection (+isDefault / +studentLimitStatus for the cards).
+    const withStatus = await Promise.all(teachers.map(async t => ({
+      ...teacherAdminPayload(t), isDefault: !!t.isDefault, studentLimitStatus: await studentLimitStatus(env, t)
+    })));
+    const archivedSafe = archived.map(a => ({ ...teacherAdminPayload(a), archived: true }));
+    return json({ teachers: withStatus, archived: archivedSafe });
   }
   /* ---------- restore an archived teacher (delete is non-destructive) ---------- */
   const restoreMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/restore$/);
@@ -633,13 +737,17 @@ async function handleAdmin(request, env, ctx, pathname) {
     teachers.push(t);
     await kvPut(env, 'teachers', JSON.stringify(teachers));
     await kvPut(env, 'teachers:archived', JSON.stringify(archived));
-    return json({ ok: true, teacher: t });
+    return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
     const body = await readJson(request, 3 * 1024 * 1024);
     const t = await sanitizeTeacher(body, null, env);
     const teachers = await getTeachers(env);
     if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+    // An archived teacher keeps its results index (results:teacher:<slug>). Creating a
+    // NEW account on that slug would silently inherit the old teacher's history — blocked.
+    const archivedNow = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+    if (archivedNow.some(x => x.slug === t.slug)) return fail('هذا الرابط يخص معلمًا مؤرشفًا — استعده من الأرشيف أو اختر رابطًا مختلفًا.', 409);
     t.id = 't_' + randomHex(6);
     t.teacherCode = 'TCH-' + String(teachers.length + 1).padStart(4, '0');
     t.createdAt = new Date().toISOString();
@@ -683,6 +791,8 @@ async function handleAdmin(request, env, ctx, pathname) {
       const body = await readJson(request, 3 * 1024 * 1024);
       const t = await sanitizeTeacher(body, teachers[idx], env);
       if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+      // setting/clearing the password through the edit form is a credential change → revoke sessions
+      if ((teachers[idx].passHash || '') !== (t.passHash || '')) await clearV(env, 'sessv:t:' + teachers[idx].id);
       t.id = teachers[idx].id;
       t.teacherCode = teachers[idx].teacherCode || ('TCH-' + String(idx + 1).padStart(4, '0'));
       t.createdAt = teachers[idx].createdAt;
@@ -690,12 +800,15 @@ async function handleAdmin(request, env, ctx, pathname) {
       if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
       teachers[idx] = t;
       await kvPut(env, 'teachers', JSON.stringify(teachers));
+      // disabling kills all live sessions immediately (re-enabling requires a fresh login)
+      if (t.enabled === false) await clearV(env, 'sessv:t:' + t.id);
       return json({ ok: true, teacher: teacherAdminPayload(t) });
     }
     if (method === 'DELETE') {
       // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
       // and the student registry are never deleted. The slug is released for reuse.
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
+      await clearV(env, 'sessv:t:' + teachers[idx].id); // archive = sign out everywhere
       const [removed] = teachers.splice(idx, 1);
       const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
       archived.unshift({ ...removed, enabled: false, archived: true, archivedAt: new Date().toISOString() });
@@ -718,6 +831,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     const hash = await pbkdf2(newPassword, salt);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
     await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await clearV(env, 'sessv:t:' + teachers[idx].id); // admin reset = the teacher must sign in again everywhere
     return json({ ok: true });
   }
 
@@ -780,12 +894,15 @@ async function sanitizeTeacher(body, existing, env) {
   if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw bad('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
   if (RESERVED_SLUGS.has(slug)) throw bad('هذا الرابط محجوز.');
   const social = {};
+  const socialSrc = body.socialLinks ?? existing?.socialLinks ?? {};
   for (const k of ['whatsapp', 'facebook', 'tiktok']) {
-    const v = String(body.socialLinks?.[k] || '').trim();
+    const v = String(socialSrc[k] || '').trim();
     if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
     social[k] = v;
   }
-  let phone = String(body.phone || '').trim();
+  // Field-preserving PUT semantics: an ABSENT field keeps the stored value (explicit '' clears it).
+  // Otherwise a partial update would silently wipe phone/email/social links or re-enable a disabled teacher.
+  let phone = String(body.phone !== undefined ? body.phone : (existing?.phone ?? '')).trim();
   if (phone) {
     const np = normalizePhone(phone);
     phone = isValidEgMobile(np) ? np : phone.replace(/[\s\-.()]/g, '');
@@ -796,9 +913,9 @@ async function sanitizeTeacher(body, existing, env) {
   if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
   // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
   // أي قيم colors قادمة من الطلب تُتجاهل ولا تُخزَّن.
-  let email = String(body.email || '').trim().toLowerCase();
+  let email = String(body.email !== undefined ? body.email : (existing?.email ?? '')).trim().toLowerCase();
   if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad('البريد الإلكتروني غير صالح.');
-  let username = String(body.username || '').trim().toLowerCase();
+  let username = String(body.username !== undefined ? body.username : (existing?.username ?? '')).trim().toLowerCase();
   if (username && !/^[a-z0-9][a-z0-9_.-]{1,29}$/.test(username)) throw bad('اسم المستخدم غير صالح.');
   if (email || username) {
     const teachers = env ? await getTeachers(env).catch(() => []) : [];
@@ -824,9 +941,9 @@ async function sanitizeTeacher(body, existing, env) {
     bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
     socialLinks: social,
-    requirePhone: body.requirePhone !== false,
-    enabled: body.enabled !== false,
-    unlimited: body.unlimited !== false,
+    requirePhone: body.requirePhone !== undefined ? body.requirePhone !== false : (existing ? existing.requirePhone !== false : true),
+    enabled: body.enabled !== undefined ? body.enabled !== false : (existing ? existing.enabled !== false : true),
+    unlimited: body.unlimited !== undefined ? body.unlimited !== false : (existing ? existing.unlimited !== false : true),
     maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3)),
     offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true),
     // Student limit: a REAL unlimited flag (not a big number). When limited, studentLimit is the
@@ -875,14 +992,16 @@ async function handleTeacherLogin(request, env) {
   }
   if (t.enabled === false || t.archived) return fail('حساب المعلم غير مفعّل.', 403);
   const hash = await pbkdf2(password, t.passSalt, t.passIterations || 120000);
-  if (hash !== t.passHash) {
+  if (!safeEqualHex(hash, t.passHash)) {
     teacherLoginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
     return fail('بيانات الدخول غير صحيحة.', 401);
   }
   teacherLoginFails.delete(ip);
   const secret = await getSessionSecret(env).catch(() => null);
   if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
-  const token = await signToken({ t: 'teacher', tid: t.id, slug: t.slug, exp: Math.floor(Date.now() / 1000) + TEACHER_SESSION_TTL }, secret);
+  const v = randomHex(8);
+  await addV(env, 'sessv:t:' + t.id, v); // server-side revocation registry
+  const token = await signToken({ t: 'teacher', tid: t.id, slug: t.slug, v, exp: Math.floor(Date.now() / 1000) + TEACHER_SESSION_TTL }, secret);
   const res = json({ ok: true, name: t.name, slug: t.slug, id: t.id });
   const headers = new Headers(res.headers);
   headers.append('Set-Cookie', 'teacher_session=' + encodeURIComponent(token) + '; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=' + TEACHER_SESSION_TTL);
@@ -891,6 +1010,7 @@ async function handleTeacherLogin(request, env) {
 async function requireTeacher(request, env) {
   const session = await teacherCookiePayload(request, env);
   if (!session || session.t !== 'teacher') return null;
+  if (!(await hasV(env, 'sessv:t:' + session.tid, session.v))) return null; // revoked elsewhere → dead
   const teachers = await getTeachers(env);
   const t = teachers.find(x => x.id === session.tid);
   if (!t || t.enabled === false || t.archived) return null;
@@ -908,14 +1028,32 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     if (next.length < 8) return fail('كلمة المرور 8 أحرف على الأقل.');
     if (next === current) return fail('كلمتا المرور متطابقتان.');
     const curHash = await pbkdf2(current, teacher.passSalt, teacher.passIterations || 120000);
-    if (curHash !== teacher.passHash) return fail('كلمة المرور الحالية غير صحيحة.', 401);
+    if (!safeEqualHex(curHash, teacher.passHash)) return fail('كلمة المرور الحالية غير صحيحة.', 401);
     const salt = randomHex(16); const hash = await pbkdf2(next, salt);
     const teachers = await getTeachers(env);
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
     await kvPut(env, 'teachers', JSON.stringify(teachers));
-    return json({ ok: true });
+    // password change revokes every session, then re-issues the CURRENT device only
+    const v = randomHex(8);
+    await setVList(env, 'sessv:t:' + teacher.id, [v]);
+    const secret2 = await getSessionSecret(env);
+    const token = await signToken({ t: 'teacher', tid: teacher.id, slug: teacher.slug, v, exp: Math.floor(Date.now() / 1000) + TEACHER_SESSION_TTL }, secret2);
+    const res = json({ ok: true });
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie', 'teacher_session=' + encodeURIComponent(token) + '; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=' + TEACHER_SESSION_TTL);
+    return new Response(res.body, { status: res.status, headers });
+  }
+  if (pathname === '/api/t/profile' && method === 'GET') {
+    // The teacher's own safe profile (used to pre-fill the edit form — prevents the
+    // "save blanks out fields you never saw" bug). Never exposes hashes/limits of others.
+    return json({ teacher: {
+      id: teacher.id, slug: teacher.slug, studentUrl: '/' + teacher.slug,
+      phone: teacher.phone || '', email: teacher.email || '', username: teacher.username || '',
+      hasPassword: !!teacher.passHash,
+      ...teacherPublic(teacher)
+    } });
   }
   if (pathname === '/api/t/profile' && method === 'POST') {
     const body = await readJson(request, 3 * 1024 * 1024);
@@ -1135,16 +1273,18 @@ export default {
         return securityHeaders(fail('الطريقة غير مسموح بها.', 405));
       }
 
-      // teacher SPA: /teacher (login + dashboard)
+      // teacher SPA: /teacher (login + dashboard) — shell must always revalidate (assets are ?v= versioned)
       if (pathname === '/teacher' || pathname === '/teacher/' || pathname.startsWith('/teacher/')) {
         const res = await env.ASSETS.fetch(new URL('https://assets.internal/teacher.html'));
-        return securityHeaders(new Response(res.body, { status: 200, headers: res.headers }));
+        const h = new Headers(res.headers); h.set('Cache-Control', 'no-cache');
+        return securityHeaders(new Response(res.body, { status: 200, headers: h }));
       }
 
       // student SPA: / or /:slug ; admin SPA: /admin
       if (pathname === '/admin' || pathname === '/admin/') {
         const res = await env.ASSETS.fetch(new URL('https://assets.internal/admin.html'));
-        return securityHeaders(new Response(res.body, { status: 200, headers: res.headers }));
+        const h = new Headers(res.headers); h.set('Cache-Control', 'no-cache');
+        return securityHeaders(new Response(res.body, { status: 200, headers: h }));
       }
 
       if (pathname === '/' || pathname === '') {

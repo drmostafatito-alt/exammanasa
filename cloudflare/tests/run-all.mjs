@@ -16,6 +16,12 @@
  *  12. حدود المحاولات لكل معلم (خادم + عدّاد ذري) وتوحيد أرقام الهواتف
  *  13. وضع عدم الاتصال (عقد الخادم: صلاحية 72 ساعة + علَم offline)
  *  14. لوحة المعلم لكل معلم + أمان التسجيل (رفض المعلم المعطّل، تجاهل حقن الدرجة) وعدم تسريب المفاتيح
+ *  15. حد الطلاب لكل معلم (علم unlimited حقيقي + سباقات التسجيل)
+ *  16. حسابات المعلمين: دخول آمن، تغيير/إعادة تعيين كلمة المرور، رفض الحقن، عزل القوائم الإدارية عن المفاتيح الحساسة
+ *  17. عزل بيانات المعلمين (Teacher A ∌ بيانات Teacher B)
+ *  18. مسارات /teacher الثابتة (تسجيل دخول فقط — بلا إنشاء حساب)
+ *  19. نسبة النتائج للمعلم خادومياً + سدّ تجاوز الحد عبر slug وهمي/فارغ
+ *  20. قفل المحاولات المتكررة لتسجيل الدخول (المعلم والمسؤول) — يجب أن يبقى في النهاية
  *
  * Usage: npm test   (from cloudflare/)
  */
@@ -446,6 +452,8 @@ try {
     ok('رفض كلمة مرور جديدة قصيرة', tooShort.status === 400);
     const ch = await post('/api/admin/password', { current: 'TestAdminPass-2026', next: 'TestAdminPass-2027' }, { Cookie: cookie2, 'X-Requested-With': 'fetch' });
     ok('تغيير كلمة المرور ناجح', ch.status === 200);
+    const staleAdmin = await jfetch('/api/admin/session', { headers: { Cookie: cookie2 } });
+    ok('تغيير كلمة مرور المسؤول يُسقط الجلسات القديمة فورًا (401)', staleAdmin.status === 401);
     const oldLogin = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' });
     ok('كلمة المرور القديمة لم تعد تعمل', oldLogin.status === 401);
     const newLogin = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2027' });
@@ -453,6 +461,11 @@ try {
     const newCookie = (newLogin.headers.get('set-cookie') || '').split(';')[0];
     const back = await post('/api/admin/password', { current: 'TestAdminPass-2027', next: 'TestAdminPass-2026' }, { Cookie: newCookie, 'X-Requested-With': 'fetch' });
     ok('العودة لكلمة المرور الأصلية', back.status === 200);
+    // the change re-issued THIS device's cookie — adopt it for the remaining sections
+    const backCookie = (back.headers.get('set-cookie') || '').split(';')[0];
+    if (/^admin_session=/.test(backCookie)) cookie = backCookie;
+    const afterBack = await jfetch('/api/admin/session', { headers: { Cookie: cookie } });
+    ok('جلسة الجهاز الحالي تبقى صالحة بعد تغيير كلمة المرور', afterBack.status === 200);
   }
 
   console.log('\n[11] تكافؤ خلط الخيارات مع تطبيق GAS الأصلي');
@@ -666,7 +679,7 @@ try {
     const tId = mk.data.teacher.id;
     const loginEmail = await post('/api/t/login', { email: 'teacher1@test.com', password: 'securePass123' });
     ok('دخول المعلم بالبريد', loginEmail.status === 200 && loginEmail.data.ok === true);
-    const tCookie = 'teacher_session=' + loginEmail.headers.get('set-cookie').match(/teacher_session=([^;]+)/)[1];
+    let tCookie = 'teacher_session=' + loginEmail.headers.get('set-cookie').match(/teacher_session=([^;]+)/)[1];
     const loginUser = await post('/api/t/login', { email: 'teacher1', password: 'securePass123' });
     ok('دخول المعلم باسم المستخدم', loginUser.status === 200);
     const sess = await jfetch('/api/t/session', { headers: { Cookie: tCookie } });
@@ -681,6 +694,13 @@ try {
     ok('تحديث الملف الشخصي', prof.status === 200 && prof.data.teacher.name === 'معلم محدث');
     const cpw = await post('/api/t/password', { current: 'securePass123', next: 'newSecure456' }, { Cookie: tCookie });
     ok('تغيير كلمة المرور', cpw.status === 200);
+    // the change rotates sessions: server re-issues THIS device's cookie; all others die
+    const cpwCookie = 'teacher_session=' + (cpw.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/)[1];
+    const staleSess = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie } });
+    ok('تغيير كلمة المرور يُسقط الجلسات الأخرى (الإصدار القديم أصبح 401)', staleSess.status === 401);
+    tCookie = cpwCookie;
+    const liveAfterCpw = await jfetch('/api/t/session', { headers: { Cookie: tCookie } });
+    ok('إعادة إصدار كوكيز الجهاز الحالي بعد تغيير كلمة المرور (تبقى الجلسة عاملة)', liveAfterCpw.status === 200);
     const oldPw = await post('/api/t/login', { email: 'teacher1@test.com', password: 'securePass123' });
     ok('كلمة المرور القديمة لا تعمل', oldPw.status === 401);
     const newPw = await post('/api/t/login', { email: 'teacher1@test.com', password: 'newSecure456' });
@@ -689,13 +709,56 @@ try {
     ok('كلمة مرور خاطئة مرفوضة', badLogin.status === 401);
     const adminAccess = await jfetch('/api/admin/session', { headers: { Cookie: tCookie } });
     ok('المعلم لا يصل للإدارة', adminAccess.status === 401);
+    // 16b: admin teachers list must NEVER carry credential material (passHash/passSalt)
+    const tList = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    const tListText = JSON.stringify(tList.data);
+    ok('قائمة المعلمين بالإدارة لا تسرّب passHash/passSalt/iterations',
+      tList.status === 200 && !tListText.includes('passHash') && !tListText.includes('passSalt') && !tListText.includes('passIterations'));
+    const tacctRow = (tList.data.teachers || []).find(x => x.slug === 'tacct1');
+    ok('قائمة المعلمين تعرض hasPassword/isDefault الآمنين', !!tacctRow && tacctRow.hasPassword === true && !('passHash' in tacctRow));
+    const defRow = (tList.data.teachers || []).find(x => x.slug === 'mostafa');
+    ok('المعلم الافتراضي معلَّم isDefault في القائمة', !!defRow && defRow.isDefault === true);
+    // 16c: teacher profile endpoint must not let a teacher escalate or mutate identity fields
+    const tamper = await post('/api/t/profile', { name: 'معلم محدث', slug: 'hacked', enabled: false, role: 'admin', teacherId: 't_default_mostafa', studentLimit: 0, studentLimitUnlimited: false, email: 'evil@evil.com', username: 'evil', password: 'attackerPass99' }, { Cookie: tCookie });
+    ok('حقن slug/enabled/role/limits/email عبر ملف المعلم يُتجاهل', tamper.status === 200);
+    const afterTamper = await jfetch('/api/t/session', { headers: { Cookie: tCookie } });
+    const tRow2 = (await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } })).data.teachers.find(x => x.slug === 'tacct1');
+    ok('بعد الحقن: الهوية والقيود لم تتغير (slug/tacct1، enabled، studentLimitUnlimited)',
+      afterTamper.status === 200 && afterTamper.data.slug === 'tacct1' && !!tRow2 && tRow2.enabled === true && tRow2.studentLimitUnlimited === true);
+    const profGet = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('GET /api/t/profile يعيد بيانات الملف للعرض (pre-fill) بلا مفاتيح حساسة',
+      profGet.status === 200 && profGet.data.teacher.name && profGet.data.teacher.studentUrl === '/tacct1' && !JSON.stringify(profGet.data).includes('pass'));
+    const idor = await jfetch('/api/t/results?slug=mostafa&teacherId=t_default_mostafa', { headers: { Cookie: tCookie } });
+    ok('IDOR عبر query params في /api/t/results يُتجاهل (العزل خادمي)', idor.status === 200 && idor.data.total === 0);
+    const noRegister = await post('/api/t/register', { name: 'x' });
+    ok('لا يوجد مسار تسجيل ذاتي للمعلمين', noRegister.status === 401 || noRegister.status === 404);
+    const teacherPageHtml = await jfetch('/teacher');
+    ok('صفحة /teacher لا تحتوي أي دعوة لإنشاء حساب', teacherPageHtml.status === 200 && !/إنشاء حساب|تسجيل جديد|register/i.test(teacherPageHtml.text));
     const noAuth = await jfetch('/api/t/dashboard');
     ok('API بدون جلسة مرفوض', noAuth.status === 401);
     const adminReset = await post('/api/admin/teachers/' + tId + '/password', { password: 'adminReset789' }, { Cookie: cookie });
     ok('المسؤول يعيد تعيين كلمة المرور', adminReset.status === 200);
-    const resetLogin = await post('/api/t/login', { email: 'teacher1@test.com', password: 'adminReset789' });
-    ok('كلمة المرور الجديدة من المسؤول تعمل', resetLogin.status === 200);
-    await post('/api/t/logout', {}, { Cookie: tCookie });
+    // 16d: server-side revocation — reset/disable kill live sessions immediately
+    const dashKilled = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie } });
+    ok('إعادة تعيين المسؤول للكلمة السرية تُسقط جلسات المعلم فورًا (401)', dashKilled.status === 401);
+    const relive = await post('/api/t/login', { email: 'teacher1@test.com', password: 'adminReset789' });
+    ok('دخول جديد بعد إعادة تعيين المسؤول', relive.status === 200);
+    const tCookie2 = 'teacher_session=' + (relive.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/)[1];
+    const dash2 = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie2 } });
+    ok('الجلسة الجديدة عاملة', dash2.status === 200);
+    await jfetch('/api/admin/teachers/' + tId, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'معلم محدث', slug: 'tacct1', email: 'teacher1@test.com', enabled: false }) });
+    const dashDis = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie2 } });
+    ok('تعطيل المعلم يُسقط جلساته فورًا (401)', dashDis.status === 401);
+    const reEnable = await jfetch('/api/admin/teachers/' + tId, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'معلم محدث', slug: 'tacct1', enabled: true }) });
+    ok('PUT جزئي يحافظ على البريد/الهاتف (بلا مسح صامت عند تعديل الحقول)', reEnable.status === 200 && reEnable.data.teacher.email === 'teacher1@test.com' && reEnable.data.teacher.phone === '01099999999' && reEnable.data.teacher.enabled === true);
+    const dashRe = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie2 } });
+    ok('إعادة التفعيل لا تُحيي جلسة قديمة — يتطلب دخولًا جديدًا', dashRe.status === 401);
+    const relive2 = await post('/api/t/login', { email: 'teacher1@test.com', password: 'adminReset789' });
+    const tCookie3 = 'teacher_session=' + (relive2.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/)[1];
+    ok('الدخول بعد إعادة التفعيل يعمل + جلسة حية', relive2.status === 200 && (await jfetch('/api/t/session', { headers: { Cookie: tCookie3 } })).status === 200);
+    // logout drops only its own epoch
+    const out = await post('/api/t/logout', {}, { Cookie: tCookie3 });
+    ok('تسجيل الخروج (200) ثم الجلسة نفسها صارت ميتة', out.status === 200 && (await jfetch('/api/t/session', { headers: { Cookie: tCookie3 } })).status === 401);
     const dupEmail = await post('/api/admin/teachers', { name: 'مكرر', slug: 'tacct3', email: 'teacher1@test.com' }, { Cookie: cookie });
     ok('رفض بريد مكرر', dupEmail.status === 400);
     const dupUser = await post('/api/admin/teachers', { name: 'مكرر', slug: 'tacct4', username: 'teacher1' }, { Cookie: cookie });
@@ -708,6 +771,9 @@ try {
     await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     const archLogin = await post('/api/t/login', { email: 'disabled@test.com', password: 'password123' });
     ok('معلم مؤرشف لا يدخل', archLogin.status === 401);
+    // archived teacher's slug cannot be claimed by a NEW teacher (no silent result inheritance)
+    const reuseArchived = await post('/api/admin/teachers', { name: 'وارث', slug: 'tacct2', email: 'reuse@test.com' }, { Cookie: cookie });
+    ok('رفض إنشاء معلم جديد برابط يخص معلمًا مؤرشفًا', reuseArchived.status === 409);
     // cleanup
     await jfetch('/api/admin/teachers/' + tId, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id + '/restore', { method: 'POST', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
@@ -753,6 +819,53 @@ try {
     ok('GET /teacher → 200', tPage.status === 200 && tPage.text.includes('لوحة المعلم'));
     const tDash = await jfetch('/teacher/dashboard');
     ok('GET /teacher/dashboard → 200', tDash.status === 200);
+  }
+
+  /* ============ 19. STUDENT ATTRIBUTION + LIMIT-BYPASS CLOSE ============ */
+  console.log('\n[19] نسبة نتائج الطلاب للمعلم وسد تجاوز الحدود');
+  {
+    // a fabricated slug can no longer produce an orphan result (or dodge the seat registry)
+    const ghost = await post('/api/exam/start', { examId: 'U1-T1', name: 'وهم', phone: '01090000001', slug: 'ghost404' });
+    ok('slug غير معروف في exam/start → 404 (لا نتائج يتيمة)', ghost.status === 404);
+    // an empty slug (root page "/") is resolved SERVER-SIDE to the owner teacher
+    const st0 = await jfetch('/api/admin/teachers/t_default_mostafa/stats', { headers: { Cookie: cookie } });
+    const beforeReg = st0.data.studentLimit.current;
+    const rootStart = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب الجذر', phone: '01090000009' });
+    ok('بدء من "/" (بلا slug) يُنسب خادومياً للمالك مع بيانات مقعد', rootStart.status === 200 && !!rootStart.data.students && rootStart.data.students.unlimited === true);
+    const tk = decodeToken(rootStart.data.token);
+    ok('توكن الجلسة يحمل slug المالك (مرجع خادومي)', tk.slug === 'mostafa');
+    await post('/api/exam/submit', { token: rootStart.data.token, answers: correctPositions('U1-T1', tk.seed) });
+    await new Promise(r => setTimeout(r, 800)); // waitUntil persist
+    const st1 = await jfetch('/api/admin/teachers/t_default_mostafa/stats', { headers: { Cookie: cookie } });
+    ok('نتيجة "/" تظهر في لوحة المالك وتستهلك مقعدًا (سجل خادومي)',
+      st1.data.recent.some(r => r.name === 'طالب الجذر') && st1.data.studentLimit.current === beforeReg + 1);
+    // a limited teacher's seat is enforced at START now (cannot be dodged by omitting the slug)
+    const mk19 = await post('/api/admin/teachers', { name: 'معلم مقاعد', slug: 'attr19', studentLimitUnlimited: false, studentLimit: 1, requirePhone: true }, { Cookie: cookie });
+    const s1 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب أول', phone: '01090000011', slug: 'attr19' });
+    const s2 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ثانٍ', phone: '01090000012', slug: 'attr19' });
+    ok('حد الطلاب يُطبَّق عند البدء (مقعد 1/1 → الثاني 429)', s1.status === 200 && s2.status === 429);
+    // a DISABLED teacher cannot even be resolved from the client slug
+    await jfetch('/api/admin/teachers/' + mk19.data.teacher.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'معلم مقاعد', slug: 'attr19', enabled: false, studentLimitUnlimited: false, studentLimit: 1 }) });
+    const sDis = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01090000013', slug: 'attr19' });
+    ok('معلم معطّل: بدء الامتحان 403', sDis.status === 403);
+    await jfetch('/api/admin/teachers/' + mk19.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 20. LOGIN THROTTLE (MUST BE LAST — locks out this dev instance) ============ */
+  console.log('\n[20] قفل المحاولات المتكررة (الأخير)');
+  {
+    let sawLock = false;
+    for (let i = 0; i < 12; i++) {
+      const r = await post('/api/t/login', { email: 'throttle@test.com', password: 'nope-nope-nope' });
+      if (r.status === 429) { sawLock = true; break; }
+    }
+    ok('دخول المعلم: قفل مؤقت بعد تكرار الفشل (429)', sawLock);
+    let sawLockA = false;
+    for (let i = 0; i < 12; i++) {
+      const r = await post('/api/admin/login', { email: 'throttle@test.com', password: 'nope-nope-nope' });
+      if (r.status === 429) { sawLockA = true; break; }
+    }
+    ok('دخول المسؤول: قفل مؤقت بعد تكرار الفشل (429)', sawLockA);
   }
 
   console.log('\n══════════════════════════════');
