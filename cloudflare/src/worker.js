@@ -848,6 +848,22 @@ function studentLimitOf(t) {
   if (t.studentLimitUnlimited !== false) return { unlimited: true, limit: null };
   return { unlimited: false, limit: sanitizeStudentLimit(t.studentLimit) };
 }
+function teacherAdminPayload(t) {
+  const sl = studentLimitOf(t);
+  return {
+    id: t.id, teacherCode: t.teacherCode || '', slug: t.slug, name: t.name,
+    email: t.email || '', username: t.username || '',
+    phone: t.phone || '', specialty: t.specialty || '', bio: t.bio || '',
+    photo: t.photo || '', socialLinks: t.socialLinks || {},
+    requirePhone: t.requirePhone !== false, enabled: t.enabled !== false,
+    archived: !!t.archived,
+    unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3,
+    offlineMode: t.offlineMode === true,
+    studentLimitUnlimited: sl.unlimited, studentLimit: sl.limit,
+    hasPassword: !!t.passHash,
+    createdAt: t.createdAt || '', updatedAt: t.updatedAt || ''
+  };
+}
 function teacherAdminSummary(t) {
   const sl = studentLimitOf(t);
   return {
