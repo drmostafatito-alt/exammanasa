@@ -200,3 +200,30 @@ npx wrangler deploy
 [✓] STRICT_KEYS نظيف · [✓] validate كامل · [✓] 185/185 + 115/115 + build idempotent · [✓] Chromium E2E 74/74
 [✓] موبايل 360×800 بلا overflow · [✓] RTL بلا mojibake (وحارس دائم ضده) · [✓] لا أسرار الإنتاج بالـrepo · [✓] Free-ready (dry-run 359KB)
 [✓] وثيقة التسليم هذه · [~] نطاق إنتاج حي: متعذر من بيئة معزولة بلا اعتماد Cloudflare — الـrunbook في §13 (صراحةً، لا ادعاء زائف)
+
+---
+
+## 15) حالة التسليم النهائية (صادقة، لا ادعاءات)
+
+**محليًا (مكتمل):** 4 commits على الفرع `arena/01a0916b-exammanasa` فوق `ef50b13` —
+`eb460ca` (أمان Worker) · `f38ee64` (إصلاحات UI) · `3574588` (اختبارات + harness متصفح) · `7a6195b` (توثيق) — تعمل جميعها مع:
+npm test **185/185** · ui-qa **115/115** · validate **PASS** · Psychology SHA **مطابق** · STRICT_KEYS **0** · build idempotent · browser E2E **74/74** · mobile RTL **PASS** · dry-run **✓** · شجرة العمل نظيفة.
+
+**GitHub:** انتهت صلاحية رمز الجلسة في بيئة التنفيذ عند مرحلة `git push` (عند بداية الجلسة كان يعمل: fetch + gh api نجحا).
+لذلك **لم يُدفع الفرع، ولم يُفتح PR، ولم يُدمج إلى main** من هنا — ولن أدّعي خلاف ذلك. بعد إعادة ربط GitHub في Arena، الإكمال سطرًا سطرًا (كل البوابات خُضعت بالفعل أعلاه):
+
+```bash
+cd exammanasa
+git push -u origin arena/01a0916b-exammanasa
+gh pr create --base main --head arena/01a0916b-exammanasa \
+  --title "Teacher platform FINAL: security hardening + isolation close + real-browser QA" \
+  --body-file PR_BODY.md            # نص الـPR الجاهز في PR_BODY.md
+gh pr checks --watch || true        # لا CI workflows في المستودع — البوابات المحلية هي الفحص
+gh pr merge --merge --delete-branch=false
+git fetch origin main:main && git rev-parse origin main   # يجب أن يعرض sha الدمج الجديد
+git status --porcelain                                    # فارغ = شجرة نظيفة
+```
+
+**قبل إعلان «Production Ready» نهائيًا:** نفّذ runbook §13 على حساب Cloudflare المالك، ثم أعد تشغيل
+`tools/browser-e2e.mjs` نفسه مقابل **رابط الإنتاج** (نفس المتصفح الحقيقي) — هذا هو البند الذي تعذّر تنفيذه
+من بيئة معزولة بلا اعتماد نشر، وهو مسجَّل هنا بصراحة حسب المطلوب.
