@@ -23,10 +23,12 @@ import BANKS from './data/banks.json';
 const SESSION_TTL_SECONDS = 6 * 3600;      // 6 ساعات — مطابق لتطبيق GAS
 const OFFLINE_TTL_SECONDS = 72 * 3600;     // 72 ساعة لجلسات معلمي وضع عدم الاتصال
 const ADMIN_SESSION_TTL = 8 * 3600;
+const TEACHER_SESSION_TTL = 8 * 3600;
 const RESERVED_SLUGS = new Set([
   'api', 'admin', 'assets', 'static', 'favicon.ico', 'favicon.svg', 'robots.txt',
   'index.html', 'admin.html', 'app.js', 'admin.js', 'styles.css', 'index.js',
-  'worker.js', 'wrangler.toml', 'wrangler.jsonc', 'src', 'public', 'docs', 'tests', 'www'
+  'worker.js', 'wrangler.toml', 'wrangler.jsonc', 'src', 'public', 'docs', 'tests', 'www',
+  'teacher', 'login', 'dashboard'
 ]);
 
 /* ============================ helpers ============================ */
@@ -221,6 +223,28 @@ async function handleApi(request, env, ctx, pathname) {
     return json({ teacher: teacherPublic(t) }, 200, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
   }
 
+
+  /* ---------- teacher auth: login ---------- */
+  if (pathname === '/api/t/login' && method === 'POST') {
+    return handleTeacherLogin(request, env);
+  }
+  /* ---------- teacher auth: session ---------- */
+  if (pathname === '/api/t/session' && method === 'GET') {
+    const session = await teacherCookiePayload(request, env);
+    if (!session) return fail('\u063a\u064a\u0631 \u0645\u0635\u0631\u062d.', 401);
+    const teachers = await getTeachers(env);
+    const t = teachers.find(x => x.id === session.tid);
+    if (!t || t.enabled === false || t.archived) return fail('\u062d\u0633\u0627\u0628 \u0627\u0644\u0645\u0639\u0644\u0645 \u063a\u064a\u0631 \u0645\u062a\u0627\u062d.', 403);
+    return json({ id: t.id, name: t.name, slug: t.slug });
+  }
+  /* ---------- teacher auth: logout ---------- */
+  if (pathname === '/api/t/logout' && method === 'POST') {
+    const res = json({ ok: true });
+    const headers = new Headers(res.headers);
+    headers.append('Set-Cookie', 'teacher_session=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0');
+    return new Response(res.body, { status: res.status, headers });
+  }
+
   /* ---------- student: start exam session ---------- */
   if (pathname === '/api/exam/start' && method === 'POST') {
     const body = await readJson(request);
@@ -236,7 +260,7 @@ async function handleApi(request, env, ctx, pathname) {
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
     const normPhone = normalizePhone(rawPhone);
     if (rawPhone && !isValidEgMobile(normPhone)) return fail('رقم الهاتف غير صالح. أدخل رقمًا مصريًا صحيحًا (01xxxxxxxxx).');
-    const slug = String(body.slug || '');
+    const slug = String(body.slug || '').toLowerCase();
     const teachers = await getTeachers(env);
     const teacher = teachers.find(x => x.slug === slug) || null;
     if (teacher && teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
@@ -423,7 +447,7 @@ async function handleApi(request, env, ctx, pathname) {
             let tlist = [];
             try { tlist = tprev ? JSON.parse(tprev) : []; } catch {}
             tlist.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage });
-            if (tlist.length > 100) tlist = tlist.slice(0, 100);
+            if (tlist.length > 200) tlist = tlist.slice(0, 200);
             await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(tlist)).catch(() => {});
           }
         }
@@ -452,6 +476,12 @@ async function handleApi(request, env, ctx, pathname) {
     ctx.waitUntil(persist());
     ctx.waitUntil(cache.put(dedupeUrl, new Response(responseJson, { headers: { 'Cache-Control': 'max-age=604800' } })).catch(() => {}));
     return json(response);
+  }
+
+
+  /* ============================ teacher API (authenticated) ============================ */
+  if (pathname.startsWith('/api/t/')) {
+    return handleTeacherAuthenticated(request, env, ctx, pathname);
   }
 
   /* ============================ admin ============================ */
@@ -598,7 +628,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     if (i === -1) return fail('المعلم غير موجود في الأرشيف.', 404);
     const t = archived[i];
     if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم حاليًا بواسطة معلم آخر — عدّل رابط المعلم الحالي أولًا.', 409);
-    delete t.archivedAt; t.enabled = false; t.updatedAt = new Date().toISOString();
+    delete t.archivedAt; delete t.archived; t.enabled = false; t.updatedAt = new Date().toISOString();
     archived.splice(i, 1);
     teachers.push(t);
     await kvPut(env, 'teachers', JSON.stringify(teachers));
@@ -607,15 +637,16 @@ async function handleAdmin(request, env, ctx, pathname) {
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
     const body = await readJson(request, 3 * 1024 * 1024);
-    const t = sanitizeTeacher(body, null);
+    const t = await sanitizeTeacher(body, null, env);
     const teachers = await getTeachers(env);
     if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
     t.id = 't_' + randomHex(6);
+    t.teacherCode = 'TCH-' + String(teachers.length + 1).padStart(4, '0');
     t.createdAt = new Date().toISOString();
     t.updatedAt = t.createdAt;
     teachers.push(t);
     await kvPut(env, 'teachers', JSON.stringify(teachers));
-    return json({ ok: true, teacher: t });
+    return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   /* ---------- teacher dashboard (per-teacher results index) ---------- */
   const statsMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/stats$/);
@@ -650,15 +681,16 @@ async function handleAdmin(request, env, ctx, pathname) {
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     if (method === 'PUT') {
       const body = await readJson(request, 3 * 1024 * 1024);
-      const t = sanitizeTeacher(body, teachers[idx]);
+      const t = await sanitizeTeacher(body, teachers[idx], env);
       if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
       t.id = teachers[idx].id;
+      t.teacherCode = teachers[idx].teacherCode || ('TCH-' + String(idx + 1).padStart(4, '0'));
       t.createdAt = teachers[idx].createdAt;
       t.updatedAt = new Date().toISOString();
       if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
       teachers[idx] = t;
       await kvPut(env, 'teachers', JSON.stringify(teachers));
-      return json({ ok: true, teacher: t });
+      return json({ ok: true, teacher: teacherAdminPayload(t) });
     }
     if (method === 'DELETE') {
       // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
@@ -666,11 +698,27 @@ async function handleAdmin(request, env, ctx, pathname) {
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
       const [removed] = teachers.splice(idx, 1);
       const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
-      archived.unshift({ ...removed, enabled: false, archivedAt: new Date().toISOString() });
+      archived.unshift({ ...removed, enabled: false, archived: true, archivedAt: new Date().toISOString() });
       await kvPut(env, 'teachers:archived', JSON.stringify(archived.slice(0, 200)));
       await kvPut(env, 'teachers', JSON.stringify(teachers));
       return json({ ok: true, archived: true });
     }
+  }
+
+  /* ---------- admin: reset teacher password ---------- */
+  const resetPwMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/password$/);
+  if (resetPwMatch && method === 'POST') {
+    const teachers = await getTeachers(env);
+    const idx = teachers.findIndex(x => x.id === resetPwMatch[1]);
+    if (idx === -1) return fail('\u0627\u0644\u0645\u0639\u0644\u0645 \u063a\u064a\u0631 \u0645\u0648\u062c\u0648\u062f.', 404);
+    const body = await readJson(request);
+    const newPassword = String(body.password || '');
+    if (newPassword.length < 8) return fail('\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 8 \u0623\u062d\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.');
+    const salt = randomHex(16);
+    const hash = await pbkdf2(newPassword, salt);
+    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    return json({ ok: true });
   }
 
   /* ---------- question bank (admin sees keys) ---------- */
@@ -719,7 +767,7 @@ async function handleAdmin(request, env, ctx, pathname) {
   return fail('المسار غير موجود.', 404);
 }
 
-function sanitizeTeacher(body, existing) {
+async function sanitizeTeacher(body, existing, env) {
   const name = String(body.name || '').trim();
   if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
@@ -748,8 +796,30 @@ function sanitizeTeacher(body, existing) {
   if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
   // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
   // أي قيم colors قادمة من الطلب تُتجاهل ولا تُخزَّن.
+  let email = String(body.email || '').trim().toLowerCase();
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) throw bad('البريد الإلكتروني غير صالح.');
+  let username = String(body.username || '').trim().toLowerCase();
+  if (username && !/^[a-z0-9][a-z0-9_.-]{1,29}$/.test(username)) throw bad('اسم المستخدم غير صالح.');
+  if (email || username) {
+    const teachers = env ? await getTeachers(env).catch(() => []) : [];
+    if (email && teachers.some((x, i) => (!existing || x.id !== existing.id) && x.email && x.email.toLowerCase() === email))
+      throw bad('البريد الإلكتروني مستخدم بالفعل.');
+    if (username && teachers.some((x, i) => (!existing || x.id !== existing.id) && x.username && x.username.toLowerCase() === username))
+      throw bad('اسم المستخدم مستخدم بالفعل.');
+  }
+  let passHash = existing?.passHash || '';
+  let passSalt = existing?.passSalt || '';
+  let passIterations = existing?.passIterations || 120000;
+  if (body.password && String(body.password).length >= 8) {
+    passSalt = randomHex(16);
+    passHash = await pbkdf2(String(body.password), passSalt);
+    passIterations = 120000;
+  } else if (body.password && String(body.password).length > 0 && String(body.password).length < 8) {
+    throw bad('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
+  }
+
   return {
-    slug, name, phone,
+    slug, name, phone, email, username, passHash, passSalt, passIterations,
     specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
     bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
@@ -907,6 +977,12 @@ export default {
 
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         return securityHeaders(fail('الطريقة غير مسموح بها.', 405));
+      }
+
+      // teacher SPA: /teacher (login + dashboard)
+      if (pathname === '/teacher' || pathname === '/teacher/' || pathname.startsWith('/teacher/')) {
+        const res = await env.ASSETS.fetch(new URL('https://assets.internal/teacher.html'));
+        return securityHeaders(new Response(res.body, { status: 200, headers: res.headers }));
       }
 
       // student SPA: / or /:slug ; admin SPA: /admin
