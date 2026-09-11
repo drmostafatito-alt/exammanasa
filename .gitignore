@@ -6,3 +6,7 @@ node_modules/
 
 # local scratch
 /tmp/
+
+# QA screenshot artifacts (browser-e2e)
+tools/shots/
+node_modules/
