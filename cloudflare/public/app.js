@@ -11,7 +11,7 @@
 
   /* ---------------- الحالة ---------------- */
   var S = {
-    slug: '', teacher: null, catalog: null, exams: null,
+    slug: '', teacher: null, catalog: null, exams: null, settings: null,
     view: 'home', // home | student | subject | topic | exam | quiz | result
     sub: null, term: 1, topicKey: null, lessonKey: null, // الموضوع/الدرس الحالي (الفلسفة والمنطق)
     examId: null, session: null,
@@ -23,6 +23,57 @@
     scrollTo: null      // قسم للتمرير إليه بعد رسم الرئيسية
   };
 
+  /* ---------------- المظهر (ألوان قابلة للتحكم من الإدارة) ---------------- */
+  function hexToRgb(h) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim());
+    if (!m) m = /^#?([0-9a-f]{3})$/i.exec(String(h || '').trim());
+    if (!m) return null;
+    var x = m[1];
+    if (x.length === 3) x = x[0] + x[0] + x[1] + x[1] + x[2] + x[2];
+    return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)];
+  }
+  function rgbToHex(r, g, b) {
+    return '#' + [r, g, b].map(function (n) { n = Math.max(0, Math.min(255, Math.round(n))); return n.toString(16).padStart(2, '0'); }).join('');
+  }
+  function mixHex(a, b, t) { // t: 0 = a, 1 = b
+    var ca = hexToRgb(a), cb = hexToRgb(b);
+    if (!ca || !cb) return a;
+    return rgbToHex(ca[0] + (cb[0] - ca[0]) * t, ca[1] + (cb[1] - ca[1]) * t, ca[2] + (cb[2] - ca[2]) * t);
+  }
+  function shadeHex(hex, t) { // t > 0 → نحو الأبيض، t < 0 → نحو الأسود
+    var c = hexToRgb(hex);
+    if (!c) return hex;
+    var target = t > 0 ? 255 : 0, k = Math.abs(t);
+    return rgbToHex(c[0] + (target - c[0]) * k, c[1] + (target - c[1]) * k, c[2] + (target - c[2]) * k);
+  }
+  function applyTheme(ap) {
+    if (!ap) return;
+    var root = document.documentElement, set = function (k, v) { root.style.setProperty(k, v); };
+    var primary = ap.primary || '#1E56C8', accent = ap.accent || '#C99A2E', bg = ap.background || '#F5F7FD', text = ap.text || '#1B2540', button = ap.button || primary;
+    set('--primary', primary);
+    set('--primary-deep', shadeHex(primary, -0.18));
+    set('--primary-ink', shadeHex(primary, -0.42));
+    set('--primary-soft', mixHex(primary, '#ffffff', 0.9));
+    set('--primary-soft-2', mixHex(primary, '#ffffff', 0.78));
+    set('--gold', accent);
+    set('--gold-deep', shadeHex(accent, -0.18));
+    set('--gold-soft', mixHex(accent, '#ffffff', 0.88));
+    set('--accent', accent);
+    set('--accent-2', shadeHex(accent, -0.18));
+    set('--bg', bg);
+    set('--bg-2', shadeHex(bg, -0.035));
+    set('--lav', mixHex(primary, bg, 0.85));
+    set('--ink', text);
+    set('--muted', mixHex(text, bg, 0.45));
+    set('--muted-2', mixHex(text, bg, 0.62));
+    set('--line', mixHex(text, bg, 0.14));
+    set('--line-strong', mixHex(text, bg, 0.26));
+    set('--button', button);
+    set('--button-deep', shadeHex(button, -0.15));
+    var meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute('content', bg);
+  }
+
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
@@ -31,6 +82,64 @@
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
   function smoothScroll(el) { try { if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { } }
 
+  /* ظهور ناعم متدرج — يُحترم تفضيل تقليل الحركة عبر CSS */
+  var revealObs = null;
+  function observeReveals() {
+    if (!('IntersectionObserver' in window)) { var all = document.querySelectorAll('.reveal'); for (var i = 0; i < all.length; i++) all[i].classList.add('in'); return; }
+    if (!revealObs) {
+      revealObs = new IntersectionObserver(function (entries) {
+        entries.forEach(function (en) {
+          if (en.isIntersecting) { en.target.classList.add('in'); revealObs.unobserve(en.target); }
+        });
+      }, { threshold: 0.12 });
+    }
+    var els = document.querySelectorAll('.reveal:not(.in)');
+    for (var j = 0; j < els.length; j++) revealObs.observe(els[j]);
+  }
+
+  /* ---------------- شريط التنقل السفلي (هاتف) ---------------- */
+  var BOTTOM_NAV = [
+    { key: 'home', label: 'الرئيسية', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>' },
+    { key: 'subjects', label: 'الامتحانات', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7"/><path d="M9 11h7"/></svg>' },
+    { key: 'about', label: 'عن المعلم', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>' },
+    { key: 'contact', label: 'تواصل', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2z"/></svg>' }
+  ];
+  var activeBottomKey = 'home';
+  function bottomNav(key) {
+    var el = $('bottomnav');
+    if (!el) return;
+    if (key) activeBottomKey = key;
+    var bars = el.querySelectorAll('.bn-item');
+    for (var i = 0; i < bars.length; i++) {
+      var it = bars[i];
+      var k = it.getAttribute('data-key');
+      if (k === activeBottomKey) it.classList.add('active'); else it.classList.remove('active');
+      it.setAttribute('aria-current', k === activeBottomKey ? 'page' : 'false');
+    }
+    var onHome = S.view === 'home';
+    el.classList.toggle('hidden', !onHome);
+    document.body.classList.toggle('has-bottomnav', onHome);
+    /* إخفاء عناصر عن "المعلم" و"تواصل" إذا لم يوجد محتوى حقيقي لها */
+    var t = S.teacher;
+    var links = socialLinksOf(t);
+    var aboutItem = el.querySelector('.bn-item[data-key="about"]');
+    var contactItem = el.querySelector('.bn-item[data-key="contact"]');
+    if (aboutItem) aboutItem.style.display = (t && (t.bio || t.specialty)) ? '' : 'none';
+    if (contactItem) contactItem.style.display = links.length ? '' : 'none';
+    if (activeBottomKey === 'about' && (!t || (!t.bio && !t.specialty))) activeBottomKey = 'home';
+    if (activeBottomKey === 'contact' && !links.length) activeBottomKey = 'home';
+    var bars2 = el.querySelectorAll('.bn-item');
+    for (var j = 0; j < bars2.length; j++) {
+      var it2 = bars2[j];
+      var k2 = it2.getAttribute('data-key');
+      if (k2 === activeBottomKey) it2.classList.add('active'); else it2.classList.remove('active');
+    }
+  }
+  function bnHome() { navTo('top'); bottomNav('home'); }
+  function bnSubjects() { scrollToSubjects(); bottomNav('subjects'); }
+  function bnAbout() { var el = $('about'); if (el) smoothScroll(el); bottomNav('about'); }
+  function bnContact() { var el = $('contact'); if (el) smoothScroll(el); bottomNav('contact'); }
+
   var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   var CAP_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 8l11 5 9-4.09V15h2V8L12 3zm-7 9.18V16c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.18-7-3.18z"/></svg>';
   var WARN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5"/><circle cx="12" cy="16.6" r=".5" fill="currentColor"/><path d="M10.3 3.6 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>';
@@ -38,7 +147,8 @@
   var SOCIAL_DEFS = [
     ['whatsapp', 'واتساب', 'M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5 13.6c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3.3-1s-3.8-3.6-4-3.9c-.1-.3-.8-1.2-.8-2.3s.6-1.6.8-1.8c.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .6.4l.8 1.9c.1.2.1.4 0 .6l-.4.5c-.1.2-.3.3-.1.6.2.3.7 1.1 1.4 1.8 1 .9 1.8 1.2 2.1 1.3.2.1.4.1.6-.1l.8-.9c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.4.3.1.2.1.8-.1 1.4z'],
     ['facebook', 'فيسبوك', 'M13 22v-8h3l.5-4H13V8c0-1.1.3-1.9 2-1.9h1.6V2.6C16.3 2.5 15.1 2.4 13.8 2.4 10.9 2.4 9 4.1 9 7.5V10H6v4h3v8h4z'],
-    ['tiktok', 'تيك توك', 'M16.6 5.8c.9 1 2.1 1.6 3.4 1.7v-3a4.9 4.9 0 01-3.4-2.1 5 5 0 01-.9-2.4h-3v13.6a2.8 2.8 0 11-2.8-2.8c.3 0 .6 0 .9.1V8.8a6 6 0 00-.9-.1 5.9 5.9 0 105.9 5.9V9.7c1.1.9 2.4 1.4 3.8 1.5V8.2c-.5 0-1-.1-1.4-.2-.8-.3-1.5-.7-2-1.3l-.6-.9z']
+    ['tiktok', 'تيك توك', 'M16.6 5.8c.9 1 2.1 1.6 3.4 1.7v-3a4.9 4.9 0 01-3.4-2.1 5 5 0 01-.9-2.4h-3v13.6a2.8 2.8 0 11-2.8-2.8c.3 0 .6 0 .9.1V8.8a6 6 0 00-.9-.1 5.9 5.9 0 105.9 5.9V9.7c1.1.9 2.4 1.4 3.8 1.5V8.2c-.5 0-1-.1-1.4-.2-.8-.3-1.5-.7-2-1.3l-.6-.9z'],
+    ['youtube', 'يوتيوب', 'M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12l-6.2 3.6z']
   ];
 
   /* ---------------- البيانات ---------------- */
@@ -60,13 +170,15 @@
 
   function loadAll() {
     S.slug = teacherSlugFromPath();
-    var jobs = [api('/api/catalog')];
+    var jobs = [api('/api/catalog'), api('/api/settings').catch(function () { return null; })];
     if (S.slug) jobs.push(api('/api/teacher/' + S.slug).then(function (d) { return d.teacher; }).catch(function () { return null; }));
     return Promise.all(jobs).then(function (res) {
       S.catalog = res[0].catalog;
       S.exams = res[0].exams;
+      S.settings = res[1] || null;
+      if (S.settings && S.settings.appearance) applyTheme(S.settings.appearance);
       // في الصفحة الرئيسية نعرض مالك المنصة (المعلم الافتراضي) من بيانات فعلية
-      S.teacher = S.slug ? (res[1] || null) : (res[0].owner || null);
+      S.teacher = S.slug ? (res[2] || null) : (res[0].owner || null);
       if (S.slug && !S.teacher) { renderTeacherUnavailable(); return; }
       try {
         var raw = sessionStorage.getItem('exammanasa_student');
@@ -91,25 +203,39 @@
 
   function renderBrand() {
     var t = S.teacher;
-    // الهوية ديناميكية بالكامل من بيانات المعلم الحالي — الغلاف الثابت محايد
-    // (لا اسم معلم ثابت في title/meta/الهوية/footer إطلاقًا)
-    document.title = t ? (t.name + ' — منصة الامتحانات') : 'منصة الامتحانات';
+    var st = (S.settings && S.settings.identity) || {};
+    var hp = (S.settings && S.settings.homepage) || {};
+    var platformName = st.platformName || 'منصة الامتحانات';
+    var shortDesc = st.shortDescription || 'الفلسفة والمنطق · علم النفس';
+    var logo = st.logo || '';
+    // هوية الشريط يمين = هوية المعلم الحقيقي (صفحة المعلم)، واسم المنصة/الشعار
+    // القابلان للتحكم يظهران في العنوان والوصف والتذييل وصفحات الدخول — لا اسم
+    // معلم ثابت في أي غلاف.
+    document.title = t ? (t.name + ' — ' + platformName) : platformName;
     var metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute('content', t
-      ? (t.name + ' — منصة الامتحانات الإلكترونية: اختبر نفسك وقيّم مستواك في الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي.')
-      : 'منصة الامتحانات الإلكترونية — اختبر نفسك وقيّم مستواك في الفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: امتحانات منظمة حسب الوحدات والموضوعات، درجتك فورًا، ومراجعة كاملة لإجاباتك.');
-    $('brandName').textContent = t ? t.name : 'منصة الامتحانات';
-    $('brandSub').textContent = t ? (t.specialty || 'اختبارات المنهج الرسمي') : 'الفلسفة والمنطق · علم النفس';
-    var logo = $('brandLogo');
-    if (t && t.photo) logo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
-    else logo.textContent = monogramOf(t ? t.name : 'منصة الامتحانات');
+      ? (t.name + ' — ' + platformName + ': ' + (hp.heroSubtitle || shortDesc))
+      : (platformName + ' — ' + (hp.heroSubtitle || shortDesc)));
+    $('brandName').textContent = t ? t.name : platformName;
+    $('brandSub').textContent = t ? (t.specialty || shortDesc) : shortDesc;
+    var logoEl = $('brandLogo');
+    if (t && t.photo) logoEl.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
+    else if (logo) logoEl.innerHTML = '<img src="' + esc(logo) + '" alt="">';
+    else logoEl.textContent = monogramOf(t ? t.name : platformName);
     var footBrand = document.getElementById('footBrand');
-    if (footBrand) footBrand.innerHTML = t
-      ? ('منصة الامتحانات الإلكترونية — <b>' + esc(t.name) + '</b>')
-      : 'منصة الامتحانات الإلكترونية';
+    if (footBrand) footBrand.innerHTML = platformName + (t ? ' — <b>' + esc(t.name) + '</b>' : '');
+    var footSub = document.getElementById('footSub');
+    if (footSub) footSub.textContent = shortDesc;
+    var footCopy = document.getElementById('footCopy');
+    if (footCopy) footCopy.textContent = 'جميع الحقوق محفوظة © ' + new Date().getFullYear() + ' — ' + platformName;
     // أيقونات التواصل في الشريط العلوي — روابط فعلية فقط (لا أيقونات وهمية)
     var links = socialLinksOf(t);
     $('topSocials').innerHTML = links.map(function (l) {
+      return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '" title="' + l.label + '">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
+    }).join('');
+    var footSocial = $('footSocial');
+    if (footSocial) footSocial.innerHTML = links.map(function (l) {
       return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '" title="' + l.label + '">' +
         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
     }).join('');
@@ -117,6 +243,17 @@
     if (navContact) {
       if (links.length) { navContact.hidden = false; navContact.classList.remove('hidden'); }
       else { navContact.hidden = true; navContact.classList.add('hidden'); }
+    }
+    var footContact = $('footContact');
+    if (footContact) {
+      if (links.length) { footContact.hidden = false; footContact.classList.remove('hidden'); }
+      else { footContact.hidden = true; footContact.classList.add('hidden'); }
+    }
+    var footLogo = $('footLogo');
+    if (footLogo) {
+      if (t && t.photo) footLogo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
+      else if (logo) footLogo.innerHTML = '<img src="' + esc(logo) + '" alt="">';
+      else footLogo.textContent = monogramOf(t ? t.name : platformName);
     }
   }
 
@@ -186,16 +323,17 @@
 
   /* ---------------- تنقل الشريط العلوي ---------------- */
   function navTo(target) {
+    var keyMap = { top: 'home', subjects: 'subjects', about: 'about', contact: 'contact' };
     if (S.view === 'home') {
-      if (target === 'top') { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { } return; }
+      if (target === 'top') { try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { } bottomNav('home'); return; }
       var el = $(target);
-      if (el) { smoothScroll(el); return; }
+      if (el) { smoothScroll(el); bottomNav(keyMap[target] || 'home'); return; }
     }
     S.scrollTo = target; // يُنفذ بعد رسم الرئيسية
     if (location.hash === '#/' || location.hash === '') { S.view = 'home'; renderHome(); }
     else go('#/');
   }
-  function scrollToSubjects() { var el = $('subjects'); if (el) smoothScroll(el); }
+  function scrollToSubjects() { var el = $('subjects'); if (el) smoothScroll(el); bottomNav('subjects'); }
 
   /* ---------------- بيانات الصفوف (أرقام فعلية من الفهرس) ---------------- */
   function countExams(subjectId) {
@@ -229,7 +367,10 @@
   function renderHome() {
     var cat = S.catalog;
     var t = S.teacher;
-    var year = cat.philosophy.academicYear;
+    var st = (S.settings && S.settings.identity) || {};
+    var hp = (S.settings && S.settings.homepage) || {};
+    var sec = (S.settings && S.settings.sections) || {};
+    var year = st.academicYear || cat.philosophy.academicYear || '';
     var links = socialLinksOf(t);
     var photo = (t && t.photo)
       ? '<img src="' + esc(t.photo) + '" alt="صورة ' + esc(t.name) + '">'
@@ -239,64 +380,86 @@
     var waUrl = '';
     links.forEach(function (l) { if (l.key === 'whatsapp' && !waUrl) waUrl = l.url; });
 
+    var heroTitle = hp.heroTitle || 'اختبر نفسك';
+    var heroAccent = hp.heroTitleAccent || 'وقيّم مستواك!';
+    var heroSubtitle = hp.heroSubtitle || '';
+    var chip1 = hp.chip1 || '';
+    var chip2 = hp.chip2 || '';
+    var floatChip = hp.floatChip || 'تصحيح فوري';
+    var ctaLabel = hp.ctaLabel || 'ابدأ الامتحان الآن';
+    var waCta = hp.whatsappCtaLabel || 'تواصل عبر واتساب';
+
+    /* الشريط العلوي (badge) = هوية المنصة/المنهج — منفصل تمامًا عن نبذة المعلم */
+    var badgeText = hp.badgeText || st.platformName || 'منصة الامتحانات';
+    var bio = t && t.bio ? String(t.bio).trim() : '';
+
+    /* بطاقة الهوية داخل الـ Hero (الاسم/التخصص/المنهج/الشارات) */
+    var heroBody =
+      '<h1>' + esc(t ? t.name : 'منصة الامتحانات التعليمية') + '</h1>' +
+      (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
+      '<p class="hero-tagline">' + esc(heroTitle) + (heroAccent ? ' <em>' + esc(heroAccent) + '</em>' : '') + '</p>' +
+      (heroSubtitle ? '<p class="lead">' + esc(heroSubtitle) + '</p>' : '') +
+      '<div class="hero-ctas">' +
+      '<button class="btn" onclick="go(\'#/start\')">' + esc(ctaLabel) + '</button>' +
+      (waUrl ? '<a class="btn wa" href="' + esc(waUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(waCta) + '</a>' : '') +
+      '</div>' +
+      (chip1 || chip2 ? '<div class="hero-chips">' +
+        (chip1 ? '<span class="chip">' + esc(chip1) + '</span>' : '') +
+        (chip2 ? '<span class="chip">' + esc(chip2) + '</span>' : '') +
+        '</div>' : '');
+
     var html =
-      '<section class="hero">' +
+      '<section class="hero reveal in">' +
       '<div class="hero-media">' +
       '<div class="blob"></div><div class="ring"></div>' +
       '<div class="photo">' + photo + '</div>' +
       '<div class="photo-badge">' + CAP_SVG + '</div>' +
-      '<div class="float-chip">' + CHECK_SVG + ' تصحيح فوري</div>' +
+      '<div class="float-chip">' + CHECK_SVG + ' ' + esc(floatChip) + '</div>' +
       '</div>' +
       '<div class="hero-body">' +
-      '<span class="kicker">' + CAP_SVG + ' منصة الامتحانات الإلكترونية — ' + esc(year) + '</span>' +
-      '<h1>اختبر نفسك <em>وقيّم مستواك!</em></h1>' +
-      '<p class="lead">منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: امتحانات منظمة حسب الصفوف والوحدات والموضوعات، درجتك فورًا بعد التسليم، ومراجعة كاملة لإجاباتك.</p>' +
-      '<div class="hero-chips">' +
-      '<span class="chip">اختبارات وفق <em>المنهج الرسمي</em></span>' +
-      '<span class="chip">تصحيح فوري ومراجعة الإجابات</span>' +
+      '<span class="chip">' + CAP_SVG + ' ' + esc(badgeText) + (year ? ' — ' + esc(year) : '') + '</span>' +
+      heroBody +
       '</div>' +
-      '<div class="hero-ctas">' +
-      '<button class="btn" onclick="go(\'#/start\')">ابدأ الامتحان الآن</button>' +
-      (waUrl ? '<a class="btn wa" href="' + esc(waUrl) + '" target="_blank" rel="noopener noreferrer">تواصل عبر واتساب</a>' : '') +
-      '</div>' +
-      (links.length ? socialRowHtml(links) : '') +
-      '</div>' +
-      '<div class="hero-grades">' +
-      gradeMini(g1) + gradeMini(g2) +
-      '</div>' +
-      '</section>' +
+      '</section>';
 
-      '<div class="section-title" id="subjects"><h3>اختر صفك للبدء</h3></div>' +
+    /* المميزات — قبل النبذة والصفوف كما في الترتيب المطلوب */
+    if (sec.showFeatures !== false) {
+      html += '<section class="section-title" id="features"><h3>' + esc(hp.featuresTitle || 'لماذا المنصة؟') + '</h3></section>' +
+        '<div class="features">' +
+        '<div class="feature reveal" style="--d:0ms"><div class="fi f1">📚</div><h3>' + esc(hp.feature1Title || 'امتحانات منظمة') + '</h3><p>' + esc(hp.feature1Text || '') + '</p></div>' +
+        '<div class="feature reveal" style="--d:70ms"><div class="fi f2">📊</div><h3>' + esc(hp.feature2Title || 'نتيجتك فورًا') + '</h3><p>' + esc(hp.feature2Text || '') + '</p></div>' +
+        '<div class="feature reveal" style="--d:140ms"><div class="fi f3">📝</div><h3>' + esc(hp.feature3Title || 'مراجعة الإجابات') + '</h3><p>' + esc(hp.feature3Text || '') + '</p></div>' +
+        '<div class="feature reveal" style="--d:210ms"><div class="fi f4">📱</div><h3>' + esc(hp.feature4Title || 'اعمل من أي جهاز') + '</h3><p>' + esc(hp.feature4Text || '') + '</p></div>' +
+        '</div>';
+    }
+
+    /* نبذة المعلم — قسم واضح بعد المميزات وقبل الصفوف (منفصل عن هوية المنصة) */
+    if (bio) {
+      html += '<section class="section-title" id="about"><h3>' + esc(hp.aboutTitle || 'نبذة عن المعلم') + '</h3></section>' +
+        '<div class="card about-card reveal">' +
+        '<div class="photo">' + photo + '</div>' +
+        '<div class="abody">' +
+        '<h3>' + esc(t.name) + '</h3>' +
+        (t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
+        '<p class="bio">' + esc(bio) + '</p>' +
+        (sec.showSocials !== false && links.length ? socialRowHtml(links) : '') +
+        '</div>' +
+        '</div>';
+    } else if (t) {
+      html += '<div id="about"></div>';
+    }
+
+    /* الصفوف/المواد — بطاقات كبيرة أنيقة */
+    html += '<section class="section-title" id="subjects"><h3>' + esc(hp.subjectsTitle || 'اختر صفك للبدء') + '</h3></section>' +
       '<div class="grid two">' +
-      gradeCard(g1) + gradeCard(g2) +
-      '</div>' +
-
-      '<div class="section-title" id="features"><h3>لماذا منصة الامتحانات؟</h3></div>' +
-      '<div class="features">' +
-      '<div class="feature"><div class="fi f1">📚</div><h3>امتحانات منظمة</h3><p>امتحانات مرتبة حسب الصف والوحدات والموضوعات وفق المنهج الرسمي.</p></div>' +
-      '<div class="feature"><div class="fi f2">📊</div><h3>نتيجتك فورًا</h3><p>اعرف درجتك ونسبتك المئوية مباشرة بعد تسليم الامتحان.</p></div>' +
-      '<div class="feature"><div class="fi f3">📝</div><h3>مراجعة الإجابات</h3><p>راجع إجاباتك الصحيحة والخاطئة سؤالًا بسؤال بعد التسليم.</p></div>' +
-      '</div>' +
-
-      '<div class="section-title" id="about"><h3>عن المعلم والمنصة</h3></div>' +
-      '<div class="card about-card">' +
-      '<div class="photo">' + photo + '</div>' +
-      '<div class="abody">' +
-      '<h3>' + (t ? esc(t.name) : 'منصة الامتحانات التعليمية') + '</h3>' +
-      (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
-      (t && t.bio ? '<p class="bio">' + esc(t.bio) + '</p>' : '') +
-      '<div class="hero-chips">' +
-      '<span class="chip">' + esc(year) + '</span>' +
-      '<span class="chip">الفلسفة والمنطق — الصف الأول الثانوي</span>' +
-      '<span class="chip">علم النفس — الصف الثاني الثانوي</span>' +
-      '</div>' +
-      (links.length ? socialRowHtml(links) : '') +
-      '</div>' +
+      '<div class="reveal" style="--d:0ms">' + gradeCard(g1) + '</div>' +
+      '<div class="reveal" style="--d:90ms">' + gradeCard(g2) + '</div>' +
       '</div>';
 
-    if (links.length) {
-      html += '<div class="section-title" id="contact"><h3>تواصل معنا</h3></div>' +
-        '<div class="card" style="padding:26px">' +
+    /* تواصل معنا — أزرار فعلية فقط */
+    if (sec.showContact !== false && links.length) {
+      html += '<section class="section-title" id="contact"><h3>' + esc(hp.contactTitle || 'تواصل معنا') + '</h3></section>' +
+        '<div class="card reveal" style="padding:26px">' +
         '<div class="social-big">' +
         links.map(function (l) {
           return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' +
@@ -304,7 +467,10 @@
         }).join('') +
         '</div></div>';
     }
+
     app.innerHTML = html;
+    observeReveals();
+    bottomNav(activeBottomKey);
 
     if (S.scrollTo) {
       var target = S.scrollTo; S.scrollTo = null;
@@ -318,14 +484,6 @@
       return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' +
         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg>' + l.label + '</a>';
     }).join('') + '</div>';
-  }
-
-  function gradeMini(g) {
-    return '<div class="grade-mini" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
-      '<div class="gi ' + g.cls + '">' + g.icon + '</div>' +
-      '<div class="gt"><div class="g1">' + esc(g.grade) + '</div><div class="g2">' + esc(g.subject) + '</div></div>' +
-      '<span class="ga">‹</span>' +
-      '</div>';
   }
 
   function gradeCard(g) {
@@ -974,7 +1132,8 @@
       }).join('');
     app.innerHTML = html;
     try { window.scrollTo({ top: 0 }); } catch (e) { }
-    document.title = 'النتيجة: ' + r.score + ' من ' + r.total + ' — منصة الامتحانات';
+    var pName = (S.settings && S.settings.identity && S.settings.identity.platformName) || 'منصة الامتحانات';
+    document.title = 'النتيجة: ' + r.score + ' من ' + r.total + ' — ' + pName;
   }
 
   function filterResult(f) { S.resultFilter = f; renderResult(); }
@@ -992,6 +1151,11 @@
   window.renderBrand = renderBrand;
   window.renderHome = renderHome;
   window.navTo = navTo;
+  window.bottomNav = bottomNav;
+  window.bnHome = bnHome;
+  window.bnSubjects = bnSubjects;
+  window.bnAbout = bnAbout;
+  window.bnContact = bnContact;
   window.scrollToSubjects = scrollToSubjects;
   window.startWithGrade = startWithGrade;
   window.renderSubject = renderSubject;

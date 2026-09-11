@@ -103,7 +103,7 @@ console.log('\n[2] الواجهة الرئيسية (Hero) — تكوين الم�
 {
   const html = doc.getElementById('app').innerHTML;
   const W = dom.window;
-  ok('عنوان رئيسي قوي: «اختبر نفسك وقيّم مستواك!»', !!doc.querySelector('.hero h1') && doc.querySelector('.hero h1').textContent.includes('اختبر نفسك'));
+  ok('اسم المعلم هو العنوان الرئيسي + شعار «اختبر نفسك وقيّم مستواك!»', !!doc.querySelector('.hero h1') && doc.querySelector('.hero h1').textContent.includes(catalog.owner.name) && !!doc.querySelector('.hero .hero-tagline') && doc.querySelector('.hero .hero-tagline').textContent.includes('اختبر نفسك'));
   ok('وصف مهني قصير للمنصة (بلا ادعاءات)', !!doc.querySelector('.hero .lead') && doc.querySelector('.hero .lead').textContent.includes('وفق المنهج الرسمي'));
   ok('صورة المعلم كبيرة في الجهة اليمنى (عمود media أول الشبكة)', !!doc.querySelector('.hero .hero-media .photo') && /grid-template-areas:\s*"media body"/.test(css));
   ok('أشكال زخرفية تعليمية حول الصورة (blob/ring/badge/شارة عائمة)', !!doc.querySelector('.hero .blob') && !!doc.querySelector('.hero .ring') && !!doc.querySelector('.hero .photo-badge') && !!doc.querySelector('.hero .float-chip'));
@@ -128,9 +128,9 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
   const phTrainings = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.reduce((k, tp) => k + tp.lessons.reduce((z, l) => z + l.trainings.length, 0), 0), 0), 0);
   const phTopics = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.length, 0), 0);
   ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعًا و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعًا') && phTrainings === 44 && phExams > phTrainings);
-  ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات',
-    doc.querySelectorAll('.feature').length === 3 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات'));
-  ok('قسم «عن المعلم والمنصة» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
+  ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات/اعمل من أي جهاز',
+    doc.querySelectorAll('.feature').length === 4 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات') && html.includes('اعمل من أي جهاز'));
+  ok('قسم «نبذة عن المعلم» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
   ok('صورة المعلم حاضرة بصريًا في قسم عن المعلم', !!doc.querySelector('.about-card .photo'));
   ok('لا إحصاءات مزيفة (عدد طلاب/شهادات/تقييمات)', !/\d+\s*(طالب|شاهد|تقييم|شهادة)/.test(html));
   ok('لا قيم undefined/null مسربة', !/\bundefined\b/.test(html) && !/>null</.test(html));
@@ -456,9 +456,9 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
 {
   const used = renderedClasses;
   ['lesson comp', 'lno', 'linfo', 'lt', 'ls', 'lgo', 'comp-badge', 'final-comp', 'unit-card', 'unit-head', 'uno', 'chapter', 'ch-title',
-   'grade-mini', 'grade-card', 'grade-opt sel', 'gcheck', 'gstats', 'stu-sum', 'sn', 'sp', 'linkbtn', 'hero-media', 'blob', 'ring',
-   'photo-badge', 'float-chip', 'hero-body', 'hero-grades', 'kicker', 'lead', 'hero-chips', 'hero-ctas', 'features', 'feature',
-   'fi f1', 'fi f2', 'fi f3', 'about-card', 'abody', 'specialty', 'bio', 'social-row', 'social-big', 'grade-pick', 'mainnav', 'socials',
+   'grade-card', 'grade-opt sel', 'gcheck', 'gstats', 'stu-sum', 'sn', 'sp', 'linkbtn', 'hero-media', 'blob', 'ring',
+   'photo-badge', 'float-chip', 'hero-body', 'kicker', 'lead', 'hero-chips', 'hero-ctas', 'features', 'feature',
+   'fi f1', 'fi f2', 'fi f3', 'fi f4', 'about-card', 'abody', 'specialty', 'bio', 'social-row', 'social-big', 'grade-pick', 'mainnav', 'socials',
    'nchip answered current', 'opt selected', 'rv-item', 'rq correct', 'rq wrong', 'ans mine wrong', 'ans correct', 'score-ring pass',
    'score-ring fail', 'tab active', 'badge green', 'badge gold', 'badge red', 'toast err', 'progressbar', 'navstrip', 'qcard', 'qtext',
    'qn', 'opts', 'letter', 'txt', 'quiz-actions', 'rules-card', 'res-badges', 'review-filters', 'meta-row', 'topic-card', 'lesson-card', 'lgo-text', 'topic-grid', 'topics-hint', 'topic-head', 'training-grid', 'training-card', 'tc-no', 'tc-body', 'tc-title', 'tc-meta', 'tc-start', 'topic-nav',
@@ -470,7 +470,7 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
   ok('هوية زرقاء احترافية (#1E56C8) + ذهبي (#C99A2E) — كمرجع التصميم', /--primary:\s*#1E56C8/i.test(css) && /--gold:\s*#C99A2E/i.test(css));
   ok('نظام فاتح فقط: خلفية فاتحة، لا prefers-color-scheme داكن', /--bg:\s*#F/i.test(css) && !/prefers-color-scheme:\s*dark/i.test(css));
   ok('تدرجات ناعمة زرقاء/لافندر وظلال خفيفة', /radial-gradient/.test(css) && /--shadow-sm/.test(css) && /--radius/.test(css));
-  ok('استجابة مقصودة للموبايل: تكديس الواجهة على شاشات صغيرة', /@media \(max-width: 920px\)/.test(css) && /grid-template-areas: "body" "media" "grades"/.test(css));
+  ok('استجابة مقصودة للموبايل: الصورة أولًا ثم الاسم (تكديس على شاشات صغيرة)', /@media \(max-width: 920px\)/.test(css) && /grid-template-areas:\s*"media"\s+"body"/.test(css));
   ok('RTL في القالبين + خط عربي احترافي مع swap', indexHtml.includes('dir="rtl"') && adminHtml.includes('dir="rtl"') && /Tajawal/.test(indexHtml) && /display=swap/.test(indexHtml));
 
   const allJs = appJs + adminJs;
@@ -560,10 +560,11 @@ console.log('\n[8] لوحة التحكم');
 console.log('\n[9] الأداء وخفة الحزمة');
 {
   // Budget: student SPA + admin panel + shared CSS must stay framework-free and lean.
-  // Re-baselined from 140KB → 155KB after the teacher-platform UI (PR #9 + final platform)
-  // added ~3KB of real functionality; the assertion still catches any framework/bloat regression.
+  // Re-baselined 140KB → 155KB (teacher-platform UI) → 190KB (settings-driven
+  // platform + six-section teacher editor + admin settings panels, all vanilla JS).
+  // The assertion still catches any framework/bloat regression.
   const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 155);
+  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 190);
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));

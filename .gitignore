@@ -10,3 +10,6 @@ node_modules/
 # QA screenshot artifacts (browser-e2e)
 tools/shots/
 node_modules/
+
+# QA scratch deps (browser-e2e)
+/qa/
