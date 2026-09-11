@@ -9,7 +9,9 @@
     opts.headers = Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, opts.headers || {});
     return fetch(path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
-        if (r.status === 401 || r.status === 403) { T.session = null; renderLogin(); throw new Error(data.error || 'انتهت الجلسة.'); }
+        // 401 from the login endpoint itself must surface its message in the form —
+        // not trigger the session-expired path (which would re-render and swallow it).
+        if ((r.status === 401 || r.status === 403) && path !== '/api/t/login') { T.session = null; renderLogin(); throw new Error(data.error || 'انتهت الجلسة.'); }
         if (!r.ok) throw new Error(data.error || ('خطأ ' + r.status));
         return data;
       });
@@ -103,12 +105,33 @@
   }
   var resTimer; function tSearchResults() { clearTimeout(resTimer); resTimer = setTimeout(function () { loadResults(1, $('resSearch').value.trim(), $('resSubject').value); }, 300); }
   function renderProfile() {
-    main.innerHTML = '<div class="t-page-header"><h2>الملف الشخصي</h2></div><div class="card"><h3 class="t-card-title">تعديل الملف</h3><div class="field"><label>الاسم</label><input type="text" id="pfName"></div><div class="field"><label>نبذة</label><textarea id="pfBio" rows="3"></textarea></div><div class="field"><label>واتساب</label><input type="url" id="pfWa" dir="ltr"></div><div class="field"><label>فيسبوك</label><input type="url" id="pfFb" dir="ltr"></div><div class="field"><label>تيك توك</label><input type="url" id="pfTk" dir="ltr"></div><div id="pfErr" class="t-err"></div><button class="btn" id="pfBtn" onclick="tSaveProfile()">حفظ</button></div>';
-    api('/api/t/dashboard').then(function (d) { $('pfName').value = d.teacher.name; });
+    main.innerHTML = '<div class="t-page-header"><h2>الملف الشخصي</h2></div><div class="card" id="pfCard"><div class="t-loading"><div class="spin"></div></div></div>';
+    // Load the CURRENT profile and pre-fill every field — saving must never blank
+    // fields the teacher never saw (fixed: bio/social used to be wiped by a partial save).
+    api('/api/t/profile').then(function (d) {
+      var t = d.teacher; T.profileSlug = t.slug;
+      $('pfCard').innerHTML =
+        '<div class="t-profile-head"><div class="t-profile-avatar">' + (t.photo ? '<img src="' + esc(t.photo) + '" alt="">' : esc((t.name || '?').slice(0, 2))) + '</div>' +
+        '<div><h3 class="t-card-title" style="margin:0">' + esc(t.name) + '</h3><div class="desc" style="font-size:.78rem">' + esc(t.specialty || '') + '</div></div></div>' +
+        '<div class="t-link-share"><span style="font-weight:700;font-size:.8rem">رابط طلابك:</span><code id="pfStuLink">' + esc(location.origin + t.studentUrl) + '</code>' +
+        '<button class="btn small" onclick="tCopyStudentLink()">نسخ</button></div>' +
+        '<div class="field"><label>الاسم</label><input type="text" id="pfName" value="' + esc(t.name) + '" maxlength="80"></div>' +
+        '<div class="field"><label>الهاتف (للتواصل — كما يضبطه المسؤول)</label><input type="text" id="pfPhone" value="' + esc(t.phone || '') + '" dir="ltr"></div>' +
+        '<div class="field"><label>نبذة</label><textarea id="pfBio" rows="3" maxlength="500">' + esc(t.bio || '') + '</textarea></div>' +
+        '<div class="field"><label>واتساب</label><input type="url" id="pfWa" dir="ltr" value="' + esc((t.socialLinks || {}).whatsapp || '') + '"></div>' +
+        '<div class="field"><label>فيسبوك</label><input type="url" id="pfFb" dir="ltr" value="' + esc((t.socialLinks || {}).facebook || '') + '"></div>' +
+        '<div class="field"><label>تيك توك</label><input type="url" id="pfTk" dir="ltr" value="' + esc((t.socialLinks || {}).tiktok || '') + '"></div>' +
+        '<div id="pfErr" class="t-err"></div><button class="btn" id="pfBtn" onclick="tSaveProfile()">حفظ</button>';
+    }).catch(function (e) { $('pfCard').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  function tCopyStudentLink() {
+    var url = location.origin + '/' + (T.profileSlug || '');
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ رابط الطلاب'); }, function () { prompt('انسخ الرابط:', url); });
+    else prompt('انسخ الرابط:', url);
   }
   function tSaveProfile() {
     $('pfBtn').disabled = true;
-    api('/api/t/profile', { method: 'POST', body: JSON.stringify({ name: $('pfName').value.trim(), bio: $('pfBio').value.trim(), socialLinks: { whatsapp: $('pfWa').value.trim(), facebook: $('pfFb').value.trim(), tiktok: $('pfTk').value.trim() } }) })
+    api('/api/t/profile', { method: 'POST', body: JSON.stringify({ name: $('pfName').value.trim(), phone: $('pfPhone').value.trim(), bio: $('pfBio').value.trim(), socialLinks: { whatsapp: $('pfWa').value.trim(), facebook: $('pfFb').value.trim(), tiktok: $('pfTk').value.trim() } }) })
       .then(function () { toast('تم الحفظ'); $('pfBtn').disabled = false; })
       .catch(function (e) { $('pfErr').textContent = e.message; $('pfBtn').disabled = false; });
   }

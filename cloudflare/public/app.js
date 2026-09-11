@@ -67,6 +67,7 @@
       S.exams = res[0].exams;
       // في الصفحة الرئيسية نعرض مالك المنصة (المعلم الافتراضي) من بيانات فعلية
       S.teacher = S.slug ? (res[1] || null) : (res[0].owner || null);
+      if (S.slug && !S.teacher) { renderTeacherUnavailable(); return; }
       try {
         var raw = sessionStorage.getItem('exammanasa_student');
         if (raw) { var st = JSON.parse(raw); if (st && st.name) S.student = st; }
@@ -123,6 +124,14 @@
     var clean = String(name || '').replace(/^(د\.|أ\.|م\.|الدكتور|الأستاذ|استاذ)\s*/g, '').trim();
     var parts = clean.split(/\s+/).filter(Boolean);
     return (parts.length >= 2 ? parts[0][0] + parts[1][0] : clean.slice(0, 2)) || 'م‌ت';
+  }
+
+  /* صفحة غير موجودة/معطّلة: رابط صريح لا يعمل — رسالة واضحة بدل الصفحة المحايدة */
+  function renderTeacherUnavailable() {
+    app.innerHTML = '<div class="card" style="max-width:520px;margin:60px auto;text-align:center;padding:44px">' +
+      '<h3>هذا الرابط غير متاح حاليًا</h3>' +
+      '<p class="desc" style="margin-top:10px">لم يعد رابط هذا المعلم يعمل — ربما تم تعطيله أو حذفه. تواصل مع المعلم للحصول على الرابط الجديد.</p>' +
+      '<div style="margin-top:18px"><button class="btn" onclick="location.href=\'/\'">العودة للرئيسية</button></div></div>';
   }
 
   /* ---------------- التوجيه ----------------

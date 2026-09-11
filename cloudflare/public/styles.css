@@ -841,3 +841,13 @@ footer.site b { color: var(--muted); }
 .t-loading{text-align:center;padding:40px}
 @media(max-width:920px){.t-layout{grid-template-columns:1fr}.t-sidebar{flex-direction:row;overflow-x:auto;position:sticky;top:68px;z-index:40;height:auto;padding:8px;gap:4px;border-left:none;border-bottom:1px solid var(--line)}.t-nav-item{padding:8px 12px;font-size:.8rem}.t-grid-2{grid-template-columns:1fr}.t-stat-grid{grid-template-columns:repeat(2,1fr)}.t-main{padding:16px}}
 @media(max-width:480px){.t-stat-grid{grid-template-columns:1fr}}
+/* admin teacher card meta rows (ID / links / email / credential status) */
+.tmeta-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:.76rem;margin-top:4px;color:var(--muted)}
+.tmeta-row .tmeta-k{font-weight:700;color:var(--ink,#1d2733)}
+.tmeta-row code{background:var(--bg-2);border:1px solid var(--line);border-radius:6px;padding:1px 6px;font-size:.72rem;word-break:break-all}
+/* teacher profile: avatar + shareable student link */
+.t-profile-head{display:flex;align-items:center;gap:14px;margin-bottom:14px;flex-wrap:wrap}
+.t-profile-avatar{width:64px;height:64px;border-radius:16px;overflow:hidden;background:var(--bg-2);border:1.5px solid var(--line);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;color:var(--primary-deep);flex:none}
+.t-profile-avatar img{width:100%;height:100%;object-fit:cover}
+.t-link-share{display:flex;align-items:center;gap:8px;background:var(--bg-2);border:1px dashed var(--line);border-radius:12px;padding:10px 12px;margin-bottom:14px;flex-wrap:wrap}
+.t-link-share code{flex:1;min-width:0;font-size:.8rem;direction:ltr;text-align:left;background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px 10px;word-break:break-all}

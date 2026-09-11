@@ -18,7 +18,9 @@
     opts.headers = Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, opts.headers || {});
     return fetch(path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
-        if (r.status === 401) { A.session = null; renderLogin(); throw new Error(data.error || 'انتهت الجلسة.'); }
+        // Same as teacher SPA: a 401 on the login call belongs to the form, not to the
+        // expired-session path (renderLogin would clear the error message instantly).
+        if (r.status === 401 && path !== '/api/admin/login') { A.session = null; renderLogin(); throw new Error(data.error || 'انتهت الجلسة.'); }
         if (!r.ok) throw new Error(data.error || ('خطأ ' + r.status));
         return data;
       });
@@ -210,10 +212,15 @@
             (t.hasPassword ? '<span class="badge green">🔑</span>' : '<span class="badge">بدون دخول</span>') + '</div>' +
             (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
             '<div class="desc" style="font-size:.78rem;margin-top:4px">' + esc(t.bio || '') + '</div>' +
-            '<div style="margin-top:8px;font-size:.78rem">الرابط العام: <a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a></div>' +
+            '<div class="tmeta-row"><span class="tmeta-k">معرّف المعلم (ID)</span><code dir="ltr">' + esc(t.id) + '</code>' + (t.teacherCode ? '<code dir="ltr">' + esc(t.teacherCode) + '</code>' : '') + '</div>' +
+            '<div class="tmeta-row"><span class="tmeta-k">رابط الطلاب</span><a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a></div>' +
+            '<div class="tmeta-row"><span class="tmeta-k">دخول المعلم</span><code dir="ltr">' + esc(location.host) + '/teacher</code><span style="font-size:.7rem">رابط موحّد لكل المعلمين</span></div>' +
+            (t.email ? '<div class="tmeta-row"><span class="tmeta-k">البريد</span><span dir="ltr">' + esc(t.email) + '</span></div>' : '') +
+            '<div class="tmeta-row"><span class="tmeta-k">بيانات الدخول</span>' + (t.hasPassword ? '<span class="badge green">كلمة مرور مضبوطة (PBKDF2)</span>' : '<span class="badge gold">بدون كلمة مرور — عيّنها من «تعديل»</span>') + '</div>' +
             studentLimitLine(t.studentLimitStatus) +
             '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
-            '<button class="btn small ghost" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ الرابط</button>' +
+            '<button class="btn small ghost" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ رابط الطلاب</button>' +
+            '<button class="btn small ghost" onclick="copyLogin()">نسخ رابط الدخول</button>' +
             '<button class="btn small" onclick="editTeacher(\'' + esc(t.id) + '\')">تعديل</button>' +
             '<button class="btn small ghost" onclick="teacherDash(\'' + esc(t.id) + '\')">لوحة المعلم</button>' +
             (t.isDefault ? '' : '<button class="btn small danger" onclick="deleteTeacher(\'' + esc(t.id) + '\')">حذف</button>') +
@@ -281,6 +288,11 @@
   function copyLink(slug) {
     var url = location.origin + '/' + slug;
     if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ الرابط: ' + url); });
+    else { prompt('انسخ الرابط:', url); }
+  }
+  function copyLogin() {
+    var url = location.origin + '/teacher';
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ رابط دخول المعلم: ' + url); });
     else { prompt('انسخ الرابط:', url); }
   }
 
@@ -563,6 +575,7 @@
   window.deleteTeacher = deleteTeacher;
   window.restoreTeacher = restoreTeacher;
   window.copyLink = copyLink;
+  window.copyLogin = copyLogin;
   window.teacherDash = teacherDash;
   window.bankFilter = bankFilter;
   window.bankPage = bankPage;
