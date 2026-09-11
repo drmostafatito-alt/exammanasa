@@ -848,6 +848,146 @@ function studentLimitOf(t) {
   if (t.studentLimitUnlimited !== false) return { unlimited: true, limit: null };
   return { unlimited: false, limit: sanitizeStudentLimit(t.studentLimit) };
 }
+/* ============================ TEACHER AUTH ============================ */
+const teacherLoginFails = new Map();
+async function teacherCookiePayload(request, env) {
+  const cookie = request.headers.get('Cookie') || '';
+  const m = cookie.match(/(?:^|;\s*)teacher_session=([^;]+)/);
+  if (!m) return null;
+  const secret = await getSessionSecret(env).catch(() => null);
+  if (!secret) return null;
+  return verifyToken(decodeURIComponent(m[1]), secret);
+}
+async function handleTeacherLogin(request, env) {
+  const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  const fails = teacherLoginFails.get(ip) || { n: 0, until: 0 };
+  if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة.', 429);
+  const body = await readJson(request);
+  const email = String(body.email || '').trim().toLowerCase();
+  const password = String(body.password || '');
+  if (!email || !password) return fail('البريد/اسم المستخدم وكلمة المرور مطلوبان.');
+  const teachers = await getTeachers(env);
+  const t = teachers.find(x => x.enabled !== false && !x.archived &&
+    ((x.email && x.email.toLowerCase() === email) || (x.username && x.username.toLowerCase() === email)));
+  if (!t || !t.passHash) {
+    teacherLoginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
+    return fail('بيانات الدخول غير صحيحة.', 401);
+  }
+  if (t.enabled === false || t.archived) return fail('حساب المعلم غير مفعّل.', 403);
+  const hash = await pbkdf2(password, t.passSalt, t.passIterations || 120000);
+  if (hash !== t.passHash) {
+    teacherLoginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
+    return fail('بيانات الدخول غير صحيحة.', 401);
+  }
+  teacherLoginFails.delete(ip);
+  const secret = await getSessionSecret(env).catch(() => null);
+  if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
+  const token = await signToken({ t: 'teacher', tid: t.id, slug: t.slug, exp: Math.floor(Date.now() / 1000) + TEACHER_SESSION_TTL }, secret);
+  const res = json({ ok: true, name: t.name, slug: t.slug, id: t.id });
+  const headers = new Headers(res.headers);
+  headers.append('Set-Cookie', 'teacher_session=' + encodeURIComponent(token) + '; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=' + TEACHER_SESSION_TTL);
+  return new Response(res.body, { status: res.status, headers });
+}
+async function requireTeacher(request, env) {
+  const session = await teacherCookiePayload(request, env);
+  if (!session || session.t !== 'teacher') return null;
+  const teachers = await getTeachers(env);
+  const t = teachers.find(x => x.id === session.tid);
+  if (!t || t.enabled === false || t.archived) return null;
+  return t;
+}
+async function handleTeacherAuthenticated(request, env, ctx, pathname) {
+  const method = request.method;
+  const teacher = await requireTeacher(request, env);
+  if (!teacher) return fail('غير مصرح.', 401);
+  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+  if (pathname === '/api/t/password' && method === 'POST') {
+    const body = await readJson(request);
+    const current = String(body.current || ''); const next = String(body.next || '');
+    if (!current || !next) return fail('كلمتا المرور مطلوبتان.');
+    if (next.length < 8) return fail('كلمة المرور 8 أحرف على الأقل.');
+    if (next === current) return fail('كلمتا المرور متطابقتان.');
+    const curHash = await pbkdf2(current, teacher.passSalt, teacher.passIterations || 120000);
+    if (curHash !== teacher.passHash) return fail('كلمة المرور الحالية غير صحيحة.', 401);
+    const salt = randomHex(16); const hash = await pbkdf2(next, salt);
+    const teachers = await getTeachers(env);
+    const idx = teachers.findIndex(x => x.id === teacher.id);
+    if (idx === -1) return fail('المعلم غير موجود.', 404);
+    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    return json({ ok: true });
+  }
+  if (pathname === '/api/t/profile' && method === 'POST') {
+    const body = await readJson(request, 3 * 1024 * 1024);
+    const teachers = await getTeachers(env);
+    const idx = teachers.findIndex(x => x.id === teacher.id);
+    if (idx === -1) return fail('المعلم غير موجود.', 404);
+    const existing = teachers[idx]; const updated = { ...existing };
+    updated.name = String(body.name || '').trim() || existing.name;
+    if (updated.name.length > 80) throw bad('اسم المعلم طويل.');
+    updated.phone = String(body.phone ?? existing.phone ?? '').trim();
+    if (updated.phone) { const np = normalizePhone(updated.phone); updated.phone = isValidEgMobile(np) ? np : updated.phone.replace(/[\s\-.()]/g, ''); }
+    const social = { ...(existing.socialLinks || {}) };
+    for (const k of ['whatsapp', 'facebook', 'tiktok']) {
+      if (body.socialLinks && body.socialLinks[k] !== undefined) {
+        const v = String(body.socialLinks[k]).trim();
+        if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+        social[k] = v;
+      }
+    }
+    updated.socialLinks = social;
+    updated.bio = String(body.bio ?? existing.bio ?? '').trim().slice(0, 500);
+    if (body.photo !== undefined) {
+      let photo = String(body.photo || '');
+      if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
+      if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير.');
+      updated.photo = photo;
+    }
+    updated.updatedAt = new Date().toISOString();
+    teachers[idx] = updated;
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    return json({ ok: true, teacher: teacherPublic(updated) });
+  }
+  if (pathname === '/api/t/dashboard' && method === 'GET') {
+    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const slStatus = await studentLimitStatus(env, teacher);
+    const students = Math.max(slStatus.current, new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size);
+    const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
+    const pass = tlist.filter(r => r.percentage >= 50).length;
+    const highest = tlist.length ? Math.max(...tlist.map(r => r.percentage)) : 0;
+    const lowest = tlist.length ? Math.min(...tlist.map(r => r.percentage)) : 0;
+    const perExam = {};
+    tlist.forEach(r => { const k = r.examId || r.examLabel; perExam[k] = perExam[k] || { examId: r.examId || '', title: r.examLabel || '', attempts: 0, sum: 0 }; perExam[k].attempts++; perExam[k].sum += r.percentage; });
+    return json({ teacher: { id: teacher.id, name: teacher.name, slug: teacher.slug },
+      totals: { results: tlist.length, students, registeredStudents: slStatus.current, avgPercentage: avg, passRate: tlist.length ? Math.round(pass / tlist.length * 10000) / 100 : 0, highestPercentage: highest, lowestPercentage: lowest },
+      perExam: Object.values(perExam).map(e => ({ examId: e.examId, title: e.title, attempts: e.attempts, avgPercentage: Math.round(e.sum / e.attempts * 100) / 100 })).sort((a, b) => b.attempts - a.attempts),
+      recent: tlist.slice(0, 10) });
+  }
+  if (pathname === '/api/t/students' && method === 'GET') {
+    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const slStatus = await studentLimitStatus(env, teacher);
+    const studentMap = new Map();
+    tlist.forEach(r => { const key = (r.phone || '') + '|' + normalizeName(r.name); if (!studentMap.has(key)) studentMap.set(key, { name: r.name, phone: r.phone || '', examCount: 0, totalScore: 0, totalPossible: 0, lastActivity: r.date, firstSeen: r.date }); const s = studentMap.get(key); s.examCount++; s.totalScore += r.score; s.totalPossible += r.total; if (new Date(r.date) > new Date(s.lastActivity)) s.lastActivity = r.date; if (new Date(r.date) < new Date(s.firstSeen)) s.firstSeen = r.date; });
+    const url = new URL(request.url); const search = (url.searchParams.get('q') || '').trim().toLowerCase();
+    let students = [...studentMap.values()];
+    if (search) students = students.filter(s => s.name.toLowerCase().includes(search) || (s.phone && s.phone.includes(search)));
+    students.sort((a, b) => new Date(b.lastActivity) - new Date(a.lastActivity));
+    return json({ total: students.length, registered: slStatus.current, students: students.map(s => ({ name: s.name, phone: s.phone, examCount: s.examCount, avgPercentage: s.totalPossible > 0 ? Math.round(s.totalScore / s.totalPossible * 10000) / 100 : 0, lastActivity: s.lastActivity, firstSeen: s.firstSeen })) });
+  }
+  if (pathname === '/api/t/results' && method === 'GET') {
+    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const url = new URL(request.url); const search = (url.searchParams.get('q') || '').trim().toLowerCase(); const subject = (url.searchParams.get('subject') || '').trim(); const examId = (url.searchParams.get('examId') || '').trim();
+    const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1); const perPage = 50;
+    let results = tlist;
+    if (search) results = results.filter(r => r.name.toLowerCase().includes(search) || (r.phone && r.phone.includes(search)));
+    if (subject) results = results.filter(r => r.subject === subject);
+    if (examId) results = results.filter(r => r.examId === examId);
+    const total = results.length; const slice = results.slice((page - 1) * perPage, page * perPage);
+    return json({ total, page, perPage, results: slice.map(r => ({ id: r.id, date: r.date, name: r.name, phone: r.phone, examId: r.examId, examLabel: r.examLabel, subject: r.subject, score: r.score, total: r.total, percentage: r.percentage })) });
+  }
+  return fail('المسار غير موجود.', 404);
+}
+
 function teacherAdminPayload(t) {
   const sl = studentLimitOf(t);
   return {
