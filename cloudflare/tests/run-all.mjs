@@ -13,6 +13,9 @@
  *   9. إدارة المعلمين: إنشاء/تعطيل/حذف + التحقق من المدخلات
  *  10. النتائج و CSV
  *  11. تكافؤ خلط الخيارات مع خوارزمية تطبيق GAS الأصلي (Code.gs)
+ *  12. حدود المحاولات لكل معلم (خادم + عدّاد ذري) وتوحيد أرقام الهواتف
+ *  13. وضع عدم الاتصال (عقد الخادم: صلاحية 72 ساعة + علَم offline)
+ *  14. لوحة المعلم لكل معلم + أمان التسجيل (رفض المعلم المعطّل، تجاهل حقن الدرجة) وعدم تسريب المفاتيح
  *
  * Usage: npm test   (from cloudflare/)
  */
@@ -153,7 +156,7 @@ try {
     const r = await jfetch('/api/catalog');
     const examCount = Object.keys(r.data.exams).length;
     const listed = Object.values(r.data.exams).filter(e => !e.legacy).length;
-    ok('113 امتحانًا في الفهرس (66 معروضًا + 47 نموذجًا قديمًا محفوظًا)', examCount === 113 && listed === 66, 'got ' + examCount + '/' + listed);
+    ok('127 امتحانًا في الفهرس (80 معروضًا + 47 نموذجًا قديمًا محفوظًا)', examCount === 127 && listed === 80, 'got ' + examCount + '/' + listed);
     ok('الفهرس يتضمن مالك المنصة (owner) ببيانات عامة فقط',
       r.data.owner && r.data.owner.name === 'د. مصطفى تيتو' && r.data.owner.slug === 'mostafa' &&
       'specialty' in r.data.owner && !('phone' in r.data.owner) && !('id' in r.data.owner));
@@ -233,18 +236,18 @@ try {
     const lessonsOf = (S, sec, no) => S.t.sections[sec].topics[no].lessons.map(l => l.title);
     ok('الترم الأول: الفلسفة موضوعان (التفكير الإنساني / الفلسفة وطبيعة الموقف الفلسفي) والمنطق موضوعان (مبادئ المنطق / الاستدلال)',
       s1.topics.length === 4 && s1.t.sections[0].topics.map(t => t.title).join('|') === 'التفكير الإنساني|الفلسفة وطبيعة الموقف الفلسفي' && s1.t.sections[1].topics.map(t => t.title).join('|') === 'مبادئ المنطق (الحدود - القضايا)|الاستدلال (تعريفه - أنواعه)');
-    ok('الترم الأول: 17 درسًا بأسماء JSON الحقيقية (3+5 فلسفة، 8+1 منطق) / 17 تدريبًا', s1.lessons.length === 17 && lessonsOf(s1, 0, 0).join('|') === 'التفكير والنشاط العقلي|أساليب التفكير|مهارات التفكير الفلسفي' && lessonsOf(s1, 0, 1).length === 5 && lessonsOf(s1, 1, 0).length === 8 && lessonsOf(s1, 1, 1).join('|') === 'القياس الأرسطي' && s1.trainings.length === 17);
+    ok('الترم الأول: 19 درسًا بأسماء JSON الحقيقية (5+5 فلسفة، 8+1 منطق) / 30 تدريبًا', s1.lessons.length === 19 && lessonsOf(s1, 0, 0).join('|') === 'التفكير والنشاط العقلي|أساليب التفكير|مهارات التفكير الفلسفي|الفلسفة والدين|الفلسفة والعلم' && lessonsOf(s1, 0, 1).length === 5 && lessonsOf(s1, 1, 0).length === 8 && lessonsOf(s1, 1, 1).join('|') === 'القياس الأرسطي' && s1.trainings.length === 30);
     ok('كل درس يحمل اسمًا حقيقيًا (لا «الدرس N» عامًا) ورقمًا متسلسلًا', s1.lessons.concat(s2.lessons).every(l => l.title.trim() && !/^الدرس\s*(الأول|الثاني|الثالث|\d+)$/.test(l.title.trim())) && s1.topics.concat(s2.topics).every(tp => tp.lessons.every((l, i) => l.no === i + 1)));
     ok('الترم الثاني: الفلسفة موضوعان (البيئية والبيوطبية / المهنية والقيم) والمنطق موضوعان (الاستقراء / الاستنباط) — 11 درسًا',
       s2.topics.length === 4 && s2.t.sections[0].topics.map(t => t.title).join('|') === 'الفلسفة والأخلاق البيئية والبيوطبية|الأخلاق المهنية ودور القيم الفلسفية في حياة الفرد' && s2.t.sections[1].topics.map(t => t.title).join('|') === 'الاستقراء وتطبيق المنهج التجريبي|الاستنباط وتطبيقه في العلوم الصورية' && s2.lessons.length === 11 && lessonsOf(s2, 0, 0).length === 3 && lessonsOf(s2, 0, 1).length === 2 && lessonsOf(s2, 1, 0).length === 3 && lessonsOf(s2, 1, 1).length === 3);
-    ok('الترم الأول: 340 سؤالًا في التدريبات (17×20 — لا أسئلة محجوزة بعد استعادة الخيار الناقص بقرار موثق)', s1.q === 340 && s1.trainings.filter(tr => tr.questionCount === 20).length === 17 && s1.trainings.filter(tr => tr.questionCount === 19).length === 0);
-    ok('الترم الثاني: 13 تدريبًا / 260 سؤالًا (13×20)', s2.trainings.length === 13 && s2.q === 260 && s2.trainings.every(tr => tr.questionCount === 20));
+    ok('الترم الأول: 710 أسئلة في التدريبات (30 تدريبًا بأعداد JSON الفعلية 15–58)', s1.q === 710 && s1.trainings.length === 30 && s1.trainings.find(tr => tr.examId === 'T1-PH-RELIGION-01').questionCount === 15 && s1.trainings.find(tr => tr.examId === 'T1-PH-07-T2').questionCount === 34);
+    ok('الترم الثاني: 14 تدريبًا / 319 سؤالًا (بأعداد JSON الفعلية)', s2.trainings.length === 14 && s2.q === 319 && s2.trainings.find(tr => tr.examId === 'T2-PH-BIO-01').questionCount === 21 && s2.trainings.find(tr => tr.examId === 'T2-PH-PRO-T2').questionCount === 20);
     const allTr = s1.trainings.concat(s2.trainings);
-    ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI)', new Set(allTr.map(tr => tr.examId)).size === 30 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
+    ok('معرفات التدريبات فريدة ومستقرة (T1-PH-01 … T2-LG-AI — 44 تدريبًا)', new Set(allTr.map(tr => tr.examId)).size === 44 && allTr.every(tr => /^T[12]-(PH|LG)-/.test(tr.examId)));
     ok('كل تدريب ينتمي لدرس واحد فقط ولا يظهر تحت درس/موضوع آخر', [1, 2].every(term => { const seen = new Set(); return summarize(term).lessons.every(l => l.trainings.every(tr => !seen.has(tr.examId) && seen.add(tr.examId))); }));
     ok('metadata كل تدريب تطابق موضوعه ودرسه (topicKey/lessonKey/lessonTitle/trainingNo/count)', allTr.every(tr => { const e = cat.exams[tr.examId]; return e && e.type === 'training' && !e.legacy && e.count === tr.questionCount && e.title === tr.title; }) &&
       [1, 2].every(term => summarize(term).topics.every(tp => tp.lessons.every(l => l.trainings.every((tr, i) => { const e = cat.exams[tr.examId]; return e.topicKey === tp.key && e.topicTitle === tp.title && e.lessonKey === l.key && e.lessonNo === l.no && e.lessonTitle === l.title && e.trainingNo === i + 1; })))));
-    ok('كل تدريب يحتفظ بـ training_id/الدرس/العنوان/20 سؤالًا (لا دمج ولا تحويل إلى label)', allTr.every(tr => BANKS.examDefs[tr.examId] && BANKS.examDefs[tr.examId].length === tr.questionCount && tr.questionCount >= 19));
+    ok('كل تدريب يحتفظ بـ training_id/الدرس/العنوان/عدد أسئلة JSON الفعلي (لا دمج ولا تحويل إلى label)', allTr.every(tr => BANKS.examDefs[tr.examId] && BANKS.examDefs[tr.examId].length === tr.questionCount && tr.questionCount >= 15));
     ok('الامتحانات الشاملة في قسم منفصل وليست تدريبات (ت1: PHI-COMP, LOG-COMP, PHLO-COMP · ت2: T2L-COMP, T2-TERM-COMP)',
       JSON.stringify(s1.t.comprehensiveExamIds) === JSON.stringify(['PHI-COMP', 'LOG-COMP', 'PHLO-COMP']) && JSON.stringify(s2.t.comprehensiveExamIds) === JSON.stringify(['T2L-COMP', 'T2-TERM-COMP']) &&
       s1.t.comprehensiveExamIds.concat(s2.t.comprehensiveExamIds).every(id => !allTr.some(tr => tr.examId === id)));
@@ -292,7 +295,7 @@ try {
   }
 
   /* ============ 6. perfect-score round-trip: ALL exams ============ */
-  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (113)');
+  console.log('\n[6] دورة الدرجة الكاملة — كل الامتحانات (127)');
   {
     const examIds = Object.keys(BANKS.examDefs);
     let allOk = true, badOnes = [];
@@ -306,7 +309,7 @@ try {
         allOk = false; badOnes.push(`${examId}:${s.status}/${s.data && s.data.score}/${r.data.exam.count}`);
       }
     }
-    ok(examIds.length + '/' + examIds.length + ' امتحانًا (بما فيها 30 تدريب JSON و47 نموذجًا قديمًا): الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk && examIds.length === 113, badOnes.join(', '));
+    ok(examIds.length + '/' + examIds.length + ' امتحانًا (بما فيها 44 تدريب JSON و47 نموذجًا قديمًا): الدرجة الكاملة صحيحة والتصحيح متطابق مع البنك', allOk && examIds.length === 127, badOnes.join(', '));
   }
 
   /* ============ 7. zero-score + review ============ */
@@ -396,9 +399,14 @@ try {
     const del = await jfetch('/api/admin/teachers/' + tid, {
       method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
     });
-    ok('حذف المعلم', del.status === 200);
+    ok('حذف المعلم غير تدميري (يُنقل إلى الأرشيف)', del.status === 200 && del.data.archived === true);
     const gone = await jfetch('/api/teacher/sara');
     ok('الملف المحذوف يعطي 404', gone.status === 404);
+    const listAfter = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    ok('المعلم المحذوف يظهر في الأرشيف ولا يظهر في القائمة النشطة', listAfter.data.archived.some(t => t.id === tid) && !listAfter.data.teachers.some(t => t.id === tid));
+    const restore = await post('/api/admin/teachers/' + tid + '/restore', {}, { Cookie: cookie });
+    ok('استعادة المعلم من الأرشيف (يعود معطّلًا)', restore.status === 200 && restore.data.teacher.slug === 'sara' && restore.data.teacher.enabled === false);
+    await jfetch('/api/admin/teachers/' + tid, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
     const defDel = await jfetch('/api/admin/teachers/t_default_mostafa', {
       method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
     });
@@ -416,8 +424,8 @@ try {
     ok('تصدير CSV مع BOM عربي (0xEF 0xBB 0xBF)',
       csvResp.status === 200 && csvBytes[0] === 0xEF && csvBytes[1] === 0xBB && csvBytes[2] === 0xBF && csvText.includes('اسم الطالب'));
     const overview = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
-    ok('نظرة عامة: 113 امتحانًا / 1770 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
-      overview.data.exams === 113 && overview.data.questions === 1770 && overview.data.structure.philosophyTrainings.term1.trainings === 17 && overview.data.structure.philosophyTrainings.term2.trainings === 13 &&
+    ok('نظرة عامة: 127 امتحانًا / 1887 سؤالًا + توثيق التصحيحات + إحصاءات التدريبات',
+      overview.data.exams === 127 && overview.data.questions === 1887 && overview.data.structure.philosophyTrainings.term1.trainings === 30 && overview.data.structure.philosophyTrainings.term2.trainings === 14 &&
       overview.data.audit.psychology.corrections.length === 8);
     const qs = await jfetch('/api/admin/questions?subject=philosophy&term=2&q=' + encodeURIComponent('البيئية'), { headers: { Cookie: cookie } });
     ok('بنك الأسئلة: بحث + مفاتيح للمسؤول فقط', qs.status === 200 && qs.data.questions.length > 0 && qs.data.questions[0].answer);
@@ -465,6 +473,189 @@ try {
       }
     }
     ok('خوارزمية الخلط مطابقة تمامًا لـ Code.gs (500 بذرة × 60 موضعًا)', same, firstDiff);
+  }
+
+  /* ============ 12. attempt limits (server-side, race-safe) + phone normalization ============ */
+  console.log('\n[12] حدود المحاولات (خادم + عدّاد ذري) وتوحيد الهاتف');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم محدود', slug: 'limited12', unlimited: false, maxAttempts: 2, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد محاولات (2) + unlimited=false', mk.status === 200 && mk.data.teacher.unlimited === false && mk.data.teacher.maxAttempts === 2);
+    const PH = '01055556666';
+    const doAttempt = async () => {
+      const st = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب محدود', phone: PH, slug: 'limited12' });
+      if (st.status !== 200) return st;
+      const seed = decodeToken(st.data.token).seed;
+      const sub = await post('/api/exam/submit', { token: st.data.token, answers: correctPositions('U1-T1', seed) });
+      return { status: sub.status, data: sub.data, start: st.data };
+    };
+    const a1 = await doAttempt();
+    ok('المحاولة 1 تنجح + الاستجابة تعلن المتبقي قبل الاستهلاك (2/2)', a1.status === 200 && a1.start.attempts && a1.start.attempts.remaining === 2 && a1.start.attempts.limit === 2);
+    const a2 = await doAttempt();
+    ok('المحاولة 2 تنجح + المتبقي (1/2)', a2.status === 200 && a2.start.attempts.remaining === 1);
+    const a3 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب محدود', phone: PH, slug: 'limited12' });
+    ok('بدء المحاولة 3 مرفوض مبكرًا (429)', a3.status === 429);
+    // submit-time gate: a token issued before exhaustion must also be rejected
+    const mk2 = await post('/api/admin/teachers', { name: 'محدود ب', slug: 'limited12b', unlimited: false, maxAttempts: 2, requirePhone: true }, { Cookie: cookie });
+    const PH2 = '01077778888';
+    const held = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ب', phone: PH2, slug: 'limited12b' });
+    for (let k = 0; k < 2; k++) {
+      const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ب', phone: PH2, slug: 'limited12b' });
+      const sd = decodeToken(s.data.token).seed;
+      await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', sd) });
+    }
+    const heldSub = await post('/api/exam/submit', { token: held.data.token, answers: correctPositions('U1-T1', decodeToken(held.data.token).seed) });
+    ok('التسليم بعد الاستنفاد مرفوض على الخادم (429) حتى بتوكن قديم', heldSub.status === 429);
+    // concurrency: 6 parallel submits, limit 3 → exactly 3 pass (atomicity proof)
+    const mk3 = await post('/api/admin/teachers', { name: 'محدود ج', slug: 'limited12c', unlimited: false, maxAttempts: 3, requirePhone: true }, { Cookie: cookie });
+    const PH3 = '01099990000';
+    const tokens = [];
+    for (let k = 0; k < 6; k++) {
+      const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب ج', phone: PH3, slug: 'limited12c' });
+      tokens.push(s.data.token);
+    }
+    const parResults = await Promise.all(tokens.map(t => post('/api/exam/submit', { token: t, answers: correctPositions('U1-T1', decodeToken(t).seed) })));
+    const okN = parResults.filter(r => r.status === 200).length;
+    const rejN = parResults.filter(r => r.status === 429).length;
+    ok('تزامن: 6 تسليمات متوازية بحد 3 → 3 ناجحة + 3 مرفوضة بالضبط (ذرية)', okN === 3 && rejN === 3, okN + '/' + rejN);
+    // unlimited default unaffected
+    const u = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب حر', phone: '01000000001', slug: 'mostafa' });
+    ok('المعلم غير المحدود: بدء بلا حقل attempts', u.status === 200 && !('attempts' in u.data));
+    // phone normalization: variants collapse to one canonical identity
+    for (const v of ['+2 010-1234 5678', '00201012345678', '٠١٠١٢٣٤٥٦٧٨']) {
+      const s = await post('/api/exam/start', { examId: 'T2P-C1-T1', name: 'طالب توحيد', phone: v });
+      if (s.status !== 200) { ok('توحيد الهاتف: بدء بصيغة ' + v, false, 'status ' + s.status); break; }
+      const sd = decodeToken(s.data.token).seed;
+      await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('T2P-C1-T1', sd) });
+    }
+    await new Promise(r => setTimeout(r, 800)); // waitUntil persist
+    const res = await jfetch('/api/admin/results', { headers: { Cookie: cookie } });
+    const mine = res.data.results.filter(r => r.name === 'طالب توحيد');
+    ok('توحيد الهاتف: 3 صيغ → نفس الرقم المعياري في النتائج', mine.length === 3 && mine.every(r => r.phone === '01012345678'), JSON.stringify(mine.map(r => r.phone)));
+    const badPh = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '019123' });
+    ok('رفض هاتف لا يطابق صيغة الموبايل المصري', badPh.status === 400);
+    // cleanup
+    for (const id of [mk.data.teacher.id, mk2.data.teacher.id, mk3.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+  }
+
+  /* ============ 13. offline mode (server contract) ============ */
+  console.log('\n[13] وضع عدم الاتصال (عقد الخادم)');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم أوفلاين', slug: 'offline13', offlineMode: true }, { Cookie: cookie });
+    ok('إنشاء معلم بوضع عدم الاتصال', mk.status === 200 && mk.data.teacher.offlineMode === true);
+    const s = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب أوفلاين', phone: '01013131313', slug: 'offline13' });
+    const tk = decodeToken(s.data.token);
+    ok('جلسة الأوفلاين: offline.enabled + صلاحية 72 ساعة', s.status === 200 && s.data.offline && s.data.offline.enabled === true && (tk.exp - tk.iss) === 72 * 3600 && !isNaN(Date.parse(s.data.offline.expiresAt)));
+    const s2 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب عادي', phone: '01014141414', slug: 'mostafa' });
+    const tk2 = decodeToken(s2.data.token);
+    ok('الجلسة العادية: offline.enabled=false + صلاحية 6 ساعات', s2.data.offline && s2.data.offline.enabled === false && (tk2.exp - tk2.iss) === 6 * 3600);
+    const sub = await post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', tk.seed) });
+    ok('تسليم جلسة الأوفلاين يعمل (الإجابة دون اتصال + التسليم عند الاتصال)', sub.status === 200 && sub.data.score === 20);
+    await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 14. teacher dashboard + registration/API security ============ */
+  console.log('\n[14] لوحة المعلم وأمان التسجيل');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم اللوحة', slug: 'dash14', phone: '+20 011-2222 3333' }, { Cookie: cookie });
+    ok('إنشاء معلم + توحيد هاتف المعلم للصيغة المعيارية', mk.status === 200 && mk.data.teacher.phone === '01122223333', mk.data.teacher && mk.data.teacher.phone);
+    const dashId = mk.data.teacher.id;
+    // submit 1: U1-T1 perfect (100) + submit 2: T2P-C1-T1 all-wrong (0)
+    const s1 = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب لوحة 1', phone: '01015151515', slug: 'dash14' });
+    await post('/api/exam/submit', { token: s1.data.token, answers: correctPositions('U1-T1', decodeToken(s1.data.token).seed) });
+    const s2 = await post('/api/exam/start', { examId: 'T2P-C1-T1', name: 'طالب لوحة 2', phone: '01016161616', slug: 'dash14' });
+    await post('/api/exam/submit', { token: s2.data.token, answers: wrongPositions('T2P-C1-T1', decodeToken(s2.data.token).seed) });
+    await new Promise(r => setTimeout(r, 800)); // waitUntil persist
+    const stats = await jfetch('/api/admin/teachers/' + dashId + '/stats', { headers: { Cookie: cookie } });
+    ok('لوحة المعلم: إجماليات صحيحة (2 نتيجة / طالبان / متوسط 50 / نجاح 50%)',
+      stats.status === 200 && stats.data.totals.results === 2 && stats.data.totals.students === 2 &&
+      stats.data.totals.avgPercentage === 50 && stats.data.totals.passRate === 50);
+    ok('تفصيل حسب الامتحان (امتحانان × محاولة) + الأحدث (2)',
+      stats.data.perExam.length === 2 && stats.data.perExam.every(e => e.attempts === 1) && stats.data.recent.length === 2);
+    const mkB = await post('/api/admin/teachers', { name: 'معلم عزل', slug: 'dash14b' }, { Cookie: cookie });
+    const statsB = await jfetch('/api/admin/teachers/' + mkB.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('عزل اللوحات: معلم آخر لا يرى نتائج الأول (0)', statsB.status === 200 && statsB.data.totals.results === 0);
+    const noAuth = await jfetch('/api/admin/teachers/' + dashId + '/stats');
+    ok('لوحة المعلم محمية بدون جلسة (401)', noAuth.status === 401);
+    // disabled teacher: new sessions rejected
+    await jfetch('/api/admin/teachers/' + mkB.data.teacher.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم عزل', slug: 'dash14b', enabled: false })
+    });
+    const disStart = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01017171717', slug: 'dash14b' });
+    ok('رفض بدء جلسة جديدة لمعلم معطّل (403)', disStart.status === 403);
+    // server ignores client-injected score (no localStorage/client trust)
+    const v = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب حقن', phone: '01018181818', slug: 'mostafa' });
+    const inj = await post('/api/exam/submit', { token: v.data.token, answers: wrongPositions('U1-T1', decodeToken(v.data.token).seed), score: 9999, percentage: 100, pass: true });
+    ok('الخادم يتجاهل الدرجة المحقونة من العميل (صفر محسوب خادميًا)', inj.status === 200 && inj.data.score === 0 && inj.data.percentage === 0 && inj.data.pass === false);
+    // no key leak on a NEW training session
+    const rel = await post('/api/exam/start', { examId: 'T1-PH-RELIGION-01', name: 'طالب دين', phone: '01019191919', slug: 'mostafa' });
+    ok('جلسة تدريب جديد (دين 15 سؤالًا): حقول السؤال نص/خيارات فقط بلا مفاتيح',
+      rel.status === 200 && rel.data.questions.length === 15 &&
+      rel.data.questions.every(q => JSON.stringify(Object.keys(q).sort()) === JSON.stringify(['id', 'no', 'options', 'text'])) &&
+      !JSON.stringify(rel.data).includes('"answer"'));
+    // cleanup
+    for (const id of [dashId, mkB.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+  }
+
+  /* ============ 15. per-teacher STUDENT LIMIT (real unlimited flag, race-safe) ============ */
+  console.log('\n[15] حد الطلاب لكل معلم (علم «غير محدود» حقيقي + ذرية تحت التزامن)');
+  {
+    const ph = (n) => '0106' + String(n).padStart(7, '0');
+    const startAs = (slug, i, examId = 'U1-T1') => post('/api/exam/start', { examId, name: 'طالب ' + i, phone: ph(i), slug });
+    // 15a: limit 2 → 2 accepted, 3rd rejected 429, existing student can re-enter, admin shows Limit/Current/Remaining
+    const mk = await post('/api/admin/teachers', { name: 'حد طلاب', slug: 'stu15', studentLimitUnlimited: false, studentLimit: 2, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد طلاب 2 (studentLimitUnlimited=false, studentLimit=2)', mk.status === 200 && mk.data.teacher.studentLimitUnlimited === false && mk.data.teacher.studentLimit === 2);
+    const s1 = await startAs('stu15', 1), s2 = await startAs('stu15', 2), s3 = await startAs('stu15', 3);
+    ok('الطالبان 1 و2 يُقبلان والثالث يُرفض (429) برسالة واضحة', s1.status === 200 && s2.status === 200 && s3.status === 429 && /اكتمل العدد/.test(s3.data.error));
+    ok('استجابة البدء تعلن الحد/الحالي/المتبقي (2/2/0 بعد الطالب الثاني)', s2.data.students && s2.data.students.limit === 2 && s2.data.students.current === 2 && s2.data.students.remaining === 0);
+    const again = await startAs('stu15', 1, 'T2P-C1-T1');
+    ok('طالب مسجَّل يدخل امتحانًا آخر رغم امتلاء الحد (الحد على الطلاب لا المحاولات)', again.status === 200);
+    const samePhoneOtherName = await post('/api/exam/start', { examId: 'U1-T1', name: 'اسم مختلف', phone: '+2' + ph(1), slug: 'stu15' });
+    ok('نفس الهاتف بصيغة مختلفة واسم مختلف = نفس الطالب (لا مقعد جديد)', samePhoneOtherName.status === 200);
+    const sub3 = await post('/api/exam/submit', { token: s1.data.token, answers: correctPositions('U1-T1', decodeToken(s1.data.token).seed) });
+    ok('تسليم الطالب المسجَّل يعمل بشكل طبيعي', sub3.status === 200 && sub3.data.score === 20);
+    const st = await jfetch('/api/admin/teachers/' + mk.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('لوحة المعلم: Limit 2 / Current 2 / Remaining 0 + الطلاب المسجَّلون = 2', st.status === 200 && st.data.studentLimit.limit === 2 && st.data.studentLimit.current === 2 && st.data.studentLimit.remaining === 0 && st.data.totals.registeredStudents === 2);
+    const lst = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    const me = lst.data.teachers.find(t => t.slug === 'stu15');
+    ok('قائمة المعلمين تحمل studentLimitStatus (limit/current/remaining)', me && me.studentLimitStatus.limit === 2 && me.studentLimitStatus.current === 2 && me.studentLimitStatus.remaining === 0);
+    // raise limit → new student accepted
+    const up = await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'حد طلاب', slug: 'stu15', studentLimitUnlimited: false, studentLimit: 3 }) });
+    const s4 = await startAs('stu15', 3);
+    ok('رفع الحد إلى 3 → الطالب الثالث يُقبل', up.status === 200 && s4.status === 200 && s4.data.students.remaining === 0);
+    // 15b: limit 0 → no new student; 15c: unlimited flag (not a number)
+    const mk0 = await post('/api/admin/teachers', { name: 'حد صفر', slug: 'stu15z', studentLimitUnlimited: false, studentLimit: 0, requirePhone: true }, { Cookie: cookie });
+    const z = await startAs('stu15z', 1);
+    ok('حد 0 = التسجيل مغلق (429)', mk0.status === 200 && z.status === 429);
+    const mkU = await post('/api/admin/teachers', { name: 'غير محدود', slug: 'stu15u', studentLimitUnlimited: true, studentLimit: 0, requirePhone: true }, { Cookie: cookie });
+    const uRes = await Promise.all([1, 2, 3, 4, 5].map(i => startAs('stu15u', i)));
+    ok('غير محدود = علم حقيقي (limit=null) ولا يُرفض أي طالب', mkU.data.teacher.studentLimitUnlimited === true && uRes.every(r => r.status === 200) && uRes[0].data.students.unlimited === true && uRes[0].data.students.limit === null);
+    // 15d: RACE — limit 500, current 499, 6 concurrent NEW students → exactly 1 accepted
+    const mkR = await post('/api/admin/teachers', { name: 'سباق', slug: 'stu15r', studentLimitUnlimited: false, studentLimit: 500, requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم بحد 500', mkR.status === 200 && mkR.data.teacher.studentLimit === 500);
+    let filled = 0;
+    for (let b = 0; b < 499; b += 25) {
+      const batch = [];
+      for (let i = b; i < Math.min(499, b + 25); i++) batch.push(startAs('stu15r', 1000 + i));
+      filled += (await Promise.all(batch)).filter(r => r.status === 200).length;
+    }
+    ok('تسجيل 499 طالبًا متمايزًا (Current = 499)', filled === 499, 'filled ' + filled);
+    const race = await Promise.all([1, 2, 3, 4, 5, 6].map(i => startAs('stu15r', 5000 + i)));
+    const acc = race.filter(r => r.status === 200).length, rej = race.filter(r => r.status === 429).length;
+    ok('سباق: حد 500 / الحالي 499 / 6 تسجيلات متزامنة → 1 مقبول + 5 مرفوضة بالضبط', acc === 1 && rej === 5, acc + '/' + rej);
+    const stR = await jfetch('/api/admin/teachers/' + mkR.data.teacher.id + '/stats', { headers: { Cookie: cookie } });
+    ok('بعد السباق: Current = 500 بالضبط (لا تجاوز)', stR.data.studentLimit.current === 500 && stR.data.studentLimit.remaining === 0);
+    // 15e: slug from body cannot escape another teacher's limit (identity is server-side per slug)
+    const spoof = await post('/api/exam/start', { examId: 'U1-T1', name: 'محتال', phone: ph(9999), slug: 'stu15r', teacherId: 't_default_mostafa' });
+    ok('لا يمكن تجاوز حد المعلم بحقن teacherId من العميل', spoof.status === 429);
+    // cleanup (archive)
+    for (const id of [mk.data.teacher.id, mk0.data.teacher.id, mkU.data.teacher.id, mkR.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
   }
 
   console.log('\n══════════════════════════════');

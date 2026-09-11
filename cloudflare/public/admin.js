@@ -172,7 +172,7 @@
           'ت1: ' + d.structure.philosophyTrainings.term1.topics + ' موضوعات / ' + d.structure.philosophyTrainings.term1.lessons + ' درسًا / ' + d.structure.philosophyTrainings.term1.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term1.trainingQuestions + ' سؤالًا · ' +
           'ت2: ' + d.structure.philosophyTrainings.term2.topics + ' موضوعات / ' + d.structure.philosophyTrainings.term2.lessons + ' درسًا / ' + d.structure.philosophyTrainings.term2.trainings + ' تدريبًا / ' + d.structure.philosophyTrainings.term2.trainingQuestions + ' سؤالًا · ' +
           d.structure.philosophyTrainings.newQuestionsFromJson + ' سؤالًا جديدًا من JSON · ' + d.structure.philosophyTrainings.keyConflictsBankKept + ' تعارض مفتاح (احتُفظ بمفتاح البنك المُدقَّق) · ' +
-          d.structure.philosophyTrainings.needsReview + ' يحتاج مراجعة · ' + d.structure.philosophyTrainings.legacyHiddenExams + ' نموذجًا قديمًا مخفيًا') : '') +
+          d.structure.philosophyTrainings.needsReview + ' مفتاح JSON غير مؤكد (احتُفظ بمفتاح البنك المُدقَّق — لا يظهر للطالب) · ' + d.structure.philosophyTrainings.legacyHiddenExams + ' نموذجًا قديمًا مخفيًا') : '') +
         kv('مستبعد', (a.philosophyTerm1.excluded || 0) + ' (ت1) + ' + (a.philosophyTerm2.excluded || 0) + ' (فلسفة ت2) + ' + ((a.philosophyTerm2Logic && a.philosophyTerm2Logic.excluded) || 0) + ' (منطق ت2) سؤالًا معزولًا') +
         '</div>' +
         '<div class="desc" style="margin-top:12px;font-size:.78rem">' + esc(d.notes.curriculumAlignment) + '</div></div>' +
@@ -183,10 +183,12 @@
             '<div class="desc" style="font-size:.74rem;margin-top:3px">' + esc(c.reason) + '</div></div>';
         }).join('') + '</div>' +
         '<div class="section-title"><h3>المعلمون</h3></div>' +
-        '<div class="card"><table class="tbl"><tr><th>الاسم</th><th>الرابط</th><th>الحالة</th></tr>' +
+        '<div class="card"><table class="tbl"><tr><th>الاسم</th><th>الرابط</th><th>الحالة</th><th>حد الطلاب</th><th>الحالي</th><th>المتبقي</th></tr>' +
         d.teachers.map(function (t) {
+          var sl = t.studentLimit || { unlimited: true, current: 0 };
           return '<tr><td>' + esc(t.name) + '</td><td><code>/' + esc(t.slug) + '</code></td><td>' +
-            (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') + '</td></tr>';
+            (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') + '</td>' +
+            '<td>' + (sl.unlimited ? 'غير محدود' : sl.limit) + '</td><td>' + sl.current + '</td><td>' + (sl.unlimited ? '—' : sl.remaining) + '</td></tr>';
         }).join('') + '</table></div>';
     }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
   }
@@ -208,14 +210,71 @@
             (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
             '<div class="desc" style="font-size:.78rem;margin-top:4px">' + esc(t.bio || '') + '</div>' +
             '<div style="margin-top:8px;font-size:.78rem">الرابط العام: <a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a></div>' +
+            studentLimitLine(t.studentLimitStatus) +
             '<div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">' +
             '<button class="btn small ghost" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ الرابط</button>' +
             '<button class="btn small" onclick="editTeacher(\'' + esc(t.id) + '\')">تعديل</button>' +
+            '<button class="btn small ghost" onclick="teacherDash(\'' + esc(t.id) + '\')">لوحة المعلم</button>' +
             (t.isDefault ? '' : '<button class="btn small danger" onclick="deleteTeacher(\'' + esc(t.id) + '\')">حذف</button>') +
             '</div></div></div>';
-        }).join('') + '</div>';
+        }).join('') + '</div>' +
+        (d.archived && d.archived.length ?
+          '<div class="section-title" style="margin-top:18px"><h3>الأرشيف (محذوفون — قابلون للاستعادة)</h3></div>' +
+          '<div class="card"><table class="tbl"><tr><th>الاسم</th><th>الرابط</th><th>تاريخ الحذف</th><th></th></tr>' +
+          d.archived.map(function (t) {
+            return '<tr><td>' + esc(t.name) + '</td><td><code>/' + esc(t.slug) + '</code></td><td style="font-size:.76rem">' + (t.archivedAt ? new Date(t.archivedAt).toLocaleString('ar-EG') : '—') + '</td>' +
+              '<td><button class="btn small ghost" onclick="restoreTeacher(\'' + esc(t.id) + '\')">استعادة</button></td></tr>';
+          }).join('') + '</table></div>' : '');
       A.teachers = d.teachers;
     }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  /* حد الطلاب: الحد / الحالي / المتبقي — أو «غير محدود» (علم حقيقي من الخادم) */
+  function studentLimitLine(st) {
+    if (!st) return '';
+    var txt = st.unlimited
+      ? 'حد الطلاب: <b>غير محدود</b> · المسجَّلون: <b>' + st.current + '</b>'
+      : 'حد الطلاب: <b>' + st.limit + '</b> · الحالي: <b>' + st.current + '</b> · المتبقي: <b style="color:' + (st.remaining > 0 ? 'var(--ok)' : 'var(--bad)') + '">' + st.remaining + '</b>';
+    return '<div style="margin-top:6px;font-size:.78rem">' + txt + '</div>';
+  }
+  function restoreTeacher(id) {
+    api('/api/admin/teachers/' + id + '/restore', { method: 'POST', body: '{}' }).then(function () {
+      toast('تمت الاستعادة (المعلم معطّل حتى تفعّله)');
+      renderTeachers($('tabBody'));
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  /* لوحة المعلم: إجماليات + تفصيل حسب الامتحان + أحدث النتائج (من فهرس المعلم في KV) */
+  function teacherDash(id) {
+    var t = A.teachers.filter(function (x) { return x.id === id; })[0] || { name: '' };
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.innerHTML =
+      '<div class="modal" style="max-width:640px">' +
+      '<h3>لوحة المعلم: ' + esc(t.name) + '</h3>' +
+      '<div id="tdBody"><div class="empty"><div class="spin"></div></div></div>' +
+      '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إغلاق</button></div>' +
+      '</div>';
+    document.body.appendChild(overlay);
+    api('/api/admin/teachers/' + id + '/stats').then(function (d) {
+      var sl = d.studentLimit || { unlimited: true, current: d.totals.students };
+      var h = '<div class="stat-grid">' +
+        stat(d.totals.results, 'نتيجة') + stat(d.totals.students, 'طالبًا') +
+        stat(d.totals.avgPercentage + '%', 'متوسط النسب') + stat(d.totals.passRate + '%', 'نسبة النجاح') + '</div>' +
+        '<div class="section-title"><h3>حد الطلاب</h3></div><div class="stat-grid">' +
+        stat(sl.unlimited ? '∞' : sl.limit, 'الحد (Limit)') + stat(sl.current, 'الحالي (Current)') +
+        stat(sl.unlimited ? '∞' : sl.remaining, 'المتبقي (Remaining)') + '</div>';
+      h += '<div class="section-title"><h3>حسب الامتحان</h3></div>';
+      h += d.perExam.length ? '<div style="overflow-x:auto"><table class="tbl"><tr><th>الامتحان</th><th>المحاولات</th><th>المتوسط</th></tr>' +
+        d.perExam.map(function (e) {
+          return '<tr><td style="font-size:.8rem">' + esc(e.title) + '</td><td>' + e.attempts + '</td><td>' + e.avgPercentage + '%</td></tr>';
+        }).join('') + '</table></div>' : '<div class="empty">لا نتائج بعد.</div>';
+      h += '<div class="section-title"><h3>أحدث النتائج</h3></div>';
+      h += d.recent.length ? '<div style="overflow-x:auto"><table class="tbl"><tr><th>الطالب</th><th>الامتحان</th><th>الدرجة</th></tr>' +
+        d.recent.map(function (r) {
+          return '<tr><td>' + esc(r.name) + '</td><td style="font-size:.78rem">' + esc(r.examLabel) + '</td><td><b>' + r.score + '/' + r.total + '</b></td></tr>';
+        }).join('') + '</table></div>' : '';
+      $('tdBody').innerHTML = h;
+    }).catch(function (e) { $('tdBody').innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
   }
 
   function copyLink(slug) {
@@ -227,7 +286,7 @@
   function editTeacher(id) {
     var t = id ? A.teachers.filter(function (x) { return x.id === id; })[0] : null;
     var isNew = !t;
-    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, requirePhone: true, enabled: true };
+    t = t || { name: '', slug: '', phone: '', specialty: '', bio: '', photo: '', socialLinks: {}, requirePhone: true, enabled: true, unlimited: true, maxAttempts: 3, offlineMode: false, studentLimitUnlimited: true, studentLimit: 0 };
     var overlay = document.createElement('div');
     overlay.className = 'modal-bg';
     overlay.innerHTML =
@@ -250,6 +309,19 @@
       '<span class="switch"><input type="checkbox" id="tReqPhone"' + (t.requirePhone ? ' checked' : '') + '><i></i></span></label>' +
       '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">مفعّل' +
       '<span class="switch"><input type="checkbox" id="tEnabled"' + (t.enabled ? ' checked' : '') + '><i></i></span></label></div>' +
+      '<div style="display:flex;gap:18px;align-items:center;margin:10px 0;flex-wrap:wrap">' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">محاولات غير محدودة' +
+      '<span class="switch"><input type="checkbox" id="tUnlimited"' + (t.unlimited !== false ? ' checked' : '') + '><i></i></span></label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">الحد الأقصى للمحاولات' +
+      '<input id="tMaxAtt" type="number" min="1" max="50" value="' + (t.maxAttempts || 3) + '" style="width:70px"></label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">وضع عدم الاتصال (صلاحية 72 ساعة)' +
+      '<span class="switch"><input type="checkbox" id="tOffMode"' + (t.offlineMode ? ' checked' : '') + '><i></i></span></label></div>' +
+      '<div style="display:flex;gap:18px;align-items:center;margin:10px 0;flex-wrap:wrap">' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">عدد طلاب غير محدود' +
+      '<span class="switch"><input type="checkbox" id="tStuUnl"' + (t.studentLimitUnlimited !== false ? ' checked' : '') + '><i></i></span></label>' +
+      '<label style="display:flex;gap:8px;align-items:center;font-size:.85rem">حد الطلاب (0 = إغلاق التسجيل)' +
+      '<input id="tStuLimit" type="number" min="0" max="1000000" value="' + (t.studentLimit || 0) + '" style="width:90px"' + (t.studentLimitUnlimited !== false ? ' disabled' : '') + '></label>' +
+      (t.studentLimitStatus ? '<span class="desc" style="font-size:.78rem">المسجَّلون حاليًا: <b>' + t.studentLimitStatus.current + '</b></span>' : '') + '</div>' +
       '<div id="tErr" style="color:var(--bad);font-size:.8rem;min-height:1.2em"></div>' +
       '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إلغاء</button>' +
       '<button class="btn" id="tSave" onclick="saveTeacher(\'' + (id || '') + '\')">حفظ</button></div>' +
@@ -257,6 +329,7 @@
     document.body.appendChild(overlay);
     $('tSlug').addEventListener('input', function () { $('tUrlPreview').value = location.host + '/' + this.value; });
     $('tPhoto').addEventListener('change', function () { resizePhoto(this.files[0]); });
+    $('tStuUnl').addEventListener('change', function () { $('tStuLimit').disabled = this.checked; });
   }
 
   function resizePhoto(file) {
@@ -289,7 +362,12 @@
       socialLinks: { whatsapp: $('tWhats').value.trim(), facebook: $('tFb').value.trim(), tiktok: $('tTt').value.trim() },
       photo: A.pendingPhoto || undefined,
       requirePhone: $('tReqPhone').checked,
-      enabled: $('tEnabled').checked
+      enabled: $('tEnabled').checked,
+      unlimited: $('tUnlimited').checked,
+      maxAttempts: parseInt($('tMaxAtt').value, 10) || 3,
+      offlineMode: $('tOffMode').checked,
+      studentLimitUnlimited: $('tStuUnl').checked,
+      studentLimit: Math.max(0, parseInt($('tStuLimit').value, 10) || 0)
     };
     $('tSave').disabled = true;
     api(id ? '/api/admin/teachers/' + id : '/api/admin/teachers', {
@@ -308,9 +386,9 @@
 
   function deleteTeacher(id) {
     var t = A.teachers.filter(function (x) { return x.id === id; })[0];
-    if (!confirm('حذف المعلم «' + t.name + '» نهائيًا؟ لن يعمل رابطه /' + t.slug + ' بعد الحذف.')) return;
+    if (!confirm('حذف المعلم «' + t.name + '»؟ سيُنقل إلى الأرشيف (قابل للاستعادة) ولن يعمل رابطه /' + t.slug + ' حتى الاستعادة. النتائج لا تُحذف.')) return;
     api('/api/admin/teachers/' + id, { method: 'DELETE' }).then(function () {
-      toast('تم الحذف');
+      toast('نُقل المعلم إلى الأرشيف');
       renderTeachers($('tabBody'));
     }).catch(function (e) { toast(e.message, true); });
   }
@@ -476,7 +554,9 @@
   window.editTeacher = editTeacher;
   window.saveTeacher = saveTeacher;
   window.deleteTeacher = deleteTeacher;
+  window.restoreTeacher = restoreTeacher;
   window.copyLink = copyLink;
+  window.teacherDash = teacherDash;
   window.bankFilter = bankFilter;
   window.bankPage = bankPage;
 

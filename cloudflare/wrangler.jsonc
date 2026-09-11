@@ -18,6 +18,12 @@
       "id": "00000000000000000000000000000000"
     }
   ],
+  // عدّادات حدود المحاولات — Durable Object (ضمن الخطة المجانية):
+  // الاستهلاك الذري داخل الكائن الواحد يجعل فرض الحد آمنًا تحت التزامن.
+  "durable_objects": {
+    "bindings": [{ "name": "ATTEMPT_LIMITER", "class_name": "AttemptLimiter" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AttemptLimiter"] }],
   // Optional secrets (see README):
   //   npx wrangler secret put SESSION_SECRET
   //   npx wrangler secret put GAS_WEBAPP_URL

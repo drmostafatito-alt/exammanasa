@@ -21,6 +21,7 @@
 import BANKS from './data/banks.json';
 
 const SESSION_TTL_SECONDS = 6 * 3600;      // 6 ساعات — مطابق لتطبيق GAS
+const OFFLINE_TTL_SECONDS = 72 * 3600;     // 72 ساعة لجلسات معلمي وضع عدم الاتصال
 const ADMIN_SESSION_TTL = 8 * 3600;
 const RESERVED_SLUGS = new Set([
   'api', 'admin', 'assets', 'static', 'favicon.ico', 'favicon.svg', 'robots.txt',
@@ -41,6 +42,27 @@ function json(data, status = 200, headers = {}) {
   });
 }
 const fail = (message, status = 400) => json({ error: message }, status);
+/* Errors that are safe to show to the client (Arabic, no internals). Anything else → generic. */
+class ApiError extends Error { constructor(message, status = 400) { super(message); this.status = status; } }
+const bad = (message, status = 400) => new ApiError(message, status);
+
+/* ---- phone normalization (Egyptian mobiles; server-side identity) ----
+ * Accepts Arabic-Indic/Persian digits, spaces/dashes, +20/0020 prefixes.
+ * Canonical form: 01XXXXXXXXX (11 digits). Used for attempt-limit identity
+ * and stored in tokens/results — the client value is never trusted as-is. */
+function normalizePhone(raw) {
+  let d = String(raw || '').trim()
+    .replace(/[٠-٩]/g, c => '٠١٢٣٤٥٦٧٨٩'.indexOf(c))
+    .replace(/[۰-۹]/g, c => '۰۱۲۳۴۵۶۷۸۹'.indexOf(c));
+  d = d.replace(/[^\d+]/g, '');
+  if (d.startsWith('+')) d = d.slice(1);
+  if (d.startsWith('0020')) d = d.slice(4);
+  else if (d.startsWith('20') && d.length >= 12) d = d.slice(2);
+  if (/^1[0125]\d{8}$/.test(d)) d = '0' + d; // missing trunk zero
+  return d;
+}
+function isValidEgMobile(d) { return /^01[0125][0-9]{8}$/.test(d); }
+function normalizeName(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 
 function securityHeaders(res) {
   const h = new Headers(res.headers);
@@ -85,8 +107,7 @@ async function pbkdf2(password, salt, iterations = 120000) {
 const randomHex = (n = 16) => hex(crypto.getRandomValues(new Uint8Array(n)));
 
 /* ---- exam session token: payload.HMAC ---- */
-function makeToken(payload, secret) { return b64url(JSON.stringify(payload)) + '.' + b64url(String.fromCharCode(...new Uint8Array(32))).slice(0, 0); }
-// (token = base64url(payload) + '.' + base64url(hmac))
+// token = base64url(payload) + '.' + base64url(hmac)
 async function signToken(payload, secret) {
   const body = b64url(JSON.stringify(payload));
   const sig = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, body))));
@@ -124,7 +145,7 @@ const DEFAULT_TEACHERS = [{
 }];
 
 async function kvGet(env, key) {
-  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
   const v = await env.PLATFORM_KV.get(key);
   return v === null ? null : v;
 }
@@ -134,7 +155,7 @@ async function kvGetJson(env, key) {
   try { return JSON.parse(v); } catch { return null; }
 }
 async function kvPut(env, key, value, ttlSeconds) {
-  if (!env.PLATFORM_KV) throw new Error('KV غير مربوط.');
+  if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
   const opts = ttlSeconds ? { expirationTtl: Math.max(60, ttlSeconds) } : undefined;
   await env.PLATFORM_KV.put(key, value, opts);
 }
@@ -157,8 +178,11 @@ async function getSessionSecret(env) {
 /* ============================ request parsing ============================ */
 async function readJson(request, maxBytes = 128 * 1024) {
   const buf = await request.arrayBuffer();
-  if (buf.byteLength > maxBytes) throw new Error('حجم الطلب كبير جدًا.');
-  try { return JSON.parse(new TextDecoder().decode(buf)); } catch { throw new Error('بيانات غير صالحة.'); }
+  if (buf.byteLength > maxBytes) throw bad('حجم الطلب كبير جدًا.', 413);
+  let data;
+  try { data = JSON.parse(new TextDecoder().decode(buf)); } catch { throw bad('بيانات غير صالحة.'); }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw bad('بيانات غير صالحة.');
+  return data;
 }
 
 /* ============================ public API ============================ */
@@ -207,15 +231,36 @@ async function handleApi(request, env, ctx, pathname) {
     if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
 
     const name = String(body.name || '').trim();
-    const phone = String(body.phone || '').trim();
+    const rawPhone = String(body.phone || '').trim();
     if (!name) return fail('اسم الطالب مطلوب.');
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
-    if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) return fail('رقم الهاتف غير صالح.');
-    if (!phone) {
-      const slug = String(body.slug || '');
-      const teachers = await getTeachers(env);
-      const t = teachers.find(x => x.slug === slug);
-      if (t && t.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    const normPhone = normalizePhone(rawPhone);
+    if (rawPhone && !isValidEgMobile(normPhone)) return fail('رقم الهاتف غير صالح. أدخل رقمًا مصريًا صحيحًا (01xxxxxxxxx).');
+    const slug = String(body.slug || '');
+    const teachers = await getTeachers(env);
+    const teacher = teachers.find(x => x.slug === slug) || null;
+    if (teacher && teacher.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
+    if (!rawPhone && teacher && teacher.requirePhone !== false) return fail('رقم الهاتف مطلوب.');
+    // Student limit — registration is the moment a distinct student is counted. Atomic inside the
+    // teacher's DO instance, so N concurrent new registrations can never exceed the limit.
+    let studentSeat = null;
+    if (teacher) {
+      const reg = await registerStudent(env, teacher, studentIdentity(normPhone, name), { enforce: true });
+      if (!reg) return fail('خدمة تسجيل الطلاب غير متاحة حاليًا.', 503);
+      if (reg.allowed !== true) return fail(STUDENT_LIMIT_MSG, 429);
+      const sl = studentLimitOf(teacher);
+      studentSeat = { unlimited: sl.unlimited, limit: sl.limit, current: reg.count, remaining: sl.unlimited ? null : Math.max(0, sl.limit - reg.count) };
+    }
+    // read-only limit pre-check (atomic enforcement happens at submit time)
+    const limit = teacherLimit(teacher);
+    let attemptsInfo = null;
+    if (limit > 0) {
+      const stub = await limiterStub(env, await limitKey(slug, examId, studentIdentity(normPhone, name)));
+      if (!stub) return fail('خدمة حدود المحاولات غير متاحة حاليًا.', 503);
+      const st = await stub.fetch('https://limiter.internal/count').then(r => r.json()).catch(() => null);
+      const used = (st && Number.isFinite(st.used)) ? st.used : 0;
+      if (used >= limit) return fail('استنفدت عدد المحاولات المسموح به لهذا الامتحان (' + limit + ').', 429);
+      attemptsInfo = { used, limit, remaining: limit - used };
     }
 
     const secret = await getSessionSecret(env).catch(() => null);
@@ -223,10 +268,12 @@ async function handleApi(request, env, ctx, pathname) {
 
     const seed = Math.floor(Math.random() * 2147483646) + 1;
     const nonce = randomHex(12);
+    const offlineMode = teacher && teacher.offlineMode === true;
+    const ttl = offlineMode ? OFFLINE_TTL_SECONDS : SESSION_TTL_SECONDS;
+    const iss = Math.floor(Date.now() / 1000);
     const token = await signToken({
-      t: 'exam', examId, seed, nonce, name, phone,
-      slug: String(body.slug || ''), iss: Math.floor(Date.now() / 1000),
-      exp: Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS
+      t: 'exam', examId, seed, nonce, name, phone: normPhone,
+      slug, iss, exp: iss + ttl
     }, secret);
 
     const questions = ids.map((qid, i) => {
@@ -237,6 +284,9 @@ async function handleApi(request, env, ctx, pathname) {
 
     return json({
       token,
+      ...(attemptsInfo ? { attempts: attemptsInfo } : {}),
+      ...(studentSeat ? { students: studentSeat } : {}),
+      offline: { enabled: offlineMode, expiresAt: new Date((iss + ttl) * 1000).toISOString() },
       exam: {
         id: examId, title: examMeta.title, count: examMeta.count,
         lessonTitle: examMeta.lessonTitle, lessonNo: examMeta.lessonNo,
@@ -283,6 +333,29 @@ async function handleApi(request, env, ctx, pathname) {
     }
     if (replay) {
       try { return json(JSON.parse(replay), 200); } catch { /* fallthrough */ }
+    }
+
+    // atomic attempt consumption for limited teachers (race-safe inside the DO)
+    {
+      const teachers = await getTeachers(env);
+      const t = teachers.find(x => x.slug === (sess.slug || '')) || null;
+      if (t && t.enabled === false) return fail('صفحة هذا المعلم غير متاحة حاليًا.', 403);
+      if (t) {
+        // Seat check at submit too: a token whose student was never registered (or a teacher whose
+        // limit was lowered afterwards) cannot bypass the limit. Registered students are always allowed.
+        const reg = await registerStudent(env, t, studentIdentity(sess.phone || '', sess.name || ''), { enforce: true });
+        if (!reg) return fail('خدمة تسجيل الطلاب غير متاحة حاليًا.', 503);
+        if (reg.allowed !== true) return fail(STUDENT_LIMIT_MSG, 429);
+      }
+      const lim = teacherLimit(t);
+      if (lim > 0) {
+        const stub = await limiterStub(env, await limitKey(sess.slug || '', sess.examId, studentIdentity(sess.phone || '', sess.name || '')));
+        if (!stub) return fail('خدمة حدود المحاولات غير متاحة حاليًا.', 503);
+        const c = await stub.fetch('https://limiter.internal/consume', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ limit: lim })
+        }).then(r => r.json()).catch(() => null);
+        if (!c || c.allowed !== true) return fail('استنفدت عدد المحاولات المسموح به لهذا الامتحان (' + lim + ').', 429);
+      }
     }
 
     // grade — SERVER ONLY
@@ -340,9 +413,19 @@ async function handleApi(request, env, ctx, pathname) {
           const recent = await env.PLATFORM_KV.get('results:recent').catch(() => null);
           let list = [];
           try { list = recent ? JSON.parse(recent) : []; } catch {}
-          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
+          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
           if (list.length > 100) list = list.slice(0, 100);
           await env.PLATFORM_KV.put('results:recent', JSON.stringify(list)).catch(() => {});
+          // per-teacher index (powers the teacher dashboard; bank/exams stay shared)
+          const tslug = result.teacherSlug || '';
+          if (tslug) {
+            const tprev = await env.PLATFORM_KV.get('results:teacher:' + tslug).catch(() => null);
+            let tlist = [];
+            try { tlist = tprev ? JSON.parse(tprev) : []; } catch {}
+            tlist.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage });
+            if (tlist.length > 100) tlist = tlist.slice(0, 100);
+            await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(tlist)).catch(() => {});
+          }
         }
       } catch { /* storage failure must not lose the student's result response */ }
 
@@ -495,14 +578,32 @@ async function handleAdmin(request, env, ctx, pathname) {
       teachersCount: teachers.length,
       teachersEnabled: teachers.filter(t => t.enabled !== false).length,
       recentResultsCount: recent.length,
-      teachers: teachers.map(t => ({ slug: t.slug, name: t.name, enabled: t.enabled !== false }))
+      teachers: await Promise.all(teachers.map(async t => ({ slug: t.slug, name: t.name, enabled: t.enabled !== false, studentLimit: await studentLimitStatus(env, t) })))
     });
   }
 
   /* ---------- teachers CRUD ---------- */
   if (pathname === '/api/admin/teachers' && method === 'GET') {
     const teachers = await getTeachers(env);
-    return json({ teachers });
+    const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+    const withStatus = await Promise.all(teachers.map(async t => ({ ...t, studentLimitStatus: await studentLimitStatus(env, t) })));
+    return json({ teachers: withStatus, archived });
+  }
+  /* ---------- restore an archived teacher (delete is non-destructive) ---------- */
+  const restoreMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/restore$/);
+  if (restoreMatch && method === 'POST') {
+    const teachers = await getTeachers(env);
+    const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+    const i = archived.findIndex(x => x.id === restoreMatch[1]);
+    if (i === -1) return fail('المعلم غير موجود في الأرشيف.', 404);
+    const t = archived[i];
+    if (teachers.some(x => x.slug === t.slug)) return fail('الرابط (slug) مستخدم حاليًا بواسطة معلم آخر — عدّل رابط المعلم الحالي أولًا.', 409);
+    delete t.archivedAt; t.enabled = false; t.updatedAt = new Date().toISOString();
+    archived.splice(i, 1);
+    teachers.push(t);
+    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await kvPut(env, 'teachers:archived', JSON.stringify(archived));
+    return json({ ok: true, teacher: t });
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
     const body = await readJson(request, 3 * 1024 * 1024);
@@ -515,6 +616,32 @@ async function handleAdmin(request, env, ctx, pathname) {
     teachers.push(t);
     await kvPut(env, 'teachers', JSON.stringify(teachers));
     return json({ ok: true, teacher: t });
+  }
+  /* ---------- teacher dashboard (per-teacher results index) ---------- */
+  const statsMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)\/stats$/);
+  if (statsMatch && method === 'GET') {
+    const teachers = await getTeachers(env);
+    const t = teachers.find(x => x.id === statsMatch[1]);
+    if (!t) return fail('المعلم غير موجود.', 404);
+    const tlist = await kvGetJson(env, 'results:teacher:' + t.slug).catch(() => null) || [];
+    const slStatus = await studentLimitStatus(env, t);
+    // distinct registered students come from the per-teacher registry (exact, not capped by the 100-row index)
+    const students = Math.max(slStatus.current, new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size);
+    const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
+    const pass = tlist.filter(r => r.percentage >= 50).length;
+    const perExam = {};
+    tlist.forEach(r => {
+      const k = r.examId || r.examLabel;
+      perExam[k] = perExam[k] || { examId: r.examId || '', title: r.examLabel || '', attempts: 0, sum: 0 };
+      perExam[k].attempts++; perExam[k].sum += r.percentage;
+    });
+    return json({
+      teacher: teacherAdminSummary(t),
+      studentLimit: slStatus,
+      totals: { results: tlist.length, students, registeredStudents: slStatus.current, avgPercentage: avg, passRate: tlist.length ? Math.round(pass / tlist.length * 10000) / 100 : 0 },
+      perExam: Object.values(perExam).map(e => ({ examId: e.examId, title: e.title, attempts: e.attempts, avgPercentage: Math.round(e.sum / e.attempts * 100) / 100 })).sort((a, b) => b.attempts - a.attempts),
+      recent: tlist.slice(0, 10)
+    });
   }
   const tMatch = pathname.match(/^\/api\/admin\/teachers\/([A-Za-z0-9_-]+)$/);
   if (tMatch) {
@@ -534,10 +661,15 @@ async function handleAdmin(request, env, ctx, pathname) {
       return json({ ok: true, teacher: t });
     }
     if (method === 'DELETE') {
+      // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
+      // and the student registry are never deleted. The slug is released for reuse.
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
-      teachers.splice(idx, 1);
+      const [removed] = teachers.splice(idx, 1);
+      const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
+      archived.unshift({ ...removed, enabled: false, archivedAt: new Date().toISOString() });
+      await kvPut(env, 'teachers:archived', JSON.stringify(archived.slice(0, 200)));
       await kvPut(env, 'teachers', JSON.stringify(teachers));
-      return json({ ok: true });
+      return json({ ok: true, archived: true });
     }
   }
 
@@ -589,7 +721,7 @@ async function handleAdmin(request, env, ctx, pathname) {
 
 function sanitizeTeacher(body, existing) {
   const name = String(body.name || '').trim();
-  if (!name || name.length > 80) throw new Error('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
+  if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
   if (!slug && body.name) {
@@ -597,19 +729,23 @@ function sanitizeTeacher(body, existing) {
     // Arabic names produce no latin slug — fall back to a short random one
     if (!/^[a-z0-9-]{2,30}$/.test(slug)) slug = 't' + randomHex(4);
   }
-  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw new Error('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
-  if (RESERVED_SLUGS.has(slug)) throw new Error('هذا الرابط محجوز.');
+  if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw bad('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
+  if (RESERVED_SLUGS.has(slug)) throw bad('هذا الرابط محجوز.');
   const social = {};
   for (const k of ['whatsapp', 'facebook', 'tiktok']) {
     const v = String(body.socialLinks?.[k] || '').trim();
-    if (v && !/^https?:\/\//i.test(v)) throw new Error('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+    if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
     social[k] = v;
   }
-  const phone = String(body.phone || '').trim();
-  if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) throw new Error('رقم هاتف المعلم غير صالح.');
+  let phone = String(body.phone || '').trim();
+  if (phone) {
+    const np = normalizePhone(phone);
+    phone = isValidEgMobile(np) ? np : phone.replace(/[\s\-.()]/g, '');
+    if (!/^[0-9+]{4,25}$/.test(phone)) throw bad('رقم هاتف المعلم غير صالح.');
+  }
   let photo = String(body.photo || existing?.photo || '');
-  if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw new Error('صورة غير صالحة.');
-  if (photo && photo.length > 2.5 * 1024 * 1024) throw new Error('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
+  if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
+  if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
   // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
   // أي قيم colors قادمة من الطلب تُتجاهل ولا تُخزَّن.
   return {
@@ -619,8 +755,135 @@ function sanitizeTeacher(body, existing) {
     photo,
     socialLinks: social,
     requirePhone: body.requirePhone !== false,
-    enabled: body.enabled !== false
+    enabled: body.enabled !== false,
+    unlimited: body.unlimited !== false,
+    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3)),
+    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true),
+    // Student limit: a REAL unlimited flag (not a big number). When limited, studentLimit is the
+    // max number of DISTINCT students (by normalized phone) who may register under this teacher.
+    // 0 = registration closed for new students (existing students keep access).
+    studentLimitUnlimited: body.studentLimitUnlimited === undefined
+      ? (existing ? existing.studentLimitUnlimited !== false : true)
+      : body.studentLimitUnlimited !== false,
+    studentLimit: sanitizeStudentLimit(body.studentLimit ?? existing?.studentLimit ?? 0)
   };
+}
+function sanitizeStudentLimit(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 0) return 0;
+  return Math.min(1000000, n);
+}
+function studentLimitOf(t) {
+  if (!t) return { unlimited: true, limit: null };
+  if (t.studentLimitUnlimited !== false) return { unlimited: true, limit: null };
+  return { unlimited: false, limit: sanitizeStudentLimit(t.studentLimit) };
+}
+function teacherAdminSummary(t) {
+  const sl = studentLimitOf(t);
+  return {
+    id: t.id, slug: t.slug, name: t.name, enabled: t.enabled !== false,
+    unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3, offlineMode: t.offlineMode === true,
+    studentLimitUnlimited: sl.unlimited, studentLimit: sl.limit
+  };
+}
+/* Per-teacher distinct-student registry (one DO instance per teacher slug).
+ * Returns { allowed, existing, count } — `allowed:false` only for a NEW student when the limit is reached. */
+async function registerStudent(env, teacher, identity, { enforce }) {
+  const stub = await limiterStub(env, 'students:' + teacher.slug);
+  if (!stub) return null;
+  const sl = studentLimitOf(teacher);
+  const digest = hex(await crypto.subtle.digest('SHA-256', enc.encode(identity)));
+  const body = { key: digest, unlimited: sl.unlimited, limit: sl.limit, enforce: !!enforce };
+  return stub.fetch('https://limiter.internal/students/register', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+  }).then(r => r.json()).catch(() => null);
+}
+async function studentCount(env, teacher) {
+  const stub = await limiterStub(env, 'students:' + teacher.slug);
+  if (!stub) return 0;
+  const st = await stub.fetch('https://limiter.internal/students/count').then(r => r.json()).catch(() => null);
+  return st && Number.isFinite(st.count) ? st.count : 0;
+}
+async function studentLimitStatus(env, teacher) {
+  const sl = studentLimitOf(teacher);
+  const current = await studentCount(env, teacher);
+  return {
+    unlimited: sl.unlimited, limit: sl.limit, current,
+    remaining: sl.unlimited ? null : Math.max(0, sl.limit - current)
+  };
+}
+const STUDENT_LIMIT_MSG = 'اكتمل العدد المسموح به من الطلاب لدى هذا المعلم. تواصل مع المعلم للحصول على مقعد.';
+
+/* ============================ attempt limiter (Durable Object) ============
+ * Race-safe per-student attempt counting. Each (teacher, exam, student-identity)
+ * maps to ONE DO instance (idFromName); /consume does an atomic
+ * read-check-increment inside that single instance, so concurrent submissions
+ * can never over-consume — unlike KV read-modify-write. Free plan includes DO. */
+export class AttemptLimiter {
+  constructor(state) { this.state = state; }
+  async fetch(request) {
+    const url = new URL(request.url);
+    const used = (await this.state.storage.get('used')) || 0;
+    if (url.pathname === '/count' && request.method === 'GET') {
+      return Response.json({ used });
+    }
+    /* ---- per-teacher distinct-student registry (instance = 'students:<slug>') ---- */
+    if (url.pathname === '/students/count' && request.method === 'GET') {
+      return Response.json({ count: (await this.state.storage.get('studentCount')) || 0 });
+    }
+    if (url.pathname === '/students/register' && request.method === 'POST') {
+      let b = null;
+      try { b = await request.json(); } catch {}
+      if (!b || !/^[0-9a-f]{64}$/.test(String(b.key || ''))) return Response.json({ error: 'key required' }, 400);
+      const unlimited = b.unlimited !== false;
+      const limit = Math.max(0, parseInt(b.limit, 10) || 0);
+      const enforce = b.enforce !== false;
+      // Atomic: existing student → always allowed; new student → allowed only if under the limit.
+      const result = await this.state.storage.transaction(async (txn) => {
+        const count = (await txn.get('studentCount')) || 0;
+        if (await txn.get('s:' + b.key)) return { allowed: true, existing: true, count };
+        if (enforce && !unlimited && count >= limit) return { allowed: false, existing: false, count };
+        await txn.put('s:' + b.key, Date.now());
+        await txn.put('studentCount', count + 1);
+        return { allowed: true, existing: false, count: count + 1 };
+      });
+      return Response.json(result);
+    }
+    if (url.pathname === '/consume' && request.method === 'POST') {
+      let limit = 0;
+      try { limit = Math.max(1, Math.min(50, parseInt((await request.json()).limit, 10) || 0)); } catch {}
+      if (!limit) return Response.json({ error: 'limit required' }, 400);
+      // Serializable storage transaction: the read-check-increment is atomic even
+      // when concurrent consumes interleave at await points — the losers retry
+      // and observe the incremented value. This is the race-safety guarantee.
+      const result = await this.state.storage.transaction(async (txn) => {
+        const cur = (await txn.get('used')) || 0;
+        if (cur >= limit) return { allowed: false, used: cur, remaining: 0 };
+        await txn.put('used', cur + 1);
+        return { allowed: true, used: cur + 1, remaining: limit - cur - 1 };
+      });
+      return Response.json(result);
+    }
+    return new Response('not found', { status: 404 });
+  }
+}
+
+async function limiterStub(env, key) {
+  if (!env.ATTEMPT_LIMITER) return null;
+  return env.ATTEMPT_LIMITER.get(env.ATTEMPT_LIMITER.idFromName('v1:' + key));
+}
+async function limitKey(slug, examId, identity) {
+  const digest = await crypto.subtle.digest('SHA-256', enc.encode(slug + '|' + examId + '|' + identity));
+  return slug + ':' + examId + ':' + hex(digest).slice(0, 32);
+}
+// 0 = unlimited (default). A positive number = max submitted attempts per student per exam.
+function teacherLimit(t) {
+  if (!t || t.unlimited !== false) return 0;
+  const n = parseInt(t.maxAttempts, 10);
+  return Number.isFinite(n) ? Math.max(1, Math.min(50, n)) : 3;
+}
+function studentIdentity(normPhone, name) {
+  return normPhone ? 'p:' + normPhone : 'n:' + normalizeName(name);
 }
 
 /* ============================ main entry ============================ */
@@ -636,8 +899,9 @@ export default {
         try {
           return securityHeaders(await handleApi(request, env, ctx, pathname));
         } catch (e) {
-          const msg = e && e.message ? e.message : 'خطأ غير متوقع.';
-          return securityHeaders(fail(msg, 400));
+          // Only ApiError messages reach the client; anything else is an internal fault → generic text, no details.
+          if (e instanceof ApiError) return securityHeaders(fail(e.message, e.status));
+          return securityHeaders(fail('خطأ غير متوقع في الخادم. حاول مرة أخرى.', 500));
         }
       }
 

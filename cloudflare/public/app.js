@@ -52,7 +52,7 @@
     return fetch(path, opts ? Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts) : undefined)
       .then(function (r) {
         return r.json().catch(function () { return {}; }).then(function (data) {
-          if (!r.ok) { var e = new Error(data.error || ('خطأ ' + r.status)); e.data = data; throw e; }
+          if (!r.ok) { var e = new Error(data.error || ('خطأ ' + r.status)); e.data = data; e.status = r.status; throw e; }
           return data;
         });
       });
@@ -72,6 +72,7 @@
         if (raw) { var st = JSON.parse(raw); if (st && st.name) S.student = st; }
       } catch (e) { }
       renderBrand();
+      flushOfflineSubmits();
       route();
     }).catch(function (e) {
       app.innerHTML = '<div class="card" style="text-align:center;padding:44px;margin-top:20px">' +
@@ -211,7 +212,7 @@
       grade: 'الصف الأول الثانوي', subject: 'الفلسفة والمنطق',
       subName: ph.name,
       stats: ['ترمان دراسيان', phTopics + ' موضوعًا', phTrainings + ' تدريبًا (امتحانًا إلكترونيًا)'],
-      desc: 'امتحانات الفلسفة والمنطق مرتبة حسب الترم ثم الموضوع ثم التدريب — كل تدريب امتحان مستقل من 20 سؤالًا مع تصحيح فوري ومراجعة الإجابات.'
+      desc: 'امتحانات الفلسفة والمنطق مرتبة حسب الترم ثم الموضوع ثم التدريب — كل تدريب امتحان مستقل بعدد أسئلته الخاصة مع تصحيح فوري ومراجعة الإجابات.'
     };
   }
 
@@ -410,14 +411,6 @@
     return html + '</div>';
   }
 
-  function difficultyBadge(e) {
-    if (!e.difficulty) return '';
-    var d = e.difficulty;
-    if (d.hard >= d.easy && d.hard >= d.medium) return '<span class="badge red">مستوى متقدم</span>';
-    if (d.easy >= d.medium) return '<span class="badge green">مستوى سهل</span>';
-    return '<span class="badge gold">مستوى متوسط</span>';
-  }
-
   /* صف موضوع: رقم الموضوع + اسم الدرس حرفيًا + امتحاناته */
   function lessonRow(lesson) {
     var first = S.exams[lesson.examIds[0]];
@@ -446,7 +439,7 @@
       '<div class="lno"><span>الموضوع</span><b>' + lesson.no + '</b></div>' +
       '<div class="linfo">' +
       '<div class="lt">' + esc(lesson.title) + '</div>' +
-      '<div class="ls"><span>' + esc(meta) + '</span>' + (lesson.examIds.length > 1 ? '' : difficultyBadge(first)) + '</div>' +
+      '<div class="ls"><span>' + esc(meta) + '</span></div>' +
       models +
       '</div>' +
       '<span class="lgo" aria-hidden="true">‹</span>' +
@@ -461,7 +454,7 @@
       '<div class="lno"><span>شامل</span><b>★</b></div>' +
       '<div class="linfo">' +
       '<div class="lt">' + esc(e.title) + '</div>' +
-      '<div class="ls"><span>' + e.count + ' سؤالًا · اختيار من متعدد' + (scope ? ' · ' + esc(scope) : '') + '</span>' + difficultyBadge(e) + '</div>' +
+      '<div class="ls"><span>' + e.count + ' سؤالًا · اختيار من متعدد' + (scope ? ' · ' + esc(scope) : '') + '</span></div>' +
       '</div>' +
       '<span class="comp-badge">⭐ امتحان شامل</span>' +
       '</div>';
@@ -494,10 +487,11 @@
   /* بطاقة درس — رقم الدرس + الاسم الحقيقي + عدد التدريبات + عرض التدريبات */
   function lessonCard(tp, l) {
     var n = l.trainings.length;
+    var totalQ = l.trainings.reduce(function (k, tr) { return k + tr.questionCount; }, 0);
     return '<a class="topic-card lesson-card" href="' + lessonHash(tp, l) + '" role="button" aria-label="الدرس ' + l.no + ' — ' + esc(l.title) + '">' +
       '<div class="lno"><span>الدرس</span><b>' + l.no + '</b></div>' +
       '<div class="linfo"><div class="lt">الدرس ' + l.no + ' — ' + esc(l.title) + '</div>' +
-      '<div class="ls"><span>' + countWord(n, 'تدريب', 'تدريبات') + ' · كل تدريب 20 سؤالًا</span></div></div>' +
+      '<div class="ls"><span>' + countWord(n, 'تدريب', 'تدريبات') + ' · ' + totalQ + ' سؤالًا</span></div></div>' +
       '<span class="lgo lgo-text" aria-hidden="true">عرض التدريبات ‹</span></a>';
   }
   /* قسم الامتحانات الشاملة — منفصل عن التدريبات */
@@ -612,7 +606,7 @@
       html2 += termTabs();
       var term = sub2.terms.filter(function (t) { return t.term === S.term; })[0];
       if (!term) { app.innerHTML = html2 + '<div class="empty">لا توجد بيانات لهذا الترم.</div>'; return; }
-      html2 += '<p class="topics-hint">اختر الموضوع ثم الدرس لعرض تدريباته — كل تدريب امتحان مستقل من 20 سؤالًا.</p>';
+      html2 += '<p class="topics-hint">اختر الموضوع ثم الدرس لعرض تدريباته — كل تدريب امتحان مستقل بعدد أسئلته الخاصة.</p>';
       (term.sections || []).forEach(function (sec) {
         html2 += '<div class="unit-card">' +
           '<div class="unit-head"><div class="uno">✦</div><h4>' + esc(sec.title) + '</h4>' +
@@ -648,9 +642,6 @@
     if (e.topicKey) crumbs.push(['الموضوع ' + e.topicNo, "go('#/s/philosophy/" + e.term + "/t/" + encodeURIComponent(e.topicKey) + "')"], ['الدرس ' + e.lessonNo, "go('" + lessonHashFor(e) + "')"], [e.title]);
     else crumbs.push([e.type === 'topic' || e.type === 'training' ? 'الموضوع ' + e.lessonNo : 'الامتحان الشامل']);
     var html = crumb(crumbs);
-    var diffRow = e.difficulty
-      ? '<span class="badge">سهل: ' + e.difficulty.easy + '</span><span class="badge">متوسط: ' + e.difficulty.medium + '</span><span class="badge">متقدم: ' + e.difficulty.hard + '</span>'
-      : '';
     var st = S.student || {};
     var hasStudent = !!st.name;
     var phoneOptional = !!(S.teacher && S.teacher.requirePhone === false);
@@ -664,7 +655,6 @@
       '<span class="badge green">' + e.count + ' سؤالًا</span>' +
       '<span class="badge gold">' + esc(examScopeText(e)) + '</span>' +
       '<span class="badge">اختيار من متعدد</span>' +
-      diffRow +
       '</div>' +
       '<div class="card rules-card">' +
       '<h3 style="font-size:.95rem">قبل أن تبدأ</h3>' +
@@ -712,6 +702,7 @@
       body: JSON.stringify({ examId: S.examId, name: name, phone: phone, slug: S.slug })
     }).then(function (data) {
       S.session = data;
+      S.result = null; S.resultFilter = 'all';
       S.answers = new Array(data.questions.length).fill(null);
       S.current = 0;
       S.reviewMode = false;
@@ -754,6 +745,8 @@
     var q = S.session.questions[S.current];
     var total = S.session.questions.length;
     var done = answeredCount();
+    var offlineBanner = (typeof navigator !== 'undefined' && navigator.onLine === false)
+      ? '<div class="rv-note warn">' + WARN_SVG + '<span>أنت دون اتصال — إجاباتك محفوظة على جهازك وستُسلَّم تلقائيًا عند عودة الإنترنت.</span></div>' : '';
     var html =
       '<div class="quiz-top">' +
       '<div class="row"><div class="qnum">السؤال <em>' + (S.current + 1) + '</em> من ' + total + '</div>' +
@@ -763,6 +756,7 @@
         var cls = 'nchip' + (S.answers[i] !== null ? ' answered' : '') + (i === S.current ? ' current' : '');
         return '<button class="' + cls + '" onclick="jumpQ(' + i + ')" aria-label="سؤال ' + (i + 1) + '">' + (i + 1) + '</button>';
       }).join('') + '</div></div>' +
+      offlineBanner +
       '<div class="qcard card">' +
       '<div class="qtext"><span class="qn">' + (S.current + 1) + '</span>' + esc(q.text) + '</div>' +
       '<div class="opts">' + q.options.map(function (opt, i) {
@@ -833,6 +827,54 @@
   function jumpFromReview(i) { S.reviewMode = false; S.current = i; renderQuiz(); }
   function backToQuiz() { S.reviewMode = false; renderQuiz(); }
 
+  /* ---------------- التسليم دون اتصال: طابور محلي + إرسال تلقائي ----------------
+   * الطالب يجيب دون إنترنت (إجاباته في sessionStorage أثناء التنقل)، وعند
+   * التسليم دون اتصال يُحفظ (التوكن + الإجابات) في localStorage ويُرسل تلقائيًا
+   * عند عودة الاتصال أو في الزيارة التالية. التصحيح يبقى على الخادم دائمًا. */
+  var PENDING_KEY = 'exammanasa_pending_submits';
+  function pendingList() {
+    try { var l = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); return Array.isArray(l) ? l : []; }
+    catch (e) { return []; }
+  }
+  function pendingSave(l) { try { localStorage.setItem(PENDING_KEY, JSON.stringify(l)); } catch (e) { } }
+  function queueOfflineSubmit() {
+    if (!S.session) return;
+    var l = pendingList().filter(function (p) { return p.token !== S.session.token; });
+    l.push({ token: S.session.token, answers: S.answers.slice(), examId: S.examId, ts: Date.now() });
+    pendingSave(l);
+    toastMsg('لا يوجد اتصال بالإنترنت — حُفظت إجاباتك وستُسلَّم تلقائيًا عند عودة الاتصال.');
+  }
+  function flushOfflineSubmits() {
+    var l = pendingList();
+    if (!l.length) return Promise.resolve([]);
+    var done = [];
+    var chain = Promise.resolve();
+    l.forEach(function (p) {
+      chain = chain.then(function () {
+        return api('/api/exam/submit', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' },
+          body: JSON.stringify({ token: p.token, answers: p.answers })
+        }).then(function (res) {
+          done.push(p.token);
+          if (S.session && S.session.token === p.token && !S.result) {
+            S.result = res; S.view = 'result'; S.reviewMode = false; clearDraft();
+            go('#/result'); renderResult();
+          } else { toastMsg('تم تسليم امتحان معلّق بنجاح.'); }
+        }).catch(function (e) {
+          if (e instanceof TypeError || (e.status && e.status >= 500)) return; // فشل شبكة/خادم مؤقت → يبقى في الطابور
+          done.push(p.token); // رفض نهائي من الخادم (4xx) → إسقاط مع تنبيه
+          toastMsg('تعذّر تسليم امتحان معلّق: ' + e.message, true);
+        });
+      });
+    });
+    return chain.then(function () {
+      pendingSave(pendingList().filter(function (p) { return done.indexOf(p.token) === -1; }));
+      return done;
+    });
+  }
+  window.addEventListener('online', function () { flushOfflineSubmits(); });
+
   function submitExam() {
     var missing = missingList();
     if (missing.length) {
@@ -841,6 +883,7 @@
       renderQuiz();
       return;
     }
+    if (typeof navigator !== 'undefined' && navigator.onLine === false) { queueOfflineSubmit(); return; }
     var btn = $('submitBtn');
     btn.disabled = true;
     btn.textContent = 'جارٍ التصحيح…';
@@ -863,6 +906,11 @@
         S.reviewMode = false;
         S.current = (unanswered[0] - 1) || 0;
         renderQuiz();
+      } else if (e instanceof TypeError || (e.status && e.status >= 500)) {
+        // انقطاع أثناء الإرسال (حتى لو كان navigator.onLine=true) → لا فقدان: يُحفظ في الطابور ويُعاد الإرسال تلقائيًا
+        btn.disabled = false;
+        btn.textContent = 'تسليم الامتحان';
+        queueOfflineSubmit();
       } else {
         btn.disabled = false;
         btn.textContent = 'تسليم الامتحان';
@@ -947,6 +995,7 @@
   window.backToQuiz = backToQuiz;
   window.jumpFromReview = jumpFromReview;
   window.submitExam = submitExam;
+  window.__offline = { queue: queueOfflineSubmit, flush: flushOfflineSubmits, list: pendingList };
   window.filterResult = filterResult;
 
   loadAll();

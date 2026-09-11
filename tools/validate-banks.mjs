@@ -17,7 +17,7 @@ import crypto from 'node:crypto';
 import path from 'node:path';
 import vm from 'node:vm';
 import { loadGsData, REPO_ROOT } from './gs-load.mjs';
-import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic, OFFICIAL_TOPICS, jsonKeyEvidence, loadKeyDecisions } from './philo-trainings.mjs';
+import { loadTrainingJson, validateTrainingJson, stripOptionLabel as stripJsonLabel, cleanQuestionText, normArabic, OFFICIAL_TOPICS, jsonKeyEvidence, loadKeyDecisions, expectedTrainingSize } from './philo-trainings.mjs';
 
 const D = loadGsData();
 const KEY_DECISIONS = loadKeyDecisions(REPO_ROOT).decisions;
@@ -250,7 +250,7 @@ console.log('\n[D] Structure & curriculum mapping');
   for (const term of [1, 2]) {
     const J = loadTrainingJson(REPO_ROOT, term);
     const jsonIssues = validateTrainingJson(J, term).filter(i => !i.includes('empty option'));
-    if (!jsonIssues.length) ok('T' + term + ' JSON structurally valid (ids unique, 20 q/training, 4 options, keys consistent)');
+    if (!jsonIssues.length) ok('T' + term + ' JSON structurally valid (ids unique, expected q/training, 4 options, keys consistent)');
     else fail('T' + term + ' JSON issues: ' + jsonIssues.join('; '));
     const T = B.catalog.philosophy.terms.find(x => x.term === term);
     if (!T) { fail('term ' + term + ' missing from catalog'); continue; }
@@ -283,7 +283,9 @@ console.log('\n[D] Structure & curriculum mapping');
       if (e.lessonTitle !== t.topic || e.sectionTitle !== t.subject) { fail(t.training_id + ': lesson/section ≠ JSON'); continue; }
       if ('difficulty' in e) { fail(t.training_id + ': difficulty exposed to students'); continue; }
       const expected = t.questions.filter(q => effectiveJsonOptions(q).every(o => stripJsonLabel(o)));
-      if (ids.length !== expected.length || ids.length < 19 || ids.length > 20) { fail(t.training_id + ': ' + ids.length + ' questions (JSON usable ' + expected.length + ')'); continue; }
+      const expSize = expectedTrainingSize(t.training_id);
+      if (ids.length !== expected.length || (ids.length !== expSize && ids.length !== expSize - 1)) { fail(t.training_id + ': ' + ids.length + ' questions (JSON usable ' + expected.length + ', expected ' + expSize + ')'); continue; }
+      if (ids.length === expSize - 1) warn(t.training_id + ': ships at ' + ids.length + ' (one quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)');
       if (new Set(ids).size !== ids.length) { fail(t.training_id + ': duplicate question inside training'); continue; }
       let good = true;
       expected.forEach((jq, i) => {
@@ -317,7 +319,8 @@ console.log('\n[D] Structure & curriculum mapping');
       // STRICT_KEYS=1 turns the remaining open items into a hard failure (production gate)
       if (nr.length && process.env.STRICT_KEYS) fail(msg); else if (nr.length) warn(msg); else ok(msg);
     }
-    ok('T' + term + ': ' + catTrainings.length + ' trainings × 20 = ' + totalQ + ' training questions' + (totalQ !== catTrainings.length * 20 ? ' (' + (catTrainings.length * 20 - totalQ) + ' quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)' : ''));
+    const expTotal = catTrainings.reduce((n, id) => n + expectedTrainingSize(id), 0);
+    ok('T' + term + ': ' + catTrainings.length + ' trainings = ' + totalQ + ' training questions (expected ' + expTotal + ')' + (totalQ !== expTotal ? ' (' + (expTotal - totalQ) + ' quarantined extraction defect — see AUDIT_PHILOSOPHY_TRAININGS.md)' : ''));
     // comprehensive exams kept & separated
     const comps = T.comprehensiveExamIds || [];
     if (comps.length && comps.every(id => B.exams[id] && /comprehensive/.test(B.exams[id].type) && !catTrainings.includes(id)))

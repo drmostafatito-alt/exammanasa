@@ -8,13 +8,20 @@
  * الاستخدام: node tools/ui-qa.mjs [http://127.0.0.1:8787]
  * (يحتاج تشغيل `wrangler dev` مسبقًا، و jsdom مثبتًا في /tmp/qa)
  */
-import { JSDOM } from '/tmp/qa/node_modules/jsdom/lib/api.js';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, '..');
+// jsdom: من devDependencies في cloudflare/ (npm install) أو من /tmp/qa كبديل قديم
+const JSDOM_CANDIDATES = [
+  path.join(ROOT, 'cloudflare', 'node_modules', 'jsdom', 'lib', 'api.js'),
+  '/tmp/qa/node_modules/jsdom/lib/api.js'
+];
+const jsdomPath = JSDOM_CANDIDATES.find(p => fs.existsSync(p));
+if (!jsdomPath) { console.error('jsdom غير مثبت — شغّل: cd cloudflare && npm install'); process.exit(2); }
+const { JSDOM } = await import(pathToFileURL(jsdomPath).href);
 const PUB = path.join(ROOT, 'cloudflare', 'public');
 const BASE = process.argv[2] || 'http://127.0.0.1:8787';
 
@@ -112,7 +119,7 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
     html.includes('الصف الأول الثانوي') && html.includes('الفلسفة والمنطق') && html.includes('الصف الثاني الثانوي') && html.includes('بكالوريا — علم النفس'));
   const phTrainings = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.reduce((k, tp) => k + tp.lessons.reduce((z, l) => z + l.trainings.length, 0), 0), 0), 0);
   const phTopics = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.length, 0), 0);
-  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعًا و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعًا') && phTrainings === 30 && phExams > phTrainings);
+  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعًا و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعًا') && phTrainings === 44 && phExams > phTrainings);
   ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات',
     doc.querySelectorAll('.feature').length === 3 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات'));
   ok('قسم «عن المعلم والمنصة» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
@@ -330,6 +337,12 @@ console.log('\n[5] قاعدة منع التسليم الناقص — تحديد 
   });
   const badBody = await bad.json().catch(() => ({}));
   ok('الخادم يرفض التسليم الناقص (400) مع قائمة الأسئلة غير المُجابة', bad.status === 400 && Array.isArray(badBody.unanswered) && badBody.unanswered.includes(1));
+  // G: طابور التسليم دون اتصال — حفظ محلي ثم إرسال تلقائي يعرض النتيجة
+  W.__offline.queue();
+  ok('الطابور دون اتصال: يُحفظ التسليم في localStorage', W.__offline.list().length === 1 && (W.localStorage.getItem('exammanasa_pending_submits') || '').includes(W.S.session.token.slice(0, 24)));
+  await W.__offline.flush();
+  await sleep(300);
+  ok('إرسال الطابور: يُسلَّم للخادم ويعرض النتيجة ويُفرَّغ الطابور', W.__offline.list().length === 0 && W.S.view === 'result' && !!W.S.result && W.S.result.total === W.S.session.questions.length);
   harvestClasses(doc);
 }
 
@@ -355,11 +368,11 @@ console.log('\n[6] الفلسفة والمنطق — أسماء الموضوعا
   }
   ok('ت2: الشوامل (شامل المنطق + شامل الترم 40 سؤالًا) في قسم «امتحانات شاملة» منفصل', doc.querySelectorAll('.lesson.comp').length === 2 && /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا') && html.includes('⭐ امتحان شامل'));
   const sumTr = () => [...doc.querySelectorAll('.topic-card .ls')].reduce((n, el) => n + parseInt((el.textContent.match(/(\d+) تدريب/) || [0, 0])[1], 10), 0);
-  ok('ت2: عدد التدريبات في بطاقات الموضوعات = 13', sumTr() === 13);
+  ok('ت2: عدد التدريبات في بطاقات الموضوعات = 14', sumTr() === 14);
   W.location.hash = '#/s/philosophy/1';
   await sleep(300);
   html = doc.getElementById('app').innerHTML;
-  ok('ت1: 4 موضوعات / 17 تدريبًا / 3 شوامل', doc.querySelectorAll('.topic-card').length === 4 && sumTr() === 17 && doc.querySelectorAll('.lesson.comp').length === 3);
+  ok('ت1: 4 موضوعات (5+5+8+1 دروس) / 30 تدريبًا / 3 شوامل', doc.querySelectorAll('.topic-card').length === 4 && sumTr() === 30 && doc.querySelectorAll('.lesson.comp').length === 3);
   ok('لا أفقي: لا عناصر تتجاوز عرض الحاوية (لا white-space:nowrap على البطاقات، شبكات auto-fill)', /\.topic-grid\s*{[^}]*auto-fill/.test(css) && /\.training-grid\s*{[^}]*auto-fill/.test(css));
   // علم النفس كما هو
   W.location.hash = '#/s/psychology';
