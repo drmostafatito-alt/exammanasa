@@ -116,7 +116,8 @@ const STATE = fs.mkdtempSync('/tmp/wrangler-test-');
 const proc = spawn('npx', ['wrangler', 'dev', '--port', String(PORT), '--persist-to', STATE], {
   cwd: path.join(ROOT, 'cloudflare'),
   env: { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '' },
-  stdio: ['ignore', 'pipe', 'pipe']
+  stdio: ['ignore', 'pipe', 'pipe'],
+  detached: true
 });
 let logs = '';
 proc.stdout.on('data', d => { logs += d; });
@@ -851,6 +852,82 @@ try {
     await jfetch('/api/admin/teachers/' + mk19.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
+  console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
+  {
+    // 21a: public settings endpoint — safe projection
+    const pub = await jfetch('/api/settings');
+    ok('GET /api/settings عام → 200 + الهوية/الرئيسية/المظهر/التواصل/الأقسام', pub.status === 200 && pub.data.identity && pub.data.homepage && pub.data.appearance && pub.data.social && pub.data.sections);
+    ok('الإعدادات العامة لا تتضمن teacherDefaults (إعداد إدارة فقط)', pub.status === 200 && !('teacherDefaults' in pub.data));
+    ok('الإعدادات العامة لا تتضمن أي أسرار', !JSON.stringify(pub.data).includes('passHash') && !JSON.stringify(pub.data).includes('salt') && !JSON.stringify(pub.data).includes('secret'));
+    ok('السنة الافتراضية 2026 / 2027', pub.data.identity.academicYear.includes('2026'));
+
+    // 21b: admin GET/PUT protection
+    const adminGet = await jfetch('/api/admin/settings', { headers: { Cookie: cookie } });
+    ok('GET /api/admin/settings → 200 + teacherDefaults', adminGet.status === 200 && adminGet.data.settings.teacherDefaults && adminGet.data.settings.teacherDefaults.requirePhone === true);
+    ok('إعدادات الإدارة محمية (401 بدون جلسة)', (await jfetch('/api/admin/settings')).status === 401);
+
+    // 21c: year + hero text change (partial PUT merges, doesn't wipe)
+    const upd = await jfetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ identity: { academicYear: '2027 / 2028', platformName: 'منصة النجاح' }, homepage: { heroTitle: 'ابدأ رحلتك', chip1: 'منهج محدث' } })
+    });
+    ok('PUT جزئي → حفظ العام الجديد واسم المنصة', upd.status === 200 && upd.data.settings.identity.academicYear === '2027 / 2028' && upd.data.settings.identity.platformName === 'منصة النجاح');
+    const pub2 = await jfetch('/api/settings');
+    ok('الطلاب يرون العام الجديد والعنوان الجديد من الخادم', pub2.data.identity.academicYear === '2027 / 2028' && pub2.data.homepage.heroTitle === 'ابدأ رحلتك' && pub2.data.homepage.chip1 === 'منهج محدث');
+    ok('التحديث الجزئي لا يمسح حقولًا لم تُرسل', pub2.data.homepage.chip2 && pub2.data.homepage.heroSubtitle && pub2.data.identity.shortDescription);
+
+    // 21d: appearance validation + social URL validation
+    const colorUpd = await jfetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ appearance: { primary: '#0E7C4A', accent: 'bad-color', background: '#F3F8F4' } })
+    });
+    ok('حفظ ألوان صالحة + تجاهل اللون غير الصالح (يبقى السابق)', colorUpd.status === 200 && colorUpd.data.settings.appearance.primary === '#0E7C4A' && colorUpd.data.settings.appearance.accent === '#C99A2E' && colorUpd.data.settings.appearance.background === '#F3F8F4');
+    const badUrl = await jfetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ social: { youtube: 'javascript:alert(1)' } })
+    });
+    ok('رفض رابط تواصل غير http(s) في الإعدادات', badUrl.status === 400);
+
+    // 21e: teacher defaults applied on new-teacher creation
+    await jfetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ teacherDefaults: { requirePhone: false, maxAttempts: 7, studentLimitUnlimited: false, studentLimit: 40 } })
+    });
+    const mk = await post('/api/admin/teachers', { name: 'معلم افتراضيات', slug: 'tdef21' }, { Cookie: cookie });
+    ok('معلم جديد يرث الافتراضيات (requirePhone=false, maxAttempts=7, حد 40)', mk.status === 200 && mk.data.teacher.requirePhone === false && mk.data.teacher.maxAttempts === 7 && mk.data.teacher.studentLimitUnlimited === false && mk.data.teacher.studentLimit === 40);
+    await jfetch('/api/admin/teachers/' + mk.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+
+    // 21f: teacher YouTube + bio (create → public profile → admin update keeps siblings)
+    const mkYt = await post('/api/admin/teachers', {
+      name: 'معلم يوتيوب', slug: 'yt21', bio: 'نبذة يوتيوب واضحة',
+      socialLinks: { youtube: 'https://youtube.com/@teacher', whatsapp: 'https://wa.me/201000000000' },
+      email: 'yt21@test.com', password: 'ytPass12345'
+    }, { Cookie: cookie });
+    ok('إنشاء معلم بحقل يوتيوب', mkYt.status === 200 && mkYt.data.teacher.socialLinks.youtube === 'https://youtube.com/@teacher');
+    const pubYt = await jfetch('/api/teacher/yt21');
+    ok('الملف العام يعرض النبذة ويوتيوب (بلا هاتف/هوية)', pubYt.status === 200 && pubYt.data.teacher.bio === 'نبذة يوتيوب واضحة' && pubYt.data.teacher.socialLinks.youtube === 'https://youtube.com/@teacher' && !('phone' in pubYt.data.teacher) && !('id' in pubYt.data.teacher));
+    const updYt = await jfetch('/api/admin/teachers/' + mkYt.data.teacher.id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم يوتيوب', slug: 'yt21', bio: 'نبذة محدثة', socialLinks: { youtube: 'https://youtube.com/@updated' } })
+    });
+    ok('تعديل النبذة ويوتيوب يحفظ ويحافظ على واتساب السابق', updYt.status === 200 && updYt.data.teacher.bio === 'نبذة محدثة' && updYt.data.teacher.socialLinks.youtube === 'https://youtube.com/@updated' && updYt.data.teacher.socialLinks.whatsapp === 'https://wa.me/201000000000');
+    const badYt = await post('/api/admin/teachers', { name: 'س', slug: 'yt22', socialLinks: { youtube: 'javascript:alert(1)' } }, { Cookie: cookie });
+    ok('رفض رابط يوتيوب غير http(s) في نموذج المعلم', badYt.status === 400);
+    // teacher self-service profile update carries youtube
+    const tLogin = await post('/api/t/login', { email: 'yt21@test.com', password: 'ytPass12345' });
+    const tCookie21 = 'teacher_session=' + ((tLogin.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/) || [])[1];
+    const profUpd = await post('/api/t/profile', { name: 'معلم يوتيوب', bio: 'نبذة من لوحة المعلم', socialLinks: { youtube: 'https://youtube.com/@self' } }, { Cookie: tCookie21 });
+    ok('المعلم يحدّث يوتيوب من ملفه الشخصي', profUpd.status === 200 && profUpd.data.teacher.socialLinks.youtube === 'https://youtube.com/@self' && profUpd.data.teacher.bio === 'نبذة من لوحة المعلم');
+    await jfetch('/api/admin/teachers/' + mkYt.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+
+    // 21g: reset settings to defaults for a clean end state
+    await jfetch('/api/admin/settings', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ identity: { academicYear: 'العام الدراسي 2026 / 2027', platformName: 'منصة الامتحانات' }, homepage: { heroTitle: 'اختبر نفسك', chip1: 'اختبارات وفق المنهج الرسمي' }, appearance: { primary: '#1E56C8', accent: '#C99A2E', background: '#F5F7FD', text: '#1B2540', button: '#1E56C8' }, teacherDefaults: { requirePhone: true, unlimited: true, maxAttempts: 3, offlineMode: false, studentLimitUnlimited: true, studentLimit: 0 } })
+    });
+  }
+
   /* ============ 20. LOGIN THROTTLE (MUST BE LAST — locks out this dev instance) ============ */
   console.log('\n[20] قفل المحاولات المتكررة (الأخير)');
   {
@@ -871,7 +948,7 @@ try {
   console.log('\n══════════════════════════════');
   console.log(`النتيجة: ${passed} ناجح ✓ / ${failed} فاشل ✗`);
 } finally {
-  proc.kill('SIGTERM');
+  try { process.kill(-proc.pid, 'SIGTERM'); } catch { try { proc.kill('SIGTERM'); } catch {} }
   try { fs.rmSync(STATE, { recursive: true, force: true }); } catch {}
 }
 process.exit(failed ? 1 : 0);

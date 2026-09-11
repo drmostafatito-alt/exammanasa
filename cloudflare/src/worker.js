@@ -175,13 +175,169 @@ const DEFAULT_TEACHERS = [{
   specialty: 'مدرس الفلسفة والمنطق وعلم النفس — المرحلة الثانوية',
   bio: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: اختبر نفسك، اعرف درجتك فورًا، وراجع إجاباتك بعد كل امتحان.',
   photo: '',
-  socialLinks: { whatsapp: '', facebook: '', tiktok: '' },
+  socialLinks: { whatsapp: '', facebook: '', tiktok: '', youtube: '' },
   requirePhone: true,
   enabled: true,
   isDefault: true,
   createdAt: '2026-09-09T00:00:00.000Z',
   updatedAt: '2026-09-09T00:00:00.000Z'
 }];
+
+/* ============================ platform settings (KV) ============================
+ * Public platform configuration managed from the Admin panel (Settings section).
+ * It is the single source of truth for branding / homepage copy / appearance /
+ * platform-level social links — students never need code changes to update them.
+ * Stored as one validated JSON document under `platform_settings`. Unknown keys are
+ * dropped on save and merged with defaults on read, so old deployments keep working
+ * (backward compatible). NEVER stored in localStorage — served from the server. */
+const DEFAULT_SETTINGS = {
+  identity: {
+    platformName: 'منصة الامتحانات',
+    academicYear: 'العام الدراسي 2026 / 2027',
+    shortDescription: 'الفلسفة والمنطق · علم النفس',
+    logo: '' // data:image/…;base64 OR https:// URL — optional
+  },
+  homepage: {
+    badgeText: 'منصة الامتحانات الإلكترونية',
+    heroTitle: 'اختبر نفسك',
+    heroTitleAccent: 'وقيّم مستواك!',
+    heroSubtitle: 'منصة امتحانات إلكترونية للفلسفة والمنطق وعلم النفس وفق المنهج الرسمي: امتحانات منظمة حسب الصفوف والوحدات والموضوعات، درجتك فورًا بعد التسليم، ومراجعة كاملة لإجاباتك.',
+    chip1: 'اختبارات وفق المنهج الرسمي',
+    chip2: 'تصحيح فوري ومراجعة الإجابات',
+    floatChip: 'تصحيح فوري',
+    ctaLabel: 'ابدأ الامتحان الآن',
+    whatsappCtaLabel: 'تواصل عبر واتساب',
+    subjectsTitle: 'اختر صفك للبدء',
+    featuresTitle: 'لماذا منصة الامتحانات؟',
+    aboutTitle: 'نبذة عن المعلم',
+    contactTitle: 'تواصل معنا',
+    feature1Title: 'امتحانات منظمة',
+    feature1Text: 'امتحانات مرتبة حسب الصف والوحدات والموضوعات وفق المنهج الرسمي.',
+    feature2Title: 'نتيجتك فورًا',
+    feature2Text: 'اعرف درجتك ونسبتك المئوية مباشرة بعد تسليم الامتحان.',
+    feature3Title: 'مراجعة الإجابات',
+    feature3Text: 'راجع إجاباتك الصحيحة والخاطئة سؤالًا بسؤال بعد التسليم.',
+    feature4Title: 'اعمل من أي جهاز',
+    feature4Text: 'المنصة تعمل على الموبايل والكمبيوتر مباشرة من المتصفح — بدون تطبيقات أو تثبيت.'
+  },
+  appearance: {
+    primary: '#1E56C8', accent: '#C99A2E', background: '#F5F7FD', text: '#1B2540', button: '#1E56C8'
+  },
+  social: { whatsapp: '', facebook: '', tiktok: '', youtube: '' },
+  sections: { showFeatures: true, showAbout: true, showContact: true, showSocials: true },
+  teacherDefaults: {
+    requirePhone: true, unlimited: true, maxAttempts: 3, offlineMode: false, studentLimitUnlimited: true, studentLimit: 0
+  }
+};
+
+function mergeSettings(stored) {
+  const out = JSON.parse(JSON.stringify(DEFAULT_SETTINGS));
+  if (!stored || typeof stored !== 'object') return out;
+  for (const section of Object.keys(DEFAULT_SETTINGS)) {
+    const s = stored[section];
+    if (s && typeof s === 'object' && !Array.isArray(s)) {
+      for (const k of Object.keys(out[section])) {
+        if (s[k] !== undefined) out[section][k] = s[k];
+      }
+    }
+  }
+  return out;
+}
+async function getSettings(env) {
+  const stored = await kvGetJson(env, 'platform_settings').catch(() => null);
+  return mergeSettings(stored);
+}
+
+function sanitizeSettings(body, base) {
+  // Merge onto the CURRENT settings (or defaults) so a partial update never wipes
+  // untouched fields. Only keys actually present in the body override the base.
+  const d = base || DEFAULT_SETTINGS;
+  const out = JSON.parse(JSON.stringify(d));
+  const b = body && typeof body === 'object' ? body : {};
+  const str = (v, max) => String(v == null ? '' : v).trim().slice(0, max);
+  const color = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return null;
+    return /^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/.test(s) ? s : null;
+  };
+  const url = (v, { allowDataImage = false } = {}) => {
+    const s = String(v == null ? '' : v).trim();
+    if (!s) return '';
+    if (allowDataImage && /^data:image\/(png|jpe?g|webp);base64,/i.test(s)) {
+      if (s.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
+      return s;
+    }
+    if (!/^https?:\/\//i.test(s)) throw bad('روابط التواصل والشعار يجب أن تبدأ بـ http:// أو https://');
+    if (s.length > 300) throw bad('الرابط طويل جدًا.');
+    return s;
+  };
+
+  /* identity */
+  const id = b.identity || {};
+  if (id.platformName !== undefined) out.identity.platformName = str(id.platformName, 80) || d.identity.platformName;
+  if (id.academicYear !== undefined) out.identity.academicYear = str(id.academicYear, 60) || d.identity.academicYear;
+  if (id.shortDescription !== undefined) out.identity.shortDescription = str(id.shortDescription, 160);
+  if (id.logo !== undefined) out.identity.logo = url(id.logo, { allowDataImage: true });
+
+  /* homepage */
+  const hp = b.homepage || {};
+  const hpText = (key, max, required) => {
+    if (hp[key] !== undefined) out.homepage[key] = str(hp[key], max) || (required ? d.homepage[key] : '');
+  };
+  hpText('badgeText', 80, true);
+  hpText('heroTitle', 80, true);
+  hpText('heroTitleAccent', 80, false);
+  hpText('heroSubtitle', 500, true);
+  hpText('chip1', 60, true);
+  hpText('chip2', 60, true);
+  hpText('floatChip', 30, true);
+  hpText('ctaLabel', 40, true);
+  hpText('whatsappCtaLabel', 40, true);
+  hpText('subjectsTitle', 60, true);
+  hpText('featuresTitle', 60, true);
+  hpText('aboutTitle', 60, true);
+  hpText('contactTitle', 60, true);
+  for (const f of [1, 2, 3, 4]) {
+    hpText('feature' + f + 'Title', 60, true);
+    hpText('feature' + f + 'Text', 300, true);
+  }
+
+  /* appearance */
+  const ap = b.appearance || {};
+  for (const k of ['primary', 'accent', 'background', 'text', 'button']) {
+    if (ap[k] === undefined) continue;
+    const c = color(ap[k]);
+    if (c) out.appearance[k] = c; // invalid color → keep the previous value
+  }
+
+  /* social */
+  const sc = b.social || {};
+  for (const k of ['whatsapp', 'facebook', 'tiktok', 'youtube']) {
+    if (sc[k] !== undefined) out.social[k] = url(sc[k]);
+  }
+
+  /* sections */
+  const sec = b.sections || {};
+  for (const k of ['showFeatures', 'showAbout', 'showContact', 'showSocials']) {
+    if (sec[k] !== undefined) out.sections[k] = sec[k] !== false;
+  }
+
+  /* teacher defaults */
+  const td = b.teacherDefaults || {};
+  if (td.requirePhone !== undefined) out.teacherDefaults.requirePhone = td.requirePhone !== false;
+  if (td.unlimited !== undefined) out.teacherDefaults.unlimited = td.unlimited !== false;
+  if (td.maxAttempts !== undefined) out.teacherDefaults.maxAttempts = Math.max(1, Math.min(50, parseInt(td.maxAttempts, 10) || d.teacherDefaults.maxAttempts));
+  if (td.offlineMode !== undefined) out.teacherDefaults.offlineMode = td.offlineMode === true;
+  if (td.studentLimitUnlimited !== undefined) out.teacherDefaults.studentLimitUnlimited = td.studentLimitUnlimited !== false;
+  if (td.studentLimit !== undefined) out.teacherDefaults.studentLimit = sanitizeStudentLimit(td.studentLimit);
+
+  return out;
+}
+
+/* Public projection of settings — only what the student pages need. No secrets. */
+function publicSettings(s) {
+  return { identity: s.identity, homepage: s.homepage, appearance: s.appearance, social: s.social, sections: s.sections };
+}
 
 async function kvGet(env, key) {
   if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
@@ -259,6 +415,11 @@ async function handleApi(request, env, ctx, pathname) {
   /* ---------- public: catalog ---------- */
   if (pathname === '/api/catalog' && method === 'GET') {
     return json(await publicCatalog(env), 200, { 'Cache-Control': 'public, max-age=300, s-maxage=3600' });
+  }
+
+  /* ---------- public: platform settings (branding/homepage/appearance) ---------- */
+  if (pathname === '/api/settings' && method === 'GET') {
+    return json(publicSettings(await getSettings(env)), 200, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
   }
 
   /* ---------- public: teacher profile ---------- */
@@ -669,6 +830,18 @@ async function handleAdmin(request, env, ctx, pathname) {
     return fail('طلب غير مصرح.', 403);
   }
 
+  /* ---------- platform settings (admin) ---------- */
+  if (pathname === '/api/admin/settings' && method === 'GET') {
+    return json({ settings: await getSettings(env) });
+  }
+  if (pathname === '/api/admin/settings' && method === 'PUT') {
+    const body = await readJson(request, 3 * 1024 * 1024); // logo data URLs can be sizable
+    const current = await getSettings(env);
+    const next = sanitizeSettings(body, current);
+    await kvPut(env, 'platform_settings', JSON.stringify(next));
+    return json({ ok: true, settings: next });
+  }
+
   /* ---------- change admin password ---------- */
   if (pathname === '/api/admin/password' && method === 'POST') {
     const body = await readJson(request);
@@ -893,11 +1066,14 @@ async function sanitizeTeacher(body, existing, env) {
   }
   if (!/^[a-z0-9][a-z0-9-]{1,29}$/.test(slug)) throw bad('الرابط (slug) غير صالح: حروف إنجليزية صغيرة وأرقام وشرطات فقط (2-30).');
   if (RESERVED_SLUGS.has(slug)) throw bad('هذا الرابط محجوز.');
-  const social = {};
-  const socialSrc = body.socialLinks ?? existing?.socialLinks ?? {};
-  for (const k of ['whatsapp', 'facebook', 'tiktok']) {
-    const v = String(socialSrc[k] || '').trim();
+  // Field-preserving merge: only keys PRESENT in body.socialLinks override the stored
+  // value (explicit '' clears it) — a partial update must never wipe sibling links.
+  const social = { ...(existing?.socialLinks || {}) };
+  for (const k of ['whatsapp', 'facebook', 'tiktok', 'youtube']) {
+    if (body.socialLinks === undefined || body.socialLinks[k] === undefined) continue;
+    const v = String(body.socialLinks[k] || '').trim();
     if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+    if (v.length > 300) throw bad('رابط التواصل طويل جدًا.');
     social[k] = v;
   }
   // Field-preserving PUT semantics: an ABSENT field keeps the stored value (explicit '' clears it).
@@ -935,24 +1111,28 @@ async function sanitizeTeacher(body, existing, env) {
     throw bad('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
   }
 
+  // Admin-configured defaults apply only when creating a NEW teacher (existing is null)
+  // and only when the request did not carry an explicit value for that field.
+  const tdefs = (env && !existing) ? ((await getSettings(env).catch(() => null))?.teacherDefaults) : null;
+
   return {
     slug, name, phone, email, username, passHash, passSalt, passIterations,
     specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
     bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
     socialLinks: social,
-    requirePhone: body.requirePhone !== undefined ? body.requirePhone !== false : (existing ? existing.requirePhone !== false : true),
+    requirePhone: body.requirePhone !== undefined ? body.requirePhone !== false : (existing ? existing.requirePhone !== false : (tdefs ? tdefs.requirePhone !== false : true)),
     enabled: body.enabled !== undefined ? body.enabled !== false : (existing ? existing.enabled !== false : true),
-    unlimited: body.unlimited !== undefined ? body.unlimited !== false : (existing ? existing.unlimited !== false : true),
-    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? 3, 10) || 3)),
-    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && existing?.offlineMode === true),
+    unlimited: body.unlimited !== undefined ? body.unlimited !== false : (existing ? existing.unlimited !== false : (tdefs ? tdefs.unlimited !== false : true)),
+    maxAttempts: Math.max(1, Math.min(50, parseInt(body.maxAttempts ?? existing?.maxAttempts ?? tdefs?.maxAttempts ?? 3, 10) || 3)),
+    offlineMode: body.offlineMode === true || (body.offlineMode === undefined && (existing ? existing.offlineMode === true : tdefs?.offlineMode === true)),
     // Student limit: a REAL unlimited flag (not a big number). When limited, studentLimit is the
     // max number of DISTINCT students (by normalized phone) who may register under this teacher.
     // 0 = registration closed for new students (existing students keep access).
     studentLimitUnlimited: body.studentLimitUnlimited === undefined
-      ? (existing ? existing.studentLimitUnlimited !== false : true)
+      ? (existing ? existing.studentLimitUnlimited !== false : (tdefs ? tdefs.studentLimitUnlimited !== false : true))
       : body.studentLimitUnlimited !== false,
-    studentLimit: sanitizeStudentLimit(body.studentLimit ?? existing?.studentLimit ?? 0)
+    studentLimit: sanitizeStudentLimit(body.studentLimit ?? existing?.studentLimit ?? tdefs?.studentLimit ?? 0)
   };
 }
 function sanitizeStudentLimit(v) {
@@ -1066,10 +1246,11 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     updated.phone = String(body.phone ?? existing.phone ?? '').trim();
     if (updated.phone) { const np = normalizePhone(updated.phone); updated.phone = isValidEgMobile(np) ? np : updated.phone.replace(/[\s\-.()]/g, ''); }
     const social = { ...(existing.socialLinks || {}) };
-    for (const k of ['whatsapp', 'facebook', 'tiktok']) {
+    for (const k of ['whatsapp', 'facebook', 'tiktok', 'youtube']) {
       if (body.socialLinks && body.socialLinks[k] !== undefined) {
         const v = String(body.socialLinks[k]).trim();
         if (v && !/^https?:\/\//i.test(v)) throw bad('روابط التواصل يجب أن تبدأ بـ http:// أو https://');
+        if (v.length > 300) throw bad('رابط التواصل طويل جدًا.');
         social[k] = v;
       }
     }
