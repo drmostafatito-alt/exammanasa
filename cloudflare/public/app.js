@@ -394,7 +394,11 @@
     if (!name || name.length < 3) { err.textContent = 'من فضلك اكتب الاسم الكامل.'; return; }
     var phoneOptional = !!(S.teacher && S.teacher.requirePhone === false);
     if (!phoneOptional && !phone) { err.textContent = 'رقم الهاتف مطلوب.'; return; }
-    if (phone && !/^[0-9+\- ]{4,25}$/.test(phone)) { err.textContent = 'رقم الهاتف غير صالح.'; return; }
+    /* فحص مبدئي للأحرف المسموحة فقط — التحقق الحاسم على الخادم.
+       يقبل الأرقام العربية-الهندية (٠-٩) والفارسية (۰-۹) لأن الخادم
+       يوحّدها في normalizePhone؛ رفضها هنا كان يمنع طالبًا يكتب بلوحة
+       مفاتيح عربية رغم أن الخادم يقبل الرقم ويصحّحه. */
+    if (phone && !/^[0-9\u0660-\u0669\u06F0-\u06F9+\- ]{4,25}$/.test(phone)) { err.textContent = 'رقم الهاتف غير صالح.'; return; }
     if (!S.uiGrade) { err.textContent = 'اختر صفك للمتابعة.'; return; }
     S.student = { name: name, phone: phone, grade: S.uiGrade };
     try { sessionStorage.setItem('exammanasa_student', JSON.stringify(S.student)); } catch (e) { }
