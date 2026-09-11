@@ -206,7 +206,8 @@
             '<div style="flex:1;min-width:0">' +
             '<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><b>' + esc(t.name) + '</b>' +
             (t.isDefault ? '<span class="badge gold">افتراضي</span>' : '') +
-            (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') + '</div>' +
+            (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') +
+            (t.hasPassword ? '<span class="badge green">🔑</span>' : '<span class="badge">بدون دخول</span>') + '</div>' +
             (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
             '<div class="desc" style="font-size:.78rem;margin-top:4px">' + esc(t.bio || '') + '</div>' +
             '<div style="margin-top:8px;font-size:.78rem">الرابط العام: <a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a></div>' +
@@ -295,6 +296,9 @@
       '<div class="field"><label>الاسم *</label><input id="tName" value="' + esc(t.name) + '" maxlength="80"></div>' +
       '<div class="field"><label>الرابط (slug) — حروف إنجليزية وأرقام وشرطات</label><input id="tSlug" value="' + esc(t.slug) + '" placeholder="مثال: mostafa" dir="ltr"></div>' +
       '<div class="field"><label>الرابط العام</label><input class="input" dir="ltr" readonly value="' + esc(location.host + '/' + (t.slug || '…')) + '" id="tUrlPreview" style="opacity:.7"></div>' +
+      '<div class="field"><label>البريد الإلكتروني (لدخول المعلم)</label><input id="tEmail" type="email" value="' + esc(t.email || '') + '" dir="ltr"></div>' +
+      '<div class="field"><label>اسم المستخدم</label><input id="tUsername" value="' + esc(t.username || '') + '" dir="ltr"></div>' +
+      '<div class="field"><label>كلمة المرور' + (t.hasPassword ? ' (اتركها فارغة)' : '') + '</label><input id="tPassword" type="password" autocomplete="new-password"></div>' +
       '<div class="field"><label>الهاتف (خاص — لا يظهر للطلاب)</label><input id="tPhone" value="' + esc(t.phone || '') + '" dir="ltr"></div>' +
       '<div class="field"><label>التخصص (يظهر في الصفحة الرئيسية)</label><input id="tSpecialty" value="' + esc(t.specialty || '') + '" maxlength="120" placeholder="مثال: مدرس الفلسفة والمنطق — المرحلة الثانوية"></div>' +
       '<div class="field"><label>نبذة</label><textarea id="tBio" rows="2" maxlength="500">' + esc(t.bio || '') + '</textarea></div>' +
@@ -356,6 +360,9 @@
     var payload = {
       name: $('tName').value.trim(),
       slug: $('tSlug').value.trim(),
+      email: $('tEmail') ? $('tEmail').value.trim() : '',
+      username: $('tUsername') ? $('tUsername').value.trim() : '',
+      password: $('tPassword') ? $('tPassword').value : '',
       phone: $('tPhone').value.trim(),
       specialty: $('tSpecialty').value.trim(),
       bio: $('tBio').value.trim(),

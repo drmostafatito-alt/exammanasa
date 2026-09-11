@@ -658,6 +658,103 @@ try {
     }
   }
 
+  /* ============ 16. TEACHER ACCOUNTS ============ */
+  console.log('\n[16] حسابات المعلمين');
+  {
+    const mk = await post('/api/admin/teachers', { name: 'معلم اختبار', slug: 'tacct1', email: 'teacher1@test.com', username: 'teacher1', password: 'securePass123', phone: '01099999999', requirePhone: true }, { Cookie: cookie });
+    ok('إنشاء معلم مع بيانات دخول', mk.status === 200 && mk.data.teacher.hasPassword === true && mk.data.teacher.email === 'teacher1@test.com' && mk.data.teacher.teacherCode && mk.data.teacher.teacherCode.startsWith('TCH-'));
+    const tId = mk.data.teacher.id;
+    const loginEmail = await post('/api/t/login', { email: 'teacher1@test.com', password: 'securePass123' });
+    ok('دخول المعلم بالبريد', loginEmail.status === 200 && loginEmail.data.ok === true);
+    const tCookie = 'teacher_session=' + loginEmail.headers.get('set-cookie').match(/teacher_session=([^;]+)/)[1];
+    const loginUser = await post('/api/t/login', { email: 'teacher1', password: 'securePass123' });
+    ok('دخول المعلم باسم المستخدم', loginUser.status === 200);
+    const sess = await jfetch('/api/t/session', { headers: { Cookie: tCookie } });
+    ok('جلسة المعلم صالحة', sess.status === 200 && sess.data.name === 'معلم اختبار');
+    const dash = await jfetch('/api/t/dashboard', { headers: { Cookie: tCookie } });
+    ok('لوحة المعلم', dash.status === 200 && dash.data.totals.results === 0);
+    const stu = await jfetch('/api/t/students', { headers: { Cookie: tCookie } });
+    ok('طلاب المعلم (فارغة)', stu.status === 200 && stu.data.total === 0);
+    const res = await jfetch('/api/t/results', { headers: { Cookie: tCookie } });
+    ok('نتائج المعلم (فارغة)', res.status === 200 && res.data.total === 0);
+    const prof = await post('/api/t/profile', { name: 'معلم محدث', bio: 'نبذة', socialLinks: { whatsapp: 'https://wa.me/123' } }, { Cookie: tCookie });
+    ok('تحديث الملف الشخصي', prof.status === 200 && prof.data.teacher.name === 'معلم محدث');
+    const cpw = await post('/api/t/password', { current: 'securePass123', next: 'newSecure456' }, { Cookie: tCookie });
+    ok('تغيير كلمة المرور', cpw.status === 200);
+    const oldPw = await post('/api/t/login', { email: 'teacher1@test.com', password: 'securePass123' });
+    ok('كلمة المرور القديمة لا تعمل', oldPw.status === 401);
+    const newPw = await post('/api/t/login', { email: 'teacher1@test.com', password: 'newSecure456' });
+    ok('كلمة المرور الجديدة تعمل', newPw.status === 200);
+    const badLogin = await post('/api/t/login', { email: 'teacher1@test.com', password: 'wrong' });
+    ok('كلمة مرور خاطئة مرفوضة', badLogin.status === 401);
+    const adminAccess = await jfetch('/api/admin/session', { headers: { Cookie: tCookie } });
+    ok('المعلم لا يصل للإدارة', adminAccess.status === 401);
+    const noAuth = await jfetch('/api/t/dashboard');
+    ok('API بدون جلسة مرفوض', noAuth.status === 401);
+    const adminReset = await post('/api/admin/teachers/' + tId + '/password', { password: 'adminReset789' }, { Cookie: cookie });
+    ok('المسؤول يعيد تعيين كلمة المرور', adminReset.status === 200);
+    const resetLogin = await post('/api/t/login', { email: 'teacher1@test.com', password: 'adminReset789' });
+    ok('كلمة المرور الجديدة من المسؤول تعمل', resetLogin.status === 200);
+    await post('/api/t/logout', {}, { Cookie: tCookie });
+    const dupEmail = await post('/api/admin/teachers', { name: 'مكرر', slug: 'tacct3', email: 'teacher1@test.com' }, { Cookie: cookie });
+    ok('رفض بريد مكرر', dupEmail.status === 400);
+    const dupUser = await post('/api/admin/teachers', { name: 'مكرر', slug: 'tacct4', username: 'teacher1' }, { Cookie: cookie });
+    ok('رفض مستخدم مكرر', dupUser.status === 400);
+    // disabled teacher
+    const mkNoCred = await post('/api/admin/teachers', { name: 'معطل', slug: 'tacct2', email: 'disabled@test.com', password: 'password123' }, { Cookie: cookie });
+    await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id, { method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie }, body: JSON.stringify({ name: 'معطل', slug: 'tacct2', enabled: false }) });
+    const disLogin = await post('/api/t/login', { email: 'disabled@test.com', password: 'password123' });
+    ok('معلم معطل لا يدخل', disLogin.status === 401);
+    await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    const archLogin = await post('/api/t/login', { email: 'disabled@test.com', password: 'password123' });
+    ok('معلم مؤرشف لا يدخل', archLogin.status === 401);
+    // cleanup
+    await jfetch('/api/admin/teachers/' + tId, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id + '/restore', { method: 'POST', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    await jfetch('/api/admin/teachers/' + mkNoCred.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 17. TEACHER ISOLATION ============ */
+  console.log('\n[17] عزل بيانات المعلمين');
+  {
+    const mkA = await post('/api/admin/teachers', { name: 'أ', slug: 'isoA', email: 'a@test.com', password: 'password123', requirePhone: true }, { Cookie: cookie });
+    const mkB = await post('/api/admin/teachers', { name: 'ب', slug: 'isob', email: 'b@test.com', password: 'password123', requirePhone: true }, { Cookie: cookie });
+    const loginA = await post('/api/t/login', { email: 'a@test.com', password: 'password123' });
+    const matchA = (loginA.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/);
+    const cookieA = 'teacher_session=' + (matchA ? matchA[1] : 'NONE');
+    const sA = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب أ', phone: '01055550001', slug: 'isoa' });
+    await post('/api/exam/submit', { token: sA.data.token, answers: correctPositions('U1-T1', decodeToken(sA.data.token).seed) });
+    for (let w = 0; w < 10; w++) {
+      await new Promise(r => setTimeout(r, 500));
+      const chk = await jfetch('/api/t/results', { headers: { Cookie: cookieA } });
+      if (chk.data && chk.data.total >= 1) break;
+    }
+    const resA = await jfetch('/api/t/results', { headers: { Cookie: cookieA } });
+    ok('المعلم أ يرى نتائجه', resA.status === 200 && resA.data.total >= 1);
+    const loginB = await post('/api/t/login', { email: 'b@test.com', password: 'password123' });
+    const matchB = (loginB.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/);
+    const cookieB = 'teacher_session=' + (matchB ? matchB[1] : 'NONE');
+    const resB = await jfetch('/api/t/results', { headers: { Cookie: cookieB } });
+    ok('المعلم ب لا يرى نتائج أ', resB.status === 200 && resB.data.total === 0);
+    const stuA = await jfetch('/api/t/students', { headers: { Cookie: cookieA } });
+    ok('المعلم أ يرى طلابه', stuA.status === 200 && stuA.data.total >= 1);
+    const stuB = await jfetch('/api/t/students', { headers: { Cookie: cookieB } });
+    ok('المعلم ب لا يرى طلاب أ', stuB.status === 200 && stuB.data.total === 0);
+    ok('لا تسريب مفاتيح', !JSON.stringify(resA.data).includes('"answer"'));
+    for (const id of [mkA.data.teacher.id, mkB.data.teacher.id]) {
+      await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+  }
+
+  /* ============ 18. TEACHER ROUTES ============ */
+  console.log('\n[18] مسارات لوحة المعلم');
+  {
+    const tPage = await jfetch('/teacher');
+    ok('GET /teacher → 200', tPage.status === 200 && tPage.text.includes('لوحة المعلم'));
+    const tDash = await jfetch('/teacher/dashboard');
+    ok('GET /teacher/dashboard → 200', tDash.status === 200);
+  }
+
   console.log('\n══════════════════════════════');
   console.log(`النتيجة: ${passed} ناجح ✓ / ${failed} فاشل ✗`);
 } finally {
