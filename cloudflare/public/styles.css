@@ -37,6 +37,11 @@
   --shadow-lg: 0 6px 20px rgba(21, 42, 84, .08), 0 26px 60px rgba(21, 42, 84, .13);
   --radius: 20px;
   --radius-sm: 13px;
+  /* المسافة الجانبية للحاوية — مصدر واحد للحقيقة: تُستخدم في .wrap وفي
+     العناصر الممتدة بعرض الشاشة (.quiz-top) حتى لا تختلف القيمتان عند
+     تغيير الحشو للشاشات الصغيرة (كان اختلافهما يسبب تمريرًا أفقيًا 8px
+     في شاشة الامتحان على الهاتف). */
+  --gutter: 16px;
   font-size: 16px;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -57,7 +62,7 @@ img { max-width: 100%; }
 button { font-family: inherit; }
 ::selection { background: var(--primary-soft-2); }
 
-.wrap { max-width: 1080px; margin: 0 auto; padding: 16px 16px 90px; }
+.wrap { max-width: 1080px; margin: 0 auto; padding: var(--gutter) var(--gutter) 90px; }
 .wrap-tight { max-width: 720px; }
 section { scroll-margin-top: 88px; }
 
@@ -500,7 +505,7 @@ section { scroll-margin-top: 88px; }
   position: sticky; top: 69px; z-index: 40;
   background: rgba(245, 247, 253, .96); backdrop-filter: blur(8px);
   padding: 10px 0 10px; border-bottom: 1px solid var(--line);
-  margin: 0 -16px; padding-inline: 16px;
+  margin: 0 calc(-1 * var(--gutter)); padding-inline: var(--gutter);
 }
 .quiz-top .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
 .quiz-top .qnum { font-weight: 800; font-size: .95rem; color: var(--ink); }
@@ -676,7 +681,8 @@ footer.site b { color: var(--muted); }
   .brand .sub { max-width: 170px; }
 }
 @media (max-width: 600px) {
-  .wrap { padding: 12px 12px 80px; }
+  :root { --gutter: 12px; }
+  .wrap { padding: var(--gutter) var(--gutter) 80px; }
   .brand .bname { font-size: .92rem; }
   .brand .logo { width: 42px; height: 42px; }
   .hero { padding: 22px 14px; border-radius: 22px; }
