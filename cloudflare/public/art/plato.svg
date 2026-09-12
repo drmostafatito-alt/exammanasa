@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" fill="none">
+  <!-- أفلاطون: إكليل غار، لحية مهذبة مدببة، لفافة — قناع أحادي اللون -->
+  <defs>
+    <radialGradient id="plaFade" gradientUnits="userSpaceOnUse" cx="200" cy="210" r="230">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset=".86" stop-color="#fff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#plaFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- head: broad forehead, composed -->
+    <path d="M140 172 C136 108 164 74 200 74 C236 74 264 108 260 172" stroke-width="5"/>
+    <!-- laurel wreath -->
+    <path d="M138 148 C160 128 240 128 262 148" stroke-width="3.4"/>
+    <path d="M150 140 C146 130 150 122 158 118 C162 126 160 134 150 140 Z" stroke-width="2.6"/>
+    <path d="M172 132 C170 122 176 114 184 112 C186 120 182 128 172 132 Z" stroke-width="2.6"/>
+    <path d="M198 128 C198 118 204 112 212 112 C212 120 208 126 198 128 Z" stroke-width="2.6"/>
+    <path d="M226 132 C228 122 234 116 242 116 C240 124 236 130 226 132 Z" stroke-width="2.6"/>
+    <path d="M248 140 C252 130 258 126 266 128 C262 136 256 140 248 140 Z" stroke-width="2.6"/>
+    <!-- hair waves under wreath -->
+    <path d="M144 164 C150 150 162 144 174 146" stroke-width="2.4" opacity=".7"/>
+    <path d="M256 164 C250 150 238 144 226 146" stroke-width="2.4" opacity=".7"/>
+    <!-- brows + eyes: serene -->
+    <path d="M158 176 Q174 168 190 176" stroke-width="4.4"/>
+    <path d="M210 176 Q226 168 242 176" stroke-width="4.4"/>
+    <path d="M162 190 Q174 184 186 190 Q174 197 162 190 Z" stroke-width="2.8"/>
+    <circle cx="174" cy="190" r="2.6" fill="url(#plaFade)" stroke="none"/>
+    <path d="M214 190 Q226 184 238 190 Q226 197 214 190 Z" stroke-width="2.8"/>
+    <circle cx="226" cy="190" r="2.6" fill="url(#plaFade)" stroke="none"/>
+    <!-- straight nose -->
+    <path d="M200 184 L200 214" stroke-width="3.4"/>
+    <path d="M193 219 Q197 224 200 222 Q203 224 207 219" stroke-width="3.2"/>
+    <!-- trimmed moustache -->
+    <path d="M184 232 Q200 226 216 232" stroke-width="3.6"/>
+    <!-- pointed philosopher beard -->
+    <path d="M150 200 C144 252 160 288 200 306 C240 288 256 252 250 200" stroke-width="4.6"/>
+    <path d="M170 240 C172 268 182 288 200 300" stroke-width="2.4" opacity=".75"/>
+    <path d="M230 240 C228 268 218 288 200 300" stroke-width="2.4" opacity=".75"/>
+    <path d="M186 250 C190 272 194 286 200 296" stroke-width="2.2" opacity=".6"/>
+    <path d="M214 250 C210 272 206 286 200 296" stroke-width="2.2" opacity=".6"/>
+    <!-- neck + himation shoulders -->
+    <path d="M184 300 L178 330" stroke-width="4"/>
+    <path d="M216 300 L222 330" stroke-width="4"/>
+    <path d="M106 396 C118 358 148 340 180 338 L220 338 C252 340 282 358 294 396" stroke-width="5"/>
+    <path d="M160 344 C180 366 220 366 240 344" stroke-width="3" opacity=".85"/>
+    <path d="M140 366 C170 390 230 390 260 366" stroke-width="2.4" opacity=".6"/>
+    <!-- scroll in hand (الأكاديميا) -->
+    <rect x="86" y="352" width="26" height="72" rx="12" stroke-width="3.6"/>
+    <path d="M86 366 h26 M86 410 h26" stroke-width="2.6" opacity=".8"/>
+    <path d="M99 372 v32" stroke-width="2.2" opacity=".6"/>
+    <path d="M112 380 C124 372 136 368 148 368" stroke-width="3.2"/>
+  </g>
+</svg>

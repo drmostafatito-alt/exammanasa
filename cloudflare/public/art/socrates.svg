@@ -1,0 +1,58 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" fill="none">
+  <!-- سقراط: قمة صلعاء، لحية كثيفة كثّة، toga — يُستخدم كقناع (mask) أحادي اللون -->
+  <defs>
+    <radialGradient id="socFade" gradientUnits="userSpaceOnUse" cx="200" cy="210" r="230">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset=".86" stop-color="#fff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#socFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- crown: bald, wide skull -->
+    <path d="M132 168 C126 106 156 70 200 70 C244 70 274 106 268 168" stroke-width="5"/>
+    <path d="M146 150 C150 112 172 92 200 92" stroke-width="2.4" opacity=".6"/>
+    <path d="M254 150 C250 112 228 92 200 92" stroke-width="2.4" opacity=".6"/>
+    <!-- side hair tufts -->
+    <path d="M132 170 C120 176 116 192 124 202" stroke-width="4"/>
+    <path d="M268 170 C280 176 284 192 276 202" stroke-width="4"/>
+    <path d="M126 186 C120 196 122 206 130 212" stroke-width="2.6" opacity=".7"/>
+    <path d="M274 186 C280 196 278 206 270 212" stroke-width="2.6" opacity=".7"/>
+    <!-- heavy brows -->
+    <path d="M152 160 Q170 148 188 158" stroke-width="5"/>
+    <path d="M212 158 Q230 148 248 160" stroke-width="5"/>
+    <!-- deep-set eyes -->
+    <path d="M156 174 Q170 167 184 174 Q170 182 156 174 Z" stroke-width="3"/>
+    <circle cx="170" cy="174" r="2.8" fill="url(#socFade)" stroke="none"/>
+    <path d="M216 174 Q230 167 244 174 Q230 182 216 174 Z" stroke-width="3"/>
+    <circle cx="230" cy="174" r="2.8" fill="url(#socFade)" stroke="none"/>
+    <!-- snub nose -->
+    <path d="M200 168 L198 200" stroke-width="3.6"/>
+    <path d="M190 206 Q196 213 200 210 Q204 213 210 206" stroke-width="3.6"/>
+    <!-- mustache merging into beard -->
+    <path d="M180 222 Q200 213 220 222" stroke-width="4.4"/>
+    <path d="M182 226 Q170 236 158 232" stroke-width="3"/>
+    <path d="M218 226 Q230 236 242 232" stroke-width="3"/>
+    <!-- bushy beard: outer mass + inner strokes -->
+    <path d="M140 190 C128 262 148 316 200 322 C252 316 272 262 260 190" stroke-width="5"/>
+    <path d="M156 232 C152 272 164 300 186 314" stroke-width="2.6" opacity=".75"/>
+    <path d="M176 240 C172 276 178 300 196 316" stroke-width="2.6" opacity=".75"/>
+    <path d="M200 244 C200 278 200 300 200 318" stroke-width="2.6" opacity=".7"/>
+    <path d="M224 240 C228 276 222 300 204 316" stroke-width="2.6" opacity=".75"/>
+    <path d="M244 232 C248 272 236 300 214 314" stroke-width="2.6" opacity=".75"/>
+    <path d="M166 258 Q182 268 198 262" stroke-width="2.2" opacity=".55"/>
+    <path d="M202 262 Q218 268 234 258" stroke-width="2.2" opacity=".55"/>
+    <!-- neck + toga shoulders -->
+    <path d="M182 316 L176 344" stroke-width="4"/>
+    <path d="M218 316 L224 344" stroke-width="4"/>
+    <path d="M104 400 C116 362 146 344 178 342 L222 342 C254 344 284 362 296 400" stroke-width="5"/>
+    <!-- toga diagonal fold -->
+    <path d="M150 350 C176 372 224 372 250 350" stroke-width="3.4" opacity=".85"/>
+    <path d="M132 372 C164 396 236 396 268 372" stroke-width="2.6" opacity=".6"/>
+    <path d="M178 342 L200 372 L222 342" stroke-width="3" opacity=".8"/>
+    <!-- raised arguing hand (سقراط يحاور) -->
+    <path d="M296 400 C306 380 314 366 322 356" stroke-width="4"/>
+    <path d="M322 356 C326 348 334 344 340 348 C346 352 344 360 338 364 L326 372" stroke-width="3.4"/>
+    <path d="M330 350 L338 340 M336 354 L346 346" stroke-width="2.6" opacity=".8"/>
+  </g>
+</svg>

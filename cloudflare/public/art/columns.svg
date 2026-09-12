@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 320" fill="none">
+  <!-- أعمدة كلاسيكية + جملون: motif معماري خافت (قناع أحادي اللون) -->
+  <defs>
+    <linearGradient id="colFade" gradientUnits="userSpaceOnUse" x1="480" y1="0" x2="480" y2="320">
+      <stop offset="0" stop-color="#fff" stop-opacity=".9"/>
+      <stop offset=".6" stop-color="#fff" stop-opacity=".55"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </linearGradient>
+  </defs>
+  <g stroke="url(#colFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- pediment -->
+    <path d="M60 96 L480 22 L900 96" stroke-width="5"/>
+    <path d="M96 96 L480 34 L864 96" stroke-width="2.4" opacity=".7"/>
+    <path d="M40 96 H920" stroke-width="5"/>
+    <path d="M64 116 H896" stroke-width="3.4"/>
+    <!-- four columns -->
+    <g stroke-width="4.4">
+      <path d="M140 132 V268 M176 132 V268"/>
+      <path d="M372 132 V268 M408 132 V268"/>
+      <path d="M552 132 V268 M588 132 V268"/>
+      <path d="M784 132 V268 M820 132 V268"/>
+    </g>
+    <g stroke-width="2.2" opacity=".6">
+      <path d="M152 140 V260 M164 140 V260"/>
+      <path d="M384 140 V260 M396 140 V260"/>
+      <path d="M564 140 V260 M576 140 V260"/>
+      <path d="M796 140 V260 M808 140 V260"/>
+    </g>
+    <!-- capitals + bases -->
+    <g stroke-width="3.6">
+      <path d="M128 132 H188 M128 122 H188"/>
+      <path d="M360 132 H420 M360 122 H420"/>
+      <path d="M540 132 H600 M540 122 H600"/>
+      <path d="M772 132 H832 M772 122 H832"/>
+      <path d="M126 268 H190 M132 280 H184"/>
+      <path d="M358 268 H422 M364 280 H416"/>
+      <path d="M538 268 H602 M544 280 H596"/>
+      <path d="M770 268 H834 M776 280 H828"/>
+    </g>
+    <!-- stylobate steps -->
+    <path d="M84 292 H876" stroke-width="4"/>
+    <path d="M52 308 H908" stroke-width="4.6"/>
+  </g>
+</svg>
