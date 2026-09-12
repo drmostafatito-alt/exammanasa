@@ -16,19 +16,28 @@
   <header class="topbar">
     <div class="wrap topbar-row">
       <div class="brand">
-        <div class="logo" id="brandLogo">م‌ا</div>
+        <div class="logo" id="brandLogo"><svg class="grad-cap" viewBox="0 0 24 24" fill="none"><path d="M12 3L1 8l11 5 9-4.09V15h2V8L12 3z" fill="#fff"/><path d="M5 13.18V17c0 1.1 2.69 2 6 2s6-.9 6-2v-3.82l-6 3.18-6-3.18z" fill="#FFD966"/></svg></div>
         <div class="brand-txt">
           <div class="bname" id="brandName">منصة الامتحانات</div>
-          <div class="sub" id="brandSub">الفلسفة والمنطق · علم النفس</div>
+          <div class="sub" id="brandSub">ارتقِ بعلمك .. مستقبل أكثر إشراقًا</div>
         </div>
       </div>
       <nav class="mainnav" aria-label="التنقل الرئيسي">
-        <button type="button" onclick="navTo('top')">الرئيسية</button>
+        <button type="button" class="active" onclick="navTo('top')">الرئيسية</button>
         <button type="button" onclick="navTo('subjects')">الامتحانات</button>
         <button type="button" onclick="navTo('about')">عن المنصة</button>
         <button type="button" onclick="navTo('contact')" id="navContact" class="hidden" hidden>تواصل معنا</button>
       </nav>
-      <div class="socials" id="topSocials"></div>
+      <div class="top-actions">
+        <div class="socials" id="topSocials"></div>
+        <a href="/teacher" class="btn-teacher" aria-label="دخول المعلم">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+          دخول المعلم
+        </a>
+        <button class="hamburger" aria-label="القائمة" onclick="toggleMobileMenu()">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -39,9 +48,9 @@
   <footer class="site wrap" id="siteFooter">
     <div class="foot-grid">
       <div class="foot-col foot-brand-col">
-        <div class="foot-logo" id="footLogo">م‌ا</div>
+        <div class="foot-logo" id="footLogo"><svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 3L1 8l11 5 9-4.09V15h2V8L12 3z" fill="white"/><path d="M5 13.18V17c0 1.1 2.69 2 6 2s6-.9 6-2v-3.82l-6 3.18-6-3.18z" fill="#FFD966"/></svg></div>
         <div class="foot-brand" id="footBrand">منصة الامتحانات الإلكترونية</div>
-        <div class="foot-sub" id="footSub">الفلسفة والمنطق · علم النفس</div>
+        <div class="foot-sub" id="footSub">الفلسفة والمنطق · علم النفس — اختبر نفسك وقيّم مستواك</div>
         <div class="foot-social" id="footSocial"></div>
       </div>
       <nav class="foot-col foot-nav" id="footNav" aria-label="روابط سريعة">
@@ -52,11 +61,28 @@
         <button type="button" onclick="navTo('contact')" id="footContact" class="hidden" hidden>تواصل معنا</button>
       </nav>
     </div>
-    <div class="foot-copy" id="footCopy">جميع الحقوق محفوظة</div>
+    <div class="footer-bar" id="footerBar">
+      <div class="fb-left">
+        <span>تابعنا على</span>
+        <div class="fb-social" id="fbSocial"></div>
+      </div>
+      <div class="fb-center">معًا نحو جيل أكثر وعيًا وتميزًا</div>
+      <div class="fb-copy" id="fbCopy">جميع الحقوق محفوظة © 2026 — منصة الامتحانات الإلكترونية</div>
+    </div>
+    <div class="foot-copy" id="footCopy">جميع الحقوق محفوظة © 2026 — منصة الامتحانات الإلكترونية</div>
+    <div class="footer-mobile-deep" id="footerMobile">
+      <div class="fmd-inner">
+        <div class="fmd-logo"><svg viewBox="0 0 24 24" fill="none" width="24" height="24"><path d="M12 3L1 8l11 5 9-4.09V15h2V8L12 3z" fill="#1E56C8"/><path d="M5 13.18V17c0 1.1 2.69 2 6 2s6-.9 6-2v-3.82l-6 3.18-6-3.18z" fill="#C99A2E"/></svg></div>
+        <div class="fmd-name" id="fmdName">منصة الامتحانات الإلكترونية</div>
+        <div class="fmd-sub" id="fmdSub">اتعلم .. اختبر .. طور مستقبلك</div>
+        <div class="fmd-social" id="fmdSocial"></div>
+        <div class="fmd-copy" id="fmdCopy">© جميع الحقوق محفوظة 2026</div>
+      </div>
+    </div>
   </footer>
 
   <nav class="bottomnav" id="bottomnav" aria-label="التنقل السفلي">
-    <button type="button" class="bn-item active" data-key="home" onclick="bnHome()">
+    <button type="button" class="bn-item active" data-key="home" onclick="bnHome()" aria-current="page">
       <svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>
       <span class="bn-label">الرئيسية</span>
     </button>

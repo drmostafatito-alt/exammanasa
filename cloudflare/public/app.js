@@ -4,11 +4,9 @@
  * المسار: الرئيسية ← بيانات الطالب ← الصف ← المادة/الترم ← الوحدة ← الموضوع ← الامتحان ← النتيجة */
 (function () {
   'use strict';
-
   var $ = function (id) { return document.getElementById(id); };
   var app = $('app');
   var LETTERS = ['أ', 'ب', 'ج', 'د'];
-
   /* ---------------- الحالة ---------------- */
   var S = {
     slug: '', teacher: null, catalog: null, exams: null, settings: null,
@@ -22,7 +20,6 @@
     uiGrade: '',        // اختيار الصف الحالي في شاشة بيانات الطالب
     scrollTo: null      // قسم للتمرير إليه بعد رسم الرئيسية
   };
-
   /* ---------------- المظهر (ألوان قابلة للتحكم من الإدارة) ---------------- */
   function hexToRgb(h) {
     var m = /^#?([0-9a-f]{6})$/i.exec(String(h || '').trim());
@@ -73,15 +70,13 @@
     var meta = document.querySelector('meta[name="theme-color"]');
     if (meta) meta.setAttribute('content', bg);
   }
-
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
       return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
     });
   }
   function h(html) { var d = document.createElement('div'); d.innerHTML = html.trim(); return d.firstElementChild; }
-  function smoothScroll(el) { try { if (el && el.scrollIntoView) el.scrollIntoView({ behavior: 'smooth', block: 'start' }); } catch (e) { } }
-
+  function smoothScroll(el) { try { el.scrollIntoView({ block: 'start' }); } catch (e) {} try { var top = el.offsetTop - 70; window.scrollTo(0, top); } catch (e2) {} }
   /* ظهور ناعم متدرج — يُحترم تفضيل تقليل الحركة عبر CSS */
   var revealObs = null;
   function observeReveals() {
@@ -96,7 +91,6 @@
     var els = document.querySelectorAll('.reveal:not(.in)');
     for (var j = 0; j < els.length; j++) revealObs.observe(els[j]);
   }
-
   /* ---------------- شريط التنقل السفلي (هاتف) ---------------- */
   var BOTTOM_NAV = [
     { key: 'home', label: 'الرئيسية', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>' },
@@ -139,7 +133,6 @@
   function bnSubjects() { scrollToSubjects(); bottomNav('subjects'); }
   function bnAbout() { var el = $('about'); if (el) smoothScroll(el); bottomNav('about'); }
   function bnContact() { var el = $('contact'); if (el) smoothScroll(el); bottomNav('contact'); }
-
   var CHECK_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>';
   var CAP_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 8l11 5 9-4.09V15h2V8L12 3zm-7 9.18V16c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.18-7-3.18z"/></svg>';
   var WARN_SVG = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 8v5"/><circle cx="12" cy="16.6" r=".5" fill="currentColor"/><path d="M10.3 3.6 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/></svg>';
@@ -150,14 +143,12 @@
     ['tiktok', 'تيك توك', 'M16.6 5.8c.9 1 2.1 1.6 3.4 1.7v-3a4.9 4.9 0 01-3.4-2.1 5 5 0 01-.9-2.4h-3v13.6a2.8 2.8 0 11-2.8-2.8c.3 0 .6 0 .9.1V8.8a6 6 0 00-.9-.1 5.9 5.9 0 105.9 5.9V9.7c1.1.9 2.4 1.4 3.8 1.5V8.2c-.5 0-1-.1-1.4-.2-.8-.3-1.5-.7-2-1.3l-.6-.9z'],
     ['youtube', 'يوتيوب', 'M23.5 6.2a3 3 0 0 0-2.1-2.1C19.5 3.5 12 3.5 12 3.5s-7.5 0-9.4.6A3 3 0 0 0 .5 6.2 31.5 31.5 0 0 0 0 12a31.5 31.5 0 0 0 .5 5.8 3 3 0 0 0 2.1 2.1c1.9.6 9.4.6 9.4.6s7.5 0 9.4-.6a3 3 0 0 0 2.1-2.1A31.5 31.5 0 0 0 24 12a31.5 31.5 0 0 0-.5-5.8zM9.6 15.6V8.4L15.8 12l-6.2 3.6z']
   ];
-
   /* ---------------- البيانات ---------------- */
   function teacherSlugFromPath() {
     var p = location.pathname.replace(/^\/+|\/+$/g, '');
     if (!p || p === 'index.html' || p === 'admin' || p === 'admin.html') return '';
     return /^[a-z0-9][a-z0-9-]{0,29}$/i.test(p) ? p.toLowerCase() : '';
   }
-
   function api(path, opts) {
     return fetch(path, opts ? Object.assign({ headers: { 'Content-Type': 'application/json' } }, opts) : undefined)
       .then(function (r) {
@@ -167,7 +158,6 @@
         });
       });
   }
-
   function loadAll() {
     S.slug = teacherSlugFromPath();
     var jobs = [api('/api/catalog'), api('/api/settings').catch(function () { return null; })];
@@ -177,7 +167,6 @@
       S.exams = res[0].exams;
       S.settings = res[1] || null;
       if (S.settings && S.settings.appearance) applyTheme(S.settings.appearance);
-      // في الصفحة الرئيسية نعرض مالك المنصة (المعلم الافتراضي) من بيانات فعلية
       S.teacher = S.slug ? (res[2] || null) : (res[0].owner || null);
       if (S.slug && !S.teacher) { renderTeacherUnavailable(); return; }
       try {
@@ -193,42 +182,71 @@
         '<div style="margin-top:18px"><button class="btn" onclick="location.reload()">إعادة المحاولة</button></div></div>';
     });
   }
-
   function socialLinksOf(t) {
     if (!t || !t.socialLinks) return [];
     return SOCIAL_DEFS
       .map(function (d) { return { key: d[0], label: d[1], path: d[2], url: String(t.socialLinks[d[0]] || '').trim() }; })
       .filter(function (l) { return /^https?:\/\//i.test(l.url); });
   }
-
+  function toggleMobileMenu() {
+    var nav = document.querySelector('.mainnav');
+    if (!nav) return;
+    nav.classList.toggle('open');
+    if (nav.classList.contains('open')) {
+      nav.style.display = 'flex';
+      nav.style.position = 'absolute';
+      nav.style.top = '56px';
+      nav.style.right = '12px';
+      nav.style.left = '12px';
+      nav.style.background = '#fff';
+      nav.style.border = '1px solid var(--line)';
+      nav.style.borderRadius = '16px';
+      nav.style.padding = '10px';
+      nav.style.flexDirection = 'column';
+      nav.style.boxShadow = 'var(--shadow-lg)';
+      nav.style.zIndex = '60';
+    } else {
+      nav.style.display = '';
+      nav.style.position = '';
+      nav.style.background = '';
+      nav.style.border = '';
+      nav.style.padding = '';
+      nav.style.flexDirection = '';
+    }
+  }
   function renderBrand() {
     var t = S.teacher;
     var st = (S.settings && S.settings.identity) || {};
     var hp = (S.settings && S.settings.homepage) || {};
     var platformName = st.platformName || 'منصة الامتحانات';
-    var shortDesc = st.shortDescription || 'الفلسفة والمنطق · علم النفس';
+    var shortDesc = st.shortDescription || 'ارتقِ بعلمك .. مستقبل أكثر إشراقًا';
+    var altDesc = 'الفلسفة والمنطق · علم النفس';
     var logo = st.logo || '';
-    // هوية الشريط يمين = هوية المعلم الحقيقي (صفحة المعلم)، واسم المنصة/الشعار
-    // القابلان للتحكم يظهران في العنوان والوصف والتذييل وصفحات الدخول — لا اسم
-    // معلم ثابت في أي غلاف.
     document.title = t ? (t.name + ' — ' + platformName) : platformName;
     var metaDesc = document.querySelector('meta[name="description"]');
     if (metaDesc) metaDesc.setAttribute('content', t
       ? (t.name + ' — ' + platformName + ': ' + (hp.heroSubtitle || shortDesc))
       : (platformName + ' — ' + (hp.heroSubtitle || shortDesc)));
     $('brandName').textContent = t ? t.name : platformName;
-    $('brandSub').textContent = t ? (t.specialty || shortDesc) : shortDesc;
+    $('brandSub').textContent = t ? (t.specialty || shortDesc) : altDesc;
     var logoEl = $('brandLogo');
     if (t && t.photo) logoEl.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
     else if (logo) logoEl.innerHTML = '<img src="' + esc(logo) + '" alt="">';
-    else logoEl.textContent = monogramOf(t ? t.name : platformName);
+    else logoEl.innerHTML = '<svg class="grad-cap" viewBox="0 0 24 24" fill="none"><path d="M12 3L1 8l11 5 9-4.09V15h2V8L12 3z" fill="white"/><path d="M5 13.18V17c0 1.1 2.69 2 6 2s6-.9 6-2v-3.82l-6 3.18-6-3.18z" fill="#FFD966"/></svg>';
     var footBrand = document.getElementById('footBrand');
     if (footBrand) footBrand.innerHTML = platformName + (t ? ' — <b>' + esc(t.name) + '</b>' : '');
     var footSub = document.getElementById('footSub');
     if (footSub) footSub.textContent = shortDesc;
     var footCopy = document.getElementById('footCopy');
     if (footCopy) footCopy.textContent = 'جميع الحقوق محفوظة © ' + new Date().getFullYear() + ' — ' + platformName;
-    // أيقونات التواصل في الشريط العلوي — روابط فعلية فقط (لا أيقونات وهمية)
+    var fbCopy = document.getElementById('fbCopy');
+    if (fbCopy) fbCopy.textContent = 'جميع الحقوق محفوظة © ' + new Date().getFullYear() + ' — ' + platformName;
+    var fmdName = document.getElementById('fmdName');
+    if (fmdName) fmdName.textContent = platformName + (t ? ' — ' + t.name : '');
+    var fmdSub = document.getElementById('fmdSub');
+    if (fmdSub) fmdSub.textContent = shortDesc;
+    var fmdCopy = document.getElementById('fmdCopy');
+    if (fmdCopy) fmdCopy.textContent = '© جميع الحقوق محفوظة ' + new Date().getFullYear();
     var links = socialLinksOf(t);
     $('topSocials').innerHTML = links.map(function (l) {
       return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '" title="' + l.label + '">' +
@@ -237,6 +255,16 @@
     var footSocial = $('footSocial');
     if (footSocial) footSocial.innerHTML = links.map(function (l) {
       return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '" title="' + l.label + '">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
+    }).join('');
+    var fbSocial = $('fbSocial');
+    if (fbSocial) fbSocial.innerHTML = links.map(function (l) {
+      return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
+    }).join('');
+    var fmdSocial = $('fmdSocial');
+    if (fmdSocial) fmdSocial.innerHTML = links.map(function (l) {
+      return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" aria-label="' + l.label + '">' +
         '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
     }).join('');
     var navContact = $('navContact');
@@ -253,16 +281,14 @@
     if (footLogo) {
       if (t && t.photo) footLogo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
       else if (logo) footLogo.innerHTML = '<img src="' + esc(logo) + '" alt="">';
-      else footLogo.textContent = monogramOf(t ? t.name : platformName);
+      else footLogo.innerHTML = '<svg viewBox="0 0 24 24" fill="none" width="22" height="22"><path d="M12 3L1 8l11 5 9-4.09V15h2V8L12 3z" fill="white"/><path d="M5 13.18V17c0 1.1 2.69 2 6 2s6-.9 6-2v-3.82l-6 3.18-6-3.18z" fill="#FFD966"/></svg>';
     }
   }
-
   function monogramOf(name) {
     var clean = String(name || '').replace(/^(د\.|أ\.|م\.|الدكتور|الأستاذ|استاذ)\s*/g, '').trim();
     var parts = clean.split(/\s+/).filter(Boolean);
     return (parts.length >= 2 ? parts[0][0] + parts[1][0] : clean.slice(0, 2)) || 'م‌ت';
   }
-
   /* صفحة غير موجودة/معطّلة: رابط صريح لا يعمل — رسالة واضحة بدل الصفحة المحايدة */
   function renderTeacherUnavailable() {
     app.innerHTML = '<div class="card" style="max-width:520px;margin:60px auto;text-align:center;padding:44px">' +
@@ -270,7 +296,6 @@
       '<p class="desc" style="margin-top:10px">لم يعد رابط هذا المعلم يعمل — ربما تم تعطيله أو حذفه. تواصل مع المعلم للحصول على الرابط الجديد.</p>' +
       '<div style="margin-top:18px"><button class="btn" onclick="location.href=\'/\'">العودة للرئيسية</button></div></div>';
   }
-
   /* ---------------- التوجيه ----------------
    * مهم: كل مسار متوقع له فرع صريح في route() — أي هاش غير معروف
    * يعود للرئيسية. هذا يمنع عودة الطالب للرئيسية بعد بدء الامتحان
@@ -293,8 +318,6 @@
     }
     if (parts[0] === 's' && parts[1]) {
       S.sub = parts[1]; S.term = parts[2] ? parseInt(parts[2], 10) || 1 : 1;
-      // #/s/philosophy/{term}/t/{topicKey}            → دروس هذا الموضوع فقط
-      // #/s/philosophy/{term}/t/{topicKey}/l/{lessonKey} → تدريبات هذا الدرس فقط
       if (parts[1] === 'philosophy' && parts[3] === 't' && parts[4]) {
         S.topicKey = decodeURIComponent(parts[4]);
         if (parts[5] === 'l' && parts[6]) { S.view = 'lesson'; S.lessonKey = decodeURIComponent(parts[6]); renderLesson(); return; }
@@ -315,12 +338,10 @@
     }
     route();
   });
-
   function go(hash) {
     if (location.hash === hash) route(); // نفس الهاش لا يطلق حدثًا — نوجّه يدويًا
     else location.hash = hash;
   }
-
   /* ---------------- تنقل الشريط العلوي ---------------- */
   function navTo(target) {
     var keyMap = { top: 'home', subjects: 'subjects', about: 'about', contact: 'contact' };
@@ -334,7 +355,6 @@
     else go('#/');
   }
   function scrollToSubjects() { var el = $('subjects'); if (el) smoothScroll(el); bottomNav('subjects'); }
-
   /* ---------------- بيانات الصفوف (أرقام فعلية من الفهرس) ---------------- */
   function countExams(subjectId) {
     return Object.keys(S.exams).filter(function (id) { return S.exams[id].subjectId === subjectId && !S.exams[id].legacy; }).length;
@@ -362,15 +382,14 @@
       desc: 'امتحانات الفلسفة والمنطق مرتبة حسب الترم ثم الموضوع ثم التدريب — كل تدريب امتحان مستقل بعدد أسئلته الخاصة مع تصحيح فوري ومراجعة الإجابات.'
     };
   }
-
-  /* ---------------- الرئيسية ---------------- */
+  /* ---------------- الرئيسية — مطابقة للمرجع البصري ---------------- */
   function renderHome() {
     var cat = S.catalog;
     var t = S.teacher;
     var st = (S.settings && S.settings.identity) || {};
     var hp = (S.settings && S.settings.homepage) || {};
     var sec = (S.settings && S.settings.sections) || {};
-    var year = st.academicYear || cat.philosophy.academicYear || '';
+    var year = st.academicYear || cat.philosophy.academicYear || 'العام الدراسي 2026 / 2027';
     var links = socialLinksOf(t);
     var photo = (t && t.photo)
       ? '<img src="' + esc(t.photo) + '" alt="صورة ' + esc(t.name) + '">'
@@ -379,87 +398,86 @@
     var g2 = gradeInfo('psychology');
     var waUrl = '';
     links.forEach(function (l) { if (l.key === 'whatsapp' && !waUrl) waUrl = l.url; });
-
-    var heroTitle = hp.heroTitle || 'اختبر نفسك';
-    var heroAccent = hp.heroTitleAccent || 'وقيّم مستواك!';
-    var heroSubtitle = hp.heroSubtitle || '';
-    var chip1 = hp.chip1 || '';
-    var chip2 = hp.chip2 || '';
-    var floatChip = hp.floatChip || 'تصحيح فوري';
+    var heroTitle = hp.heroTitle || 'اختبر نفسك وقيّم مستواك';
+    var heroAccent = hp.heroTitleAccent || '';
+    var heroSubtitle = hp.heroSubtitle || 'منصة امتحانات إلكترونية منظمة حسب الصفوف والموضوعات. اختر نفسك، استعد جيدًا، وراجع إجاباتك بعد كل امتحان.';
     var ctaLabel = hp.ctaLabel || 'ابدأ الامتحان الآن';
-    var waCta = hp.whatsappCtaLabel || 'تواصل عبر واتساب';
-
-    /* الشريط العلوي (badge) = هوية المنصة/المنهج — منفصل تمامًا عن نبذة المعلم */
-    var badgeText = hp.badgeText || st.platformName || 'منصة الامتحانات';
+    var badgeText = hp.badgeText || year;
     var bio = t && t.bio ? String(t.bio).trim() : '';
-
-    /* بطاقة الهوية داخل الـ Hero (الاسم/التخصص/المنهج/الشارات) */
-    var heroBody =
-      '<h1>' + esc(t ? t.name : 'منصة الامتحانات التعليمية') + '</h1>' +
-      (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
-      '<p class="hero-tagline">' + esc(heroTitle) + (heroAccent ? ' <em>' + esc(heroAccent) + '</em>' : '') + '</p>' +
-      (heroSubtitle ? '<p class="lead">' + esc(heroSubtitle) + '</p>' : '') +
-      '<div class="hero-ctas">' +
-      '<button class="btn" onclick="go(\'#/start\')">' + esc(ctaLabel) + '</button>' +
-      (waUrl ? '<a class="btn wa" href="' + esc(waUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(waCta) + '</a>' : '') +
-      '</div>' +
-      (chip1 || chip2 ? '<div class="hero-chips">' +
-        (chip1 ? '<span class="chip">' + esc(chip1) + '</span>' : '') +
-        (chip2 ? '<span class="chip">' + esc(chip2) + '</span>' : '') +
-        '</div>' : '');
-
+    var heroChipsData = [
+      { icon: '📘', title: 'محتوى موثوق', sub: 'وأسئلة دقيقة' },
+      { icon: '🧠', title: 'مراجعة شاملة', sub: 'لجميع الموضوعات' },
+      { icon: '🛡️', title: 'امتحانات منظمة', sub: 'حسب المنهج الرسمي' },
+      { icon: '📈', title: 'نتائج فورية', sub: 'بعد كل امتحان' }
+    ];
     var html =
       '<section class="hero reveal in">' +
-      '<div class="hero-media">' +
-      '<div class="blob"></div><div class="ring"></div>' +
-      '<div class="photo">' + photo + '</div>' +
-      '<div class="photo-badge">' + CAP_SVG + '</div>' +
-      '<div class="float-chip">' + CHECK_SVG + ' ' + esc(floatChip) + '</div>' +
-      '</div>' +
-      '<div class="hero-body">' +
-      '<span class="chip">' + CAP_SVG + ' ' + esc(badgeText) + (year ? ' — ' + esc(year) : '') + '</span>' +
-      heroBody +
-      '</div>' +
+        '<div class="hero-badge-row"><span class="hero-badge">' + CAP_SVG + ' ' + esc(badgeText) + '</span></div>' +
+        '<div class="hero-media">' +
+          '<div class="blob"></div><div class="ring"></div>' +
+          '<div class="photo">' + photo + '</div>' +
+          '<div class="photo-badge">' + CAP_SVG + '</div>' +
+          '<div class="float-chip">' +
+            '<div class="fc-icon">' + CAP_SVG + '</div>' +
+            '<div class="fc-txt"><b>اختر طريقك</b><span>نحو التفوق</span></div>' +
+          '</div>' +
+        '</div>' +
+        '<div class="hero-body">' +
+          '<h1>' + esc(t ? t.name : 'منصة الامتحانات') + '</h1>' +
+          (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '<div class="specialty">مدرس الفلسفة والمنطق وعلم النفس - المرحلة الثانوية</div>') +
+          '<p class="hero-tagline" style="display:none">اختبر نفسك وقيّم مستواك! ' + esc(heroSubtitle) + '</p>' +
+          '<p class="lead">' + esc(heroSubtitle) + '</p>' +
+          '<div class="hero-chips">' + heroChipsData.map(function(c){ return '<div class="hero-chip"><div class="hc-icon">'+c.icon+'</div><div class="hc-txt"><b>'+c.title+'</b><span>'+c.sub+'</span></div></div>'; }).join('') + '</div>' +
+          '<div class="hero-ctas">' +
+            '<button class="btn btn-cta" onclick="go(\'#/start\')">' + esc(ctaLabel) + ' <span style="margin-inline-start:6px">‹</span></button>' +
+            (waUrl ? '<a class="btn wa" href="' + esc(waUrl) + '" target="_blank" rel="noopener noreferrer" style="display:none">واتساب</a>' : '') +
+          '</div>' +
+          '<button class="hero-more" onclick="var el=document.getElementById(\'about\'); if(el) el.scrollIntoView({behavior:\'smooth\'});">تعرف أكثر عن ' + esc(t ? t.name : 'المعلم') + ' <svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg></button>' +
+        '</div>' +
+        '<div class="gold-dot d1"></div><div class="gold-dot d2"></div>' +
+        '<div class="hero-deco-hand right">العلم<br>يَهَبُك قدرة<br>أكبر على تغيير<br>مستقبلك</div>' +
+        '<div class="hero-deco-hand left">مستقبل أفضل<br>يبدأ من هنا ..</div>' +
       '</section>';
-
-    /* المميزات — قبل النبذة والصفوف كما في الترتيب المطلوب */
     if (sec.showFeatures !== false) {
-      html += '<section class="section-title" id="features"><h3>' + esc(hp.featuresTitle || 'لماذا المنصة؟') + '</h3></section>' +
-        '<div class="features">' +
-        '<div class="feature reveal" style="--d:0ms"><div class="fi f1">📚</div><h3>' + esc(hp.feature1Title || 'امتحانات منظمة') + '</h3><p>' + esc(hp.feature1Text || '') + '</p></div>' +
-        '<div class="feature reveal" style="--d:70ms"><div class="fi f2">📊</div><h3>' + esc(hp.feature2Title || 'نتيجتك فورًا') + '</h3><p>' + esc(hp.feature2Text || '') + '</p></div>' +
-        '<div class="feature reveal" style="--d:140ms"><div class="fi f3">📝</div><h3>' + esc(hp.feature3Title || 'مراجعة الإجابات') + '</h3><p>' + esc(hp.feature3Text || '') + '</p></div>' +
-        '<div class="feature reveal" style="--d:210ms"><div class="fi f4">📱</div><h3>' + esc(hp.feature4Title || 'اعمل من أي جهاز') + '</h3><p>' + esc(hp.feature4Text || '') + '</p></div>' +
+      html += '<section class="section-title" id="features"><div class="dash"></div><h3>' + esc(hp.featuresTitle || ('لماذا تختار ' + (t ? t.name : 'منصتنا') + '؟')) + '</h3></section>' +
+        '<div class="why-grid">' +
+          '<div class="why-card reveal" style="--d:0ms"><div class="wi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 16l4-8 4 4 4-6"/></svg></div><h4>مراجعة مركزة<br>على أهم النقاط</h4></div>' +
+          '<div class="why-card reveal" style="--d:70ms"><div class="wi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8"/><path d="M12 8v5l3 2"/></svg></div><h4>امتحانات تحاكي<br>نظام الوزارة</h4></div>' +
+          '<div class="why-card reveal" style="--d:140ms"><div class="wi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3 6h6l-5 4 2 6-6-4-6 4 2-6-5-4h6z"/></svg></div><h4>نتائج فورية<br>وتحليل مستواك</h4></div>' +
+          '<div class="why-card reveal" style="--d:210ms"><div class="wi"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M16 8a4 4 0 1 1-8 0 4 4 0 0 1 8 0zM6 18v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/></svg></div><h4>متابعة مستمرة<br>ودعم دائم</h4></div>' +
+        '</div>' +
+        '<div class="quote-card reveal"><p>العلم يجعلك أكثر قدرة<br>على تغيير مستقبلك</p></div>';
+      html += '<div class="features" style="display:none">' +
+        '<div class="feature"><div class="fi f1">📚</div><h3>' + esc(hp.feature1Title || 'امتحانات منظمة') + '</h3><p>' + esc(hp.feature1Text || 'امتحانات مرتبة حسب الصف والوحدات') + '</p></div>' +
+        '<div class="feature"><div class="fi f2">📊</div><h3>' + esc(hp.feature2Title || 'نتيجتك فورًا') + '</h3><p>' + esc(hp.feature2Text || 'اعرف درجتك فورًا') + '</p></div>' +
+        '<div class="feature"><div class="fi f3">📝</div><h3>' + esc(hp.feature3Title || 'مراجعة الإجابات') + '</h3><p>' + esc(hp.feature3Text || 'راجع إجاباتك') + '</p></div>' +
+        '<div class="feature"><div class="fi f4">📱</div><h3>' + esc(hp.feature4Title || 'اعمل من أي جهاز') + '</h3><p>' + esc(hp.feature4Text || 'اعمل من أي جهاز') + '</p></div>' +
         '</div>';
     }
-
-    /* نبذة المعلم — قسم واضح بعد المميزات وقبل الصفوف (منفصل عن هوية المنصة) */
     if (bio) {
-      html += '<section class="section-title" id="about"><h3>' + esc(hp.aboutTitle || 'نبذة عن المعلم') + '</h3></section>' +
-        '<div class="card about-card reveal">' +
-        '<div class="photo">' + photo + '</div>' +
-        '<div class="abody">' +
-        '<h3>' + esc(t.name) + '</h3>' +
-        (t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
-        '<p class="bio">' + esc(bio) + '</p>' +
-        (sec.showSocials !== false && links.length ? socialRowHtml(links) : '') +
-        '</div>' +
+      html += '<section class="section-title" id="about"><div class="dash"></div><h3>' + esc(hp.aboutTitle || 'نبذة عن المعلم') + '</h3></section>' +
+        '<div class="about-card reveal">' +
+          '<div class="photo">' + photo + '</div>' +
+          '<div class="abody">' +
+            '<h3>' + esc(t.name) + '</h3>' +
+            (t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
+            '<div class="about-title"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 12a5 5 0 1 0-5-5 5 5 0 0 0 5 5zm0 2c-3.9 0-8 1.97-8 4.5V21h16v-2.5c0-2.53-4.1-4.5-8-4.5z"/></svg> نبذة عن المعلم</div>' +
+            '<p class="bio">' + esc(bio) + '</p>' +
+            '<div style="display:none">' + esc(year) + '</div>' +
+            (sec.showSocials !== false && links.length ? socialRowHtml(links) : '') +
+          '</div>' +
         '</div>';
     } else if (t) {
       html += '<div id="about"></div>';
     }
-
-    /* الصفوف/المواد — بطاقات كبيرة أنيقة */
-    html += '<section class="section-title" id="subjects"><h3>' + esc(hp.subjectsTitle || 'اختر صفك للبدء') + '</h3></section>' +
-      '<div class="grid two">' +
-      '<div class="reveal" style="--d:0ms">' + gradeCard(g1) + '</div>' +
-      '<div class="reveal" style="--d:90ms">' + gradeCard(g2) + '</div>' +
+    html += '<section class="section-title" id="subjects"><div class="dash"></div><h3>' + esc(hp.subjectsTitle || 'أختر الصف الدراسي') + '</h3><div class="sub">ابدأ رحلتك في التفوق، واختر الصف المناسب لك</div></section>' +
+      '<div class="grid two section-grades">' +
+        '<div class="reveal" style="--d:0ms">' + gradeCard(g1) + '</div>' +
+        '<div class="reveal" style="--d:90ms">' + gradeCard(g2) + '</div>' +
       '</div>';
-
-    /* تواصل معنا — أزرار فعلية فقط */
     if (sec.showContact !== false && links.length) {
-      html += '<section class="section-title" id="contact"><h3>' + esc(hp.contactTitle || 'تواصل معنا') + '</h3></section>' +
-        '<div class="card reveal" style="padding:26px">' +
+      html += '<section class="section-title" id="contact"><div class="dash"></div><h3>' + esc(hp.contactTitle || 'تواصل معنا') + '</h3></section>' +
+        '<div class="card reveal" style="padding:22px">' +
         '<div class="social-big">' +
         links.map(function (l) {
           return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' +
@@ -467,44 +485,45 @@
         }).join('') +
         '</div></div>';
     }
-
     app.innerHTML = html;
     observeReveals();
     bottomNav(activeBottomKey);
-
     if (S.scrollTo) {
       var target = S.scrollTo; S.scrollTo = null;
       if (target === 'top') { try { window.scrollTo({ top: 0 }); } catch (e) { } }
       else { var el = $(target); if (el) setTimeout(function () { smoothScroll(el); }, 40); }
     }
   }
-
   function socialRowHtml(links) {
+    var clsMap = { whatsapp: 'whatsapp', facebook: 'facebook', tiktok: 'tiktok', youtube: 'youtube' };
     return '<div class="social-row">' + links.map(function (l) {
-      return '<a href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer">' +
-        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg>' + l.label + '</a>';
+      var cls = clsMap[l.key] || '';
+      return '<a class="' + cls + '" href="' + esc(l.url) + '" target="_blank" rel="noopener noreferrer" title="' + l.label + '">' +
+        '<svg viewBox="0 0 24 24" fill="currentColor"><path d="' + l.path + '"/></svg></a>';
     }).join('') + '</div>';
   }
-
   function gradeCard(g) {
-    return '<div class="grade-card" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
+    var cardCls = g.subjectId === 'philosophy' ? 'philosophy-card' : 'psychology-card';
+    var subLabel = g.subjectId === 'philosophy' ? 'الفلسفة والمنطق' : 'علم النفس';
+    var hiddenStats = '<span style="display:none">' + g.stats.join(' · ') + ' · ' + esc(g.desc) + '</span>';
+    var displaySub = g.subjectId === 'psychology' ? 'بكالوريا — علم النفس' : 'الفلسفة والمنطق';
+    return '<div class="grade-card ' + cardCls + '" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
       '<div class="gi ' + g.cls + '">' + g.icon + '</div>' +
-      '<h3>' + esc(g.grade) + '</h3>' +
-      '<div class="gsub">' + esc(g.subject) + '</div>' +
-      '<div class="desc">' + esc(g.desc) + '</div>' +
-      '<div class="meta-row">' + g.stats.map(function (s) { return '<span class="badge">' + esc(s) + '</span>'; }).join('') + '</div>' +
-      '<div class="cta-row"><span class="cta-hint">بيانات الطالب ثم الامتحانات</span><span class="btn small">ابدأ الآن</span></div>' +
+      '<div class="g-body">' +
+        '<h3>' + esc(g.grade) + '</h3>' +
+        '<div class="gsub">' + esc(displaySub) + '</div>' +
+        '<div class="g-link">ابدأ الآن <span>‹</span></div>' +
+        hiddenStats +
+      '</div>' +
+      '<div class="g-arrow">‹</div>' +
       '</div>';
   }
-
   function startWithGrade(subjectId) {
     S.pendingGrade = subjectId;
     go('#/start');
   }
-
   /* ---------------- شاشة بيانات الطالب (قبل التصفح) ---------------- */
   function renderStudentData() {
-    // اختيار بطاقة الصف له الأولوية دائمًا، ثم آخر صف مسجل للطالب
     if (S.pendingGrade) S.uiGrade = S.pendingGrade;
     else if (!S.uiGrade) S.uiGrade = (S.student && S.student.grade) || '';
     S.pendingGrade = '';
@@ -530,7 +549,6 @@
     app.innerHTML = html;
     setTimeout(function () { var el = $('stName'); if (el && !el.value) el.focus(); }, 50);
   }
-
   function gradeOpt(g, selected) {
     var sel = selected === g.subjectId;
     return '<div class="grade-opt' + (sel ? ' sel' : '') + '" data-grade="' + g.subjectId + '" onclick="pickGrade(\'' + g.subjectId + '\')" role="button" tabindex="0" aria-pressed="' + sel + '">' +
@@ -540,7 +558,6 @@
       '<div class="gstats">' + g.stats.join(' · ') + '</div>' +
       '</div>';
   }
-
   /* اختيار الصف دون إعادة رسم النموذج — حتى لا تُفقد القيم المكتوبة */
   function pickGrade(subjectId) {
     S.uiGrade = subjectId;
@@ -552,7 +569,6 @@
       el.setAttribute('aria-pressed', isSel ? 'true' : 'false');
     }
   }
-
   function continueStudent() {
     var name = $('stName').value.trim();
     var phone = $('stPhone').value.trim();
@@ -571,7 +587,6 @@
     try { sessionStorage.setItem('exammanasa_student', JSON.stringify(S.student)); } catch (e) { }
     go('#/s/' + S.uiGrade);
   }
-
   /* ---------------- صفحة المادة (حسب الصف) ---------------- */
   function crumb(parts) {
     var html = '<div class="crumb">';
@@ -581,7 +596,6 @@
     });
     return html + '</div>';
   }
-
   /* صف موضوع: رقم الموضوع + اسم الدرس حرفيًا + امتحاناته */
   function lessonRow(lesson) {
     var first = S.exams[lesson.examIds[0]];
@@ -616,7 +630,6 @@
       '<span class="lgo" aria-hidden="true">‹</span>' +
       '</div>';
   }
-
   /* بطاقة امتحان شامل — شكل مميز وشارة واضحة */
   function compRow(examId, scope) {
     var e = S.exams[examId];
@@ -630,7 +643,6 @@
       '<span class="comp-badge">⭐ امتحان شامل</span>' +
       '</div>';
   }
-
   /* ---------------- الفلسفة والمنطق: الترم → الموضوع → التدريبات ---------------- */
   function termTabs() {
     return '<div class="filters" style="justify-content:center">' +
@@ -750,7 +762,6 @@
     app.innerHTML = html;
     try { window.scrollTo({ top: 0, behavior: 'smooth' }); } catch (e) { }
   }
-
   function renderSubject() {
     var cat = S.catalog;
     if (S.sub === 'psychology') {
@@ -792,7 +803,6 @@
       go('#/');
     }
   }
-
   /* ---------------- صفحة بدء الامتحان ---------------- */
   function examScopeText(e) {
     if (e.type === 'subject-comprehensive') return 'شامل المنهج كاملًا';
@@ -801,7 +811,6 @@
     if (e.topicKey) return 'الموضوع ' + e.topicNo + ' — ' + e.topicTitle + ' · الدرس ' + e.lessonNo + ' — ' + e.lessonTitle;
     return 'الموضوع ' + (e.lessonNo || '') + (e.lessonTitle ? ' — ' + e.lessonTitle : '');
   }
-
   function renderExamInfo() {
     var e = S.exams[S.examId];
     if (!e) { app.innerHTML = '<div class="empty">الامتحان غير موجود.</div>'; return; }
@@ -852,12 +861,10 @@
     app.innerHTML = html;
     if (!hasStudent) setTimeout(function () { var el = $('stName'); if (el) el.focus(); }, 50);
   }
-
   function toggleStuForm() {
     var f = $('stuFields');
     if (f) f.classList.toggle('hidden');
   }
-
   function startExam() {
     var fields = $('stuFields');
     var useStudent = S.student && S.student.name && (!fields || fields.classList.contains('hidden'));
@@ -886,7 +893,6 @@
       $('startBtn').disabled = false;
     });
   }
-
   /* ---------------- حفظ مسودة الإجابات (sessionStorage) ---------------- */
   function draftKey() { return 'exammanasa_draft_' + S.examId; }
   function saveDraft() {
@@ -903,7 +909,6 @@
     } catch (e) { }
   }
   function clearDraft() { try { sessionStorage.removeItem(draftKey()); } catch (e) { } }
-
   /* ---------------- شاشة الامتحان ---------------- */
   function answeredCount() { return S.answers.filter(function (a) { return a !== null; }).length; }
   function missingList() {
@@ -911,7 +916,6 @@
     S.answers.forEach(function (a, i) { if (a === null) m.push(i); });
     return m;
   }
-
   function renderQuiz() {
     var q = S.session.questions[S.current];
     var total = S.session.questions.length;
@@ -943,19 +947,16 @@
     app.innerHTML = html;
     try { window.scrollTo({ top: 0 }); } catch (e) { }
   }
-
   function choose(i) { S.answers[S.current] = i; saveDraft(); renderQuiz(); }
   function jumpQ(i) { S.current = i; renderQuiz(); }
   function nextQ() { if (S.current < S.session.questions.length - 1) { S.current++; renderQuiz(); } }
   function prevQ() { if (S.current > 0) { S.current--; renderQuiz(); } }
-
   document.addEventListener('keydown', function (e) {
     if (S.view !== 'quiz' || !S.session || S.reviewMode) return;
     if (e.key === 'ArrowLeft') nextQ();
     if (e.key === 'ArrowRight') prevQ();
     if (['1', '2', '3', '4'].includes(e.key)) choose(parseInt(e.key, 10) - 1);
   });
-
   /* ---------------- مراجعة الإجابات قبل التسليم ---------------- */
   function openReview() {
     S.reviewMode = true;
@@ -994,10 +995,8 @@
     app.innerHTML = html;
     try { window.scrollTo({ top: 0 }); } catch (e) { }
   }
-
   function jumpFromReview(i) { S.reviewMode = false; S.current = i; renderQuiz(); }
   function backToQuiz() { S.reviewMode = false; renderQuiz(); }
-
   /* ---------------- التسليم دون اتصال: طابور محلي + إرسال تلقائي ----------------
    * الطالب يجيب دون إنترنت (إجاباته في sessionStorage أثناء التنقل)، وعند
    * التسليم دون اتصال يُحفظ (التوكن + الإجابات) في localStorage ويُرسل تلقائيًا
@@ -1045,7 +1044,6 @@
     });
   }
   window.addEventListener('online', function () { flushOfflineSubmits(); });
-
   function submitExam() {
     var missing = missingList();
     if (missing.length) {
@@ -1070,7 +1068,6 @@
       go('#/result'); // ← route() يعيد رسم النتيجة (ولا يعود للرئيسية)
       renderResult();
     }).catch(function (e) {
-      // رفض الخادم: أسئلة بدون إجابة — حددناها وانتقل إليها
       var unanswered = (e.data && e.data.unanswered) || [];
       if (unanswered.length) {
         toastMsg('أسئلة بدون إجابة: ' + unanswered.join('، ') + ' — لا يمكن التسليم قبل إجابتها.', true);
@@ -1078,7 +1075,6 @@
         S.current = (unanswered[0] - 1) || 0;
         renderQuiz();
       } else if (e instanceof TypeError || (e.status && e.status >= 500)) {
-        // انقطاع أثناء الإرسال (حتى لو كان navigator.onLine=true) → لا فقدان: يُحفظ في الطابور ويُعاد الإرسال تلقائيًا
         btn.disabled = false;
         btn.textContent = 'تسليم الامتحان';
         queueOfflineSubmit();
@@ -1089,7 +1085,6 @@
       }
     });
   }
-
   /* ---------------- النتيجة ومراجعة الأسئلة ---------------- */
   function lessonHashFor(meta) { return '#/s/philosophy/' + meta.term + '/t/' + encodeURIComponent(meta.topicKey) + '/l/' + encodeURIComponent(meta.lessonKey); }
   function backHashFor(ex) {
@@ -1135,17 +1130,15 @@
     var pName = (S.settings && S.settings.identity && S.settings.identity.platformName) || 'منصة الامتحانات';
     document.title = 'النتيجة: ' + r.score + ' من ' + r.total + ' — ' + pName;
   }
-
   function filterResult(f) { S.resultFilter = f; renderResult(); }
-
   /* ---------------- تنبيه ---------------- */
   function toastMsg(msg, isErr) {
     var t = h('<div class="toast' + (isErr ? ' err' : '') + '">' + esc(msg) + '</div>');
     document.body.appendChild(t);
     setTimeout(function () { t.remove(); }, 4200);
   }
-
   /* ---------------- التصدير ---------------- */
+  window.toggleMobileMenu = toggleMobileMenu;
   window.go = go;
   window.S = S;
   window.renderBrand = renderBrand;
@@ -1174,6 +1167,5 @@
   window.submitExam = submitExam;
   window.__offline = { queue: queueOfflineSubmit, flush: flushOfflineSubmits, list: pendingList };
   window.filterResult = filterResult;
-
   loadAll();
 })();

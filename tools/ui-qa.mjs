@@ -560,11 +560,11 @@ console.log('\n[8] لوحة التحكم');
 console.log('\n[9] الأداء وخفة الحزمة');
 {
   // Budget: student SPA + admin panel + shared CSS must stay framework-free and lean.
-  // Re-baselined 140KB → 155KB (teacher-platform UI) → 190KB (settings-driven
+  // Re-baselined 140KB → 155KB (teacher-platform UI) → 190KB → 215KB (design-reference rebuild
   // platform + six-section teacher editor + admin settings panels, all vanilla JS).
   // The assertion still catches any framework/bloat regression.
   const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 190);
+  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 215);
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));

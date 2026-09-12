@@ -13,7 +13,9 @@
     "qa": "node ../tools/ui-qa.mjs"
   },
   "devDependencies": {
+    "@sparticuz/chromium-min": "^153.0.0",
     "jsdom": "^26.1.0",
+    "playwright-core": "^1.63.0",
     "wrangler": "^4.0.0"
   }
 }

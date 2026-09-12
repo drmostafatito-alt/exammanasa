@@ -15,7 +15,7 @@
  * (هذا الملف وثيقة QA — لا يدخل npm test الذي يعمل بلا متصفح.)
  */
 import fs from 'node:fs';
-import chromiumMin from '@sparticuz/chromium-min';
+import chromium from '@sparticuz/chromium';
 import { chromium as pw } from 'playwright-core';
 
 const BASE = process.env.QABASE || 'http://127.0.0.1:8787';
@@ -39,9 +39,9 @@ const T_A = {
 const T_B = { name: 'BakerQA', email: 'baker@qa.test', pass: 'Baker#Pass22' };
 const STUDENT = { name: 'طالب تجريبي واحد', phone: '01144445551' };
 
-const exe = await chromiumMin.executablePath('/tmp/chrm');
-process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/crlibs/lib';
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--lang=ar'], headless: true });
+process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/al2023/lib:/tmp';
+const exe = await chromium.executablePath();
+const browser = await pw.launch({ executablePath: exe, args: chromium.args, headless: true });
 
 let apiAudit = [];
 async function noCache(ctx) {
@@ -68,7 +68,7 @@ try {
   await noCache(adminCtx);
   const ap = await adminCtx.newPage();
   attachAudit(ap);
-  await ap.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+  await ap.goto(BASE + '/admin', { waitUntil: 'domcontentloaded' });
   ok('/admin يعرض شاشة الإعداد الأولي عند عدم وجود حساب', (await ap.locator('text=إنشاء حساب المسؤول').count()) === 1);
   await shot(ap, '01-admin-first-run-setup');
   await ap.fill('#admEmail', ADMIN_EMAIL);
@@ -145,7 +145,7 @@ try {
   await noCache(tctx);
   const tp = await tctx.newPage();
   attachAudit(tp);
-  await tp.goto(BASE + '/teacher', { waitUntil: 'networkidle' });
+  await tp.goto(BASE + '/teacher', { waitUntil: 'domcontentloaded' });
   const tHtml = await tp.content();
   ok('/teacher يعرض دخولًا فقط — لا إنشاء حساب/تسجيل جديد', !/إنشاء حساب|تسجيل جديد|Sign up|\bregister\b/i.test(tHtml));
   const tBodyTxt = await tp.evaluate(() => document.body.innerText);
@@ -222,7 +222,7 @@ try {
   await noCache(sctx);
   const sp = await sctx.newPage();
   attachAudit(sp);
-  await sp.goto(BASE + '/' + T_A.slug, { waitUntil: 'networkidle' });
+  await sp.goto(BASE + '/' + T_A.slug, { waitUntil: 'domcontentloaded' });
   ok('صفحة المعلم تحمل اسمه في الهوية', (await sp.locator('#brandName').textContent()).includes('أحمد QA ٢'));
   ok('صفحة المعلم تحمل نبذته', (await sp.locator('.about-card').first().textContent()).includes('نبذة محدثة'));
   ok('صفحة المعلم تعرض رابط يوتيوب فعلي فقط', (await sp.locator('.about-card a[href*="youtube.com"]').count()) >= 1);
@@ -276,7 +276,7 @@ try {
   /* ============ 7. Teacher A dashboard now shows the result ============ */
   console.log('\n[7] النتيجة تظهر في لوحة المعلم (ربط خادومي)');
   await sleep(1300);
-  await tp.reload({ waitUntil: 'networkidle' });
+  await tp.reload({ waitUntil: 'domcontentloaded' });
   await tp.waitForSelector('.t-stat-grid', { timeout: 15000 });
   const homeTxt = await tp.locator('.t-main').innerText();
   ok('لوحة A تعرض نتيجة الطالب (اسم + آخر نشاط)', homeTxt.includes(STUDENT.name), homeTxt.slice(0, 240));
@@ -326,7 +326,7 @@ try {
   await sleep(600);
   const sessAfterDisable = await tp.evaluate(() => fetch('/api/t/session', { headers: { 'X-Requested-With': 'fetch' } }).then(r => r.status));
   ok('تعطيل المعلم يسقط جلساته فورًا (401)', sessAfterDisable === 401, String(sessAfterDisable));
-  await sp.goto(BASE + '/' + T_A.slug, { waitUntil: 'networkidle' });
+  await sp.goto(BASE + '/' + T_A.slug, { waitUntil: 'domcontentloaded' });
   ok('صفحة طالب لمعلم معطّل: رسالة غير متاح', (await sp.locator('text=هذا الرابط غير متاح حاليًا').count()) === 1);
   await shot(sp, '11-disabled-teacher-page');
   const loginDisabled = await tctx.newPage();
@@ -411,7 +411,7 @@ try {
   const s2ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar-EG' });
   await noCache(s2ctx);
   const sp2 = await s2ctx.newPage();
-  await sp2.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await sp2.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
   ok('اسم المنصة الجديد يظهر في التذييل', (await sp2.locator('#footBrand').textContent()).includes('منصة الاختبار QA'));
   ok('العام الدراسي الجديد يظهر في الواجهة', (await sp2.locator('.hero').first().textContent()).includes('2027 / 2028'));
   const primaryVar = await sp2.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
@@ -424,7 +424,7 @@ try {
   const mctx = await browser.newContext({ viewport: { width: 360, height: 800 }, locale: 'ar-EG', isMobile: true, hasTouch: true, userAgent: 'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/153.0.0.0 Mobile Safari/537.36' });
   await noCache(mctx);
   const mp = await mctx.newPage();
-  await mp.goto(BASE + '/' + T_A.slug, { waitUntil: 'networkidle' });
+  await mp.goto(BASE + '/' + T_A.slug, { waitUntil: 'domcontentloaded' });
   const noOverflowHome = await mp.evaluate(() => document.documentElement.scrollWidth);
   ok('الرئيسية 360px: لا أفقي overflow', noOverflowHome <= 360, 'scrollWidth=' + noOverflowHome);
   ok('الصفحة RTL فعلية dir=rtl', (await mp.evaluate(() => document.documentElement.dir)) === 'rtl');
@@ -497,13 +497,13 @@ try {
     });
     await noCache(c);
     const pg = await c.newPage();
-    await pg.goto(BASE + '/', { waitUntil: 'networkidle' });
+    await pg.goto(BASE + '/', { waitUntil: 'domcontentloaded' });
     const homeSW = await pg.evaluate(() => document.documentElement.scrollWidth);
     ok('الرئيسية ' + w + 'px بلا overflow أفقي', homeSW <= w, 'scrollWidth=' + homeSW);
-    await pg.goto(BASE + '/teacher', { waitUntil: 'networkidle' });
+    await pg.goto(BASE + '/teacher', { waitUntil: 'domcontentloaded' });
     const tSW = await pg.evaluate(() => document.documentElement.scrollWidth);
     ok('دخول المعلم ' + w + 'px بلا overflow أفقي', tSW <= w, 'scrollWidth=' + tSW);
-    await pg.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+    await pg.goto(BASE + '/admin', { waitUntil: 'domcontentloaded' });
     await pg.waitForSelector('#admEmail', { timeout: 10000 });
     const aSW = await pg.evaluate(() => document.documentElement.scrollWidth);
     ok('دخول المسؤول ' + w + 'px بلا overflow أفقي', aSW <= w, 'scrollWidth=' + aSW);
