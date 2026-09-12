@@ -208,7 +208,7 @@
         (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') +
         (t.hasPassword ? '<span class="badge blue">دخول مضبوط</span>' : '<span class="badge">بدون دخول</span>') + '</div>' +
         (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
-        '<div class="tmeta-row"><span class="tmeta-k">الرابط:</span><a href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a>' +
+        '<div class="tmeta-row"><span class="tmeta-k">الرابط:</span><a dir="ltr" href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a>' +
         '<button class="btn small ghost" style="padding:3px 10px;min-height:0" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ</button></div>' +
         (t.email ? '<div class="tmeta-row"><span class="tmeta-k">البريد:</span><span dir="ltr">' + esc(t.email) + '</span></div>' : '') +
         studentLimitLine(sl) +
@@ -239,12 +239,12 @@
   }
   function copyLink(slug) {
     var url = location.origin + '/' + slug;
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ الرابط: ' + url); }, function () { prompt('انسخ الرابط:', url); });
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ الرابط'); }, function () { prompt('انسخ الرابط:', url); });
     else prompt('انسخ الرابط:', url);
   }
   function copyLogin() {
     var url = location.origin + '/teacher';
-    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ رابط دخول المعلم: ' + url); }, function () { prompt('انسخ الرابط:', url); });
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(function () { toast('تم نسخ رابط دخول المعلم'); }, function () { prompt('انسخ الرابط:', url); });
     else prompt('انسخ الرابط:', url);
   }
   function setTeacherEnabled(id, enabled) {

@@ -567,7 +567,9 @@ console.log('\n[9] الأداء وخفة الحزمة');
   // external /art/*.svg so only the small inline icon set counts). Still no frameworks.
   // The assertion still catches any framework/bloat regression.
   const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 200);
+  // ميزانية 215KB: تغطي نظام التصميم «الرقمي الفاخر» (جولة 2: بطاقات الصفوف الفنية،
+  // الأشكال العضوية، CTA، تدرجات الظلال) — اللوحات الفنية نفسها SVG خارجية غير محسوبة.
+  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 215);
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));
