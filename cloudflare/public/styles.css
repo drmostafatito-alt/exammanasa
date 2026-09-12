@@ -88,8 +88,6 @@ section { scroll-margin-top: 96px; }
 .socials a { width: 37px; height: 37px; border-radius: 50%; flex: none; display: inline-flex; align-items: center; justify-content: center; background: #fff; border: 1.5px solid var(--line-strong); color: var(--muted); transition: color .14s ease, border-color .14s ease, transform .12s ease; }
 .socials a:hover { color: var(--primary); border-color: var(--primary); transform: translateY(-1px); }
 .socials svg { width: 17px; height: 17px; }
-.teacher-login { min-height: 44px; padding: 10px 22px; border-radius: 13px; font-size: .9rem; white-space: nowrap; box-shadow: 0 10px 22px -12px rgba(30, 86, 200, .6); }
-.teacher-login svg { width: 18px; height: 18px; }
 
 .chip { display: inline-flex; align-items: center; gap: 6px; background: var(--primary-soft); border: 1px solid var(--primary-soft-2); color: var(--primary-deep); border-radius: 999px; padding: 4px 13px; font-size: .74rem; font-weight: 700; white-space: nowrap; }
 
@@ -318,6 +316,9 @@ section { scroll-margin-top: 96px; }
 .btn.small { padding: 8px 16px; font-size: .8rem; border-radius: 11px; min-height: 38px; }
 .btn.danger { background: linear-gradient(160deg, #E06B6B, #C44040); box-shadow: 0 10px 22px -12px rgba(198, 64, 64, .6); }
 .btn:disabled { opacity: .5; cursor: not-allowed; box-shadow: none; transform: none; }
+/* حجم افتراضي ثابت لأيقونات الأزرار — يمنع انفلات SVG بلا أبعاد (كان يمدد
+   أزرارًا مثل «نسخ رابط الطلاب» إلى مستطيلات عملاقة على الجوال) */
+.btn svg { width: 18px; height: 18px; flex: none; }
 .linkbtn { background: none; border: none; color: var(--primary); font: inherit; font-size: .8rem; font-weight: 800; cursor: pointer; padding: 4px 8px; text-decoration: underline; text-underline-offset: 3px; }
 
 /* ============ النماذج ============ */
@@ -384,6 +385,9 @@ input[type=color] { padding: 3px; height: 44px; width: 58px; flex: none; cursor:
 .opt.selected .letter { background: var(--primary); border-color: var(--primary); color: #fff; }
 .quiz-actions { display: flex; gap: 10px; margin-top: 18px; }
 .quiz-actions .btn { flex: 1; }
+.rv-list { margin-top: 16px; }
+/* عنوان الامتحان داخل ترويسة شاشة الأسئلة — يظهر على الهاتف فقط (سطر واحد مقطوع) */
+.qtitle { display: none; }
 
 .rv-note { display: flex; gap: 10px; align-items: flex-start; padding: 13px 16px; border-radius: 13px; font-size: .85rem; font-weight: 700; margin-bottom: 14px; border: 1.5px solid; }
 .rv-note.warn { background: var(--warn-soft); border-color: #EBD9A8; color: var(--warn); }
@@ -656,18 +660,22 @@ footer.site::after { content: ''; position: absolute; bottom: -140px; inset-inli
 .foot-copy { margin-top: 26px; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: .73rem; color: rgba(255, 255, 255, .5); }
 
 /* ============ شريط التنقل السفلي (هاتف) ============ */
-/* شريط تنقل سفلي مدمج (بنمط تطبيقات الجوال): ارتفاع مضغوط، أيقونات SVG، لا يغطي المحتوى */
-.bottomnav { position: fixed; bottom: 0; right: 0; left: 0; z-index: 90; display: none; background: rgba(255, 255, 255, .96); backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 22px -12px rgba(15, 44, 102, .18); }
-.bottomnav .bn-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; background: none; border: none; cursor: pointer; font: inherit; color: var(--muted-2); padding: 6px 2px; border-radius: 10px; min-height: 48px; transition: color .15s ease, background .15s ease, transform .12s ease; }
+/* شريط تنقل سفلي مدمج بنمط تطبيقات الجوال الحقيقية: منطقة محتوى ~60px،
+   أيقونات 22px، تسميات 11.5px، حالة نشطة خفيفة (لون + مؤشر نقطي)،
+   ظل شعري رفيع بلا مستطيل خارجي ضخم، ويحترم منطقة الأمان السفلية. */
+.bottomnav { position: fixed; bottom: 0; right: 0; left: 0; z-index: 90; display: none; background: rgba(255, 255, 255, .94); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border-top: 1px solid var(--line); padding: 4px 4px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -4px 16px -10px rgba(15, 44, 102, .22); }
+.bottomnav .bn-item { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px; background: none; border: none; cursor: pointer; font: inherit; color: var(--muted-2); padding: 5px 2px; border-radius: 12px; min-height: 52px; position: relative; transition: color .15s ease, background .15s ease, transform .12s ease; }
 .bottomnav .bn-item:active { transform: scale(.96); }
-.bottomnav .bn-icon { width: 21px; height: 21px; }
-.bottomnav .bn-label { font-size: .66rem; font-weight: 700; }
+.bottomnav .bn-icon { width: 22px; height: 22px; }
+.bottomnav .bn-label { font-size: .72rem; font-weight: 700; line-height: 1.2; }
 .bottomnav .bn-item.active { color: var(--primary-deep); background: transparent; }
 .bottomnav .bn-item.active .bn-label { color: var(--primary-deep); }
 .bottomnav .bn-item.active .bn-icon { color: var(--primary); filter: none; }
+/* مؤشر نشط خفيف: نقطة صغيرة أعلى الأيقونة بدل خلفية مستطيلة */
+.bottomnav .bn-item.active::before { content: ''; position: absolute; top: 2px; right: 50%; transform: translateX(50%); width: 16px; height: 3px; border-radius: 99px; background: linear-gradient(90deg, var(--primary), var(--gold)); opacity: .85; }
 .bottomnav.hidden { display: none !important; }
-body.has-bottomnav main.wrap { padding-bottom: 124px; }
-body.has-bottomnav footer.site .foot-inner { padding-bottom: 104px; }
+body.has-bottomnav main.wrap { padding-bottom: 96px; }
+body.has-bottomnav footer.site .foot-inner { padding-bottom: 88px; }
 
 /* ============ عام ============ */
 .empty { text-align: center; color: var(--muted); padding: 44px 14px; font-size: .9rem; background: #fff; border: 1.5px dashed var(--line-strong); border-radius: var(--radius); margin-top: 14px; }
@@ -761,8 +769,6 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 104px; }
 }
 @media (max-width: 760px) { .topbar .wrap, .topbar-row { flex-wrap: wrap; gap: 8px 10px; padding-top: 8px; padding-bottom: 8px; }
   .mainnav { display: none; }
-  /* إخفاء دخول المعلم من هيدر الطالب على الجوال — يبقى في /teacher وفي الفوتر */
-  .teacher-login { display: none; }
   .topbar-end { margin-inline-start: auto; }
   .socials { margin-inline-start: auto; }
   .brand .logo { width: 40px; height: 40px; }
@@ -778,8 +784,6 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 104px; }
   .wrap { padding: var(--gutter) var(--gutter) 90px; }
   .brand .bname { font-size: .92rem; }
   .brand .logo { width: 42px; height: 42px; }
-  .teacher-login { padding: 9px 16px; font-size: .82rem; min-height: 40px; }
-  .teacher-login svg { width: 16px; height: 16px; }
   .hero { padding: 20px 14px 8px; margin-top: 8px; gap: 8px; }
   .hero .hero-media { width: 176px; height: 176px; margin: 8px auto 6px; }
   .hero .photo .monogram { font-size: 3.2rem; }
@@ -844,4 +848,163 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 104px; }
 @media print { .topbar, .quiz-top, .noprint, .bottomnav { display: none !important; }
   body { background: #fff; }
   .rq, .card { box-shadow: none; }
+}
+
+/* ============ جولة الموبايل أولًا (2026-09-12): امتحان مركّز ولوحات مضغوطة،
+   بلا تغيير على سطح المكتب (>760px). ============ */
+
+/* 1) هيدر الطالب: يمرر مع الصفحة طبيعيًا والهوية فقط */
+@media (max-width: 760px) {
+  .topbar { position: static; background: #fff; backdrop-filter: none; -webkit-backdrop-filter: none; }
+  .topbar .socials { display: none; }
+  .topbar .wrap, .topbar-row { padding-top: 9px; padding-bottom: 9px; gap: 10px; }
+  .brand .logo { width: 38px; height: 38px; border-radius: 12px; }
+  .brand .bname { font-size: .95rem; }
+  .brand .sub { font-size: .68rem; max-width: 210px; }
+  section { scroll-margin-top: 12px; }
+}
+
+/* 2) الـ Hero على الهاتف: أصغر وأكثر إحكامًا ويبقى داخل التدفق الطبيعي */
+@media (max-width: 600px) {
+  .hero { padding: 16px 14px 6px; margin-top: 6px; gap: 6px; }
+  .hero .hero-media { width: 158px; height: 158px; margin: 6px auto 4px; }
+  .hero .photo .monogram { font-size: 2.9rem; }
+  .hero .photo-badge { width: 44px; height: 44px; border-radius: 13px; bottom: 2px; inset-inline-start: -10px; }
+  .hero .photo-badge svg { width: 21px; height: 21px; }
+  .hero .float-chip { padding: 4px 10px; font-size: .64rem; top: 0; inset-inline-start: -6px; }
+  .hero .ring { width: 96px; height: 96px; top: -18px; inset-inline-end: -12px; }
+  .hero h1 { font-size: 1.55rem; margin: 8px 0 2px; }
+  .hero .specialty { font-size: .88rem; }
+  .hero .hero-tagline { font-size: .92rem; margin-top: 8px; }
+  .hero .lead { font-size: .86rem; line-height: 1.85; margin-top: 6px; }
+  .hero-feats { gap: 7px; margin-top: 12px; }
+  .hero-feat { padding: 8px 9px; gap: 7px; border-radius: 13px; }
+  .hero-feat .hfi { width: 29px; height: 29px; border-radius: 9px; }
+  .hero-feat .hfi svg { width: 15px; height: 15px; }
+  .hero-feat b { font-size: .7rem; }
+  .hero-feat i { font-size: .6rem; }
+  .hero .hero-ctas { margin-top: 14px; gap: 8px; }
+  .hero .hero-ctas .btn { min-height: 48px; padding: 11px 20px; font-size: .95rem; width: 100%; }
+  .hero-more { margin-top: 8px; font-size: .84rem; }
+  .hero .hero-chips { margin-top: 10px; }
+  .sec-head { padding-top: 34px; }
+  .grade-opt { padding: 12px 14px; }
+  .empty { padding: 30px 12px; font-size: .85rem; }
+}
+
+/* 3) شاشة الامتحان كتطبيق هاتف: ترويسة مضغوطة ← سؤال يمرر داخليًا ← أزرار ثابتة */
+@media (max-width: 760px) {
+  body.exam-mode .topbar, body.exam-mode footer.site, body.exam-mode .bottomnav { display: none !important; }
+  body.exam-mode main.wrap { max-width: 720px; height: 100dvh; padding: 0 var(--gutter); display: flex; flex-direction: column; }
+  body.exam-mode.has-bottomnav main.wrap { padding-bottom: 0; }
+  body.exam-mode .quiz-top { position: static; margin: 0 calc(-1 * var(--gutter)); padding: 9px var(--gutter) 8px; border-bottom: 1px solid var(--line); background: rgba(255, 255, 255, .92); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); flex: none; }
+  body.exam-mode .quiz-top .row { gap: 8px; }
+  body.exam-mode .quiz-top .qnum { font-size: .88rem; }
+  body.exam-mode .quiz-top .chip { font-size: .68rem; padding: 3px 10px; }
+  body.exam-mode .progressbar { height: 5px; margin-top: 7px; border: none; }
+  body.exam-mode .qtitle { display: block; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: .68rem; font-weight: 700; color: var(--muted); margin-top: 6px; }
+  /* رقائق الأرقام تبقى في DOM (وصول/سطح مكتب) ولا تستهلك شاشة الهاتف */
+  body.exam-mode .navstrip { display: none; }
+  body.exam-mode .rv-note { flex: none; margin: 8px 0 0; font-size: .8rem; padding: 10px 12px; }
+  body.exam-mode .qcard, body.exam-mode .rv-list { flex: 1 1 auto; min-height: 0; overflow-y: auto; -webkit-overflow-scrolling: touch; overscroll-behavior: contain; margin: 10px 0 6px; animation: qin .22s ease; }
+  body.exam-mode .qcard { background: none; border: none; box-shadow: none; padding: 0; border-radius: 0; }
+  body.exam-mode .qsheet { background: linear-gradient(180deg, rgba(255, 255, 255, .95), rgba(255, 255, 255, .6)); border: 1px solid rgba(230, 236, 247, .8); border-radius: 18px; box-shadow: 0 1px 2px rgba(15, 44, 102, .04), 0 10px 26px -18px rgba(15, 44, 102, .18); padding: 14px 12px 12px; }
+  body.exam-mode .qtext { font-size: 1.02rem; line-height: 1.95; }
+  body.exam-mode .qtext .qn { min-width: 26px; height: 26px; border-radius: 8px; font-size: .78rem; margin-inline-end: 6px; vertical-align: -4px; }
+  body.exam-mode .opts { gap: 9px; margin-top: 13px; }
+  body.exam-mode .opt { min-height: 52px; padding: 12px 13px; gap: 11px; border-radius: 14px; border: 1.5px solid var(--line); box-shadow: none; }
+  body.exam-mode .opt .letter { width: 30px; height: 30px; border-radius: 9px; font-size: .82rem; }
+  body.exam-mode .opt .txt { font-size: .93rem; line-height: 1.75; padding-top: 3px; }
+  body.exam-mode .opt.selected { box-shadow: 0 0 0 3px var(--primary-soft-2); }
+  body.exam-mode .rv-item { padding: 11px 12px; }
+  body.exam-mode .quiz-actions { position: static; flex: none; margin: 0 calc(-1 * var(--gutter)); padding: 9px calc(var(--gutter) + 2px) calc(9px + env(safe-area-inset-bottom)); background: linear-gradient(to top, var(--bg) 62%, rgba(245, 248, 254, 0)); }
+  body.exam-mode .quiz-actions .btn { min-height: 52px; font-size: .95rem; }
+}
+
+/* 4) لوحة المعلم: إصلاح جذري للمستطيلات العملاقة (شبكة متمددة + عناصر تتمدد عموديًا) */
+@media (max-width: 920px) {
+  .t-shell { align-content: start; }
+  .t-sidebar { height: auto; align-items: center; padding: 6px 8px; gap: 6px; top: 64px; }
+  .t-nav-item { flex: none; width: auto; align-self: center; min-height: 44px; padding: 9px 14px; border-radius: 999px; font-size: .82rem; }
+  .t-nav-item.active { box-shadow: none; background: var(--primary); color: #fff; }
+  .t-nav-icon svg { width: 17px; height: 17px; }
+  .a-shell { align-content: start; }
+}
+@media (max-width: 600px) {
+  .t-topbar { min-height: 54px; padding: 0 12px; gap: 10px; }
+  .t-sidebar { top: 54px; }
+  .t-topbar .brand h1 { font-size: .95rem; }
+  .t-topbar .brand .sub { font-size: .66rem; }
+  .t-topbar .logo { width: 38px; height: 38px; }
+  .t-topbar .who { gap: 8px; }
+  .t-topbar .who .chip { font-size: .7rem; padding: 3px 10px; max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .t-main { padding: 14px 12px 40px; }
+  .t-welcome { gap: 12px; margin-bottom: 14px; }
+  .t-welcome .tw-avatar { width: 52px; height: 52px; border-radius: 16px; font-size: 1.05rem; }
+  .t-welcome h2 { font-size: 1.1rem; }
+  .t-welcome .tw-sub { font-size: .74rem; }
+  .t-welcome .tw-sub code { font-size: .72rem; }
+  .t-welcome .tw-link { width: 100%; }
+  .t-welcome .tw-link .btn { width: 100%; min-height: 44px; }
+  .t-stat-grid { grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 16px; }
+  .t-stat-card { padding: 12px; gap: 10px; border-radius: 14px; border-width: 1px; }
+  .t-stat-icon svg { width: 19px; height: 19px; }
+  .t-stat-val { font-size: 1.18rem; }
+  .t-stat-label { font-size: .7rem; }
+  .t-link-share { padding: 10px; gap: 6px; }
+  .t-link-share code { font-size: .74rem; padding: 5px 8px; }
+  .t-search-bar input, .t-filters input, .t-filters select { max-width: none; width: 100%; }
+  .t-filters select { flex: 1 1 42%; min-width: 0; }
+  .t-page-header { margin-bottom: 12px; }
+  .t-page-header h2 { font-size: 1.08rem; }
+  .t-stu-card { padding: 11px 12px; gap: 10px; }
+  .t-stu-avatar { width: 38px; height: 38px; border-radius: 11px; font-size: 1rem; }
+  .t-result-card { padding: 12px 13px; }
+  .t-profile-avatar { width: 52px; height: 52px; }
+  .card { padding: 15px 14px; }
+}
+
+/* 5) لوحة المسؤول على الهاتف */
+@media (max-width: 760px) {
+  .a-sidebar { padding: 6px 8px; gap: 4px; }
+  .a-brand { padding: 0 8px 0 0; }
+  .a-brand .logo { width: 34px; height: 34px; border-radius: 10px; }
+  .a-brand .t b { font-size: .82rem; }
+  .a-nav-item { padding: 8px 12px; font-size: .79rem; min-height: 40px; border-radius: 999px; }
+  .a-nav-icon svg { width: 16px; height: 16px; }
+  .a-sidebar-foot .btn { min-height: 38px; padding: 7px 12px; font-size: .76rem; }
+  .a-topbar { padding: 10px 14px; gap: 10px; }
+  .a-topbar h1 { font-size: 1rem; }
+  .a-topbar .sub { font-size: .72rem; }
+  .a-topbar .chip { font-size: .7rem; padding: 3px 10px; max-width: 46vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .a-content { padding: 14px 12px 60px; }
+  .a-content .page-head h2 { font-size: 1.12rem; }
+  .modal-bg { padding: 12px; }
+  .modal { padding: 18px 16px; border-radius: 16px; }
+  .tform-head { padding: 14px 16px; }
+  .tform-body { padding: 14px 14px; }
+  .tform-section { padding: 13px 13px; }
+  .tform-foot { padding: 12px 14px; flex-wrap: wrap; }
+  .st-card { padding: 14px 14px; }
+  .stat { padding: 12px; }
+  .stat .v { font-size: 1.35rem; }
+  table.tbl { font-size: .78rem; }
+  .tbl th { font-size: .68rem; padding: 8px 6px; }
+  .tbl td { padding: 8px 6px; }
+}
+
+/* 6) شاشة النتيجة على الهاتف */
+@media (max-width: 600px) {
+  .score-hero { padding: 20px 0 6px; }
+  .score-ring { width: 132px; height: 132px; border-width: 6px; margin-bottom: 12px; }
+  .score-ring::after { inset: -10px; }
+  .score-ring .pct { font-size: 1.75rem; }
+  .score-ring .frac { font-size: .72rem; }
+  .res-badges { gap: 6px; margin: 10px 0; }
+  .res-badges .badge { font-size: .68rem; padding: 3px 10px; }
+  .review-filters { margin: 12px 0 10px; gap: 6px; }
+  .review-filters .tab { padding: 7px 13px; font-size: .76rem; }
+  .rq { padding: 12px 12px; border-radius: 13px; }
+  .rq .q { font-size: .88rem; margin: 5px 0 9px; }
+  .rq .ans { padding: 8px 11px; font-size: .82rem; }
 }
