@@ -37,10 +37,10 @@ console.log('\n[V1] Desktop 1280\u00d7900 \u2014 hierarchy & premium visuals');
   const idx = (arr, v) => arr.findIndex(x => x === v);
   ok('ترتيب الأقسام: features \u2192 about(bio) \u2192 subjects', order[0] === 'hero' && idx(order, 'features') < idx(order, 'about') && idx(order, 'about') < idx(order, 'subjects'), order.join(' \u2192 '));
 
-  const hero = await facts(p, '.hero', ['grid-template-columns', 'border-radius', 'box-shadow']);
+  const hero = await facts(p, '.hero', ['grid-template-columns', 'border-radius', 'box-shadow', 'background-image']);
   ok('Hero شبكة عمودين (media+body)', hero && hero['grid-template-columns'].trim().split(/\s+/).length === 2, hero && hero['grid-template-columns']);
-  ok('Hero بحواف دائرية كبيرة (radius \u2265 24px)', hero && parseInt(hero['border-radius']) >= 24, hero && hero['border-radius']);
-  ok('Hero بظل ناعم', hero && hero['box-shadow'] && hero['box-shadow'] !== 'none');
+  ok('Hero مفتوح بلا خلفية بطاقة (transparent)', hero && hero['background-image'] === 'none', hero && hero['background-image']);
+  ok('Hero بلا حواف/ظل بطاقة (radius 0 + shadow none)', hero && (parseInt(hero['border-radius']) === 0 || hero['border-radius'] === '0px') && hero['box-shadow'] === 'none', JSON.stringify(hero));
 
   const photo = await facts(p, '.hero .photo', ['border-radius', 'border-width']);
   ok('صورة المعلم دائرية/عضوية (radius غير حادة) + إطار', photo && parseInt(photo['border-radius']) > 20 && parseInt(photo['border-width']) >= 4, JSON.stringify(photo));
