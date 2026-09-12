@@ -5,6 +5,18 @@
   var $ = function (id) { return document.getElementById(id); };
   var app = $('tApp');
   var T = { tab: 'home', session: null, settings: null };
+  /* أيقونات SVG متناسقة بدل الإيموجي */
+  var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; };
+  var I_HOME = ICO('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>');
+  var I_USERS = ICO('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.4 2.9-5.5 6.5-5.5s6.5 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.2 14.7c2 .7 3.3 2.4 3.3 5.3"/>');
+  var I_RESULTS = ICO('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>');
+  var I_USER = ICO('<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/>');
+  var I_LOCK = ICO('<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
+  var I_CAP = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 3 1 8l11 5 9-4.09V15h2V8L12 3zm-7 9.18V16c0 1.66 3.13 3 7 3s7-1.34 7-3v-3.82l-7 3.18-7-3.18z"/></svg>';
+  var I_LINK = ICO('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>');
+  var I_CHART = ICO('<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/>');
+  var I_COPY = ICO('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>');
+  var I_CHECK = ICO('<path d="M20 6L9 17l-5-5"/>', 2.4);
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -39,17 +51,17 @@
     app.innerHTML =
       '<div class="tlogin">' +
       '<div class="tlogin-brand">' +
-      '<div class="lb-logo">' + (logo ? '<img src="' + esc(logo) + '" alt="">' : '🎓') + '</div>' +
+      '<div class="lb-logo">' + (logo ? '<img src="' + esc(logo) + '" alt="">' : I_CAP) + '</div>' +
       '<div><h1>لوحة المعلم</h1><p>' + esc(platformName) + ' — ' + esc(shortDesc) + '</p></div>' +
       '<ul>' +
-      '<li><span class="dot">👥</span> تابع طلابك ونتائجهم من مكان واحد</li>' +
-      '<li><span class="dot">🔗</span> رابط ثابت لطلابك جاهز للمشاركة</li>' +
-      '<li><span class="dot">📊</span> نتائج فورية وتصحيح خادمي كامل</li>' +
+      '<li><span class="dot">' + I_USERS + '</span> تابع طلابك ونتائجهم من مكان واحد</li>' +
+      '<li><span class="dot">' + I_LINK + '</span> رابط ثابت لطلابك جاهز للمشاركة</li>' +
+      '<li><span class="dot">' + I_CHART + '</span> نتائج فورية وتصحيح خادمي كامل</li>' +
       '</ul>' +
       '</div>' +
       '<div class="tlogin-form">' +
       '<div class="tlogin-card">' +
-      '<div class="tlogin-header"><div class="tlogin-icon">👨‍🏫</div><h2>تسجيل دخول المعلم</h2><p>أدخل بريدك الإلكتروني أو اسم المستخدم وكلمة المرور</p></div>' +
+      '<div class="tlogin-header"><div class="tlogin-icon">' + I_USER + '</div><h2>تسجيل دخول المعلم</h2><p>أدخل بريدك الإلكتروني أو اسم المستخدم وكلمة المرور</p></div>' +
       '<form onsubmit="tDoLogin();return false">' +
       '<div class="field"><label for="tEmail">البريد الإلكتروني / اسم المستخدم</label><input type="text" id="tEmail" autocomplete="username" placeholder="اسم المستخدم أو البريد"></div>' +
       '<div class="field"><label for="tPass">كلمة المرور</label><input type="password" id="tPass" autocomplete="current-password" placeholder="••••••••"></div>' +
@@ -78,17 +90,17 @@
   function renderShell() {
     app.innerHTML =
       '<header class="t-topbar">' +
-      '<div class="brand"><div class="logo">👨‍🏫</div><div><h1>لوحة المعلم</h1><div class="sub" id="tPlatformSub">منصة الامتحانات</div></div></div>' +
+      '<div class="brand"><div class="logo">' + I_USER + '</div><div><h1>لوحة المعلم</h1><div class="sub" id="tPlatformSub">منصة الامتحانات</div></div></div>' +
       '<div class="spacer"></div>' +
       '<div class="who"><span class="chip" id="teacherName"></span><button class="btn ghost small" onclick="tLogout()">خروج</button></div>' +
       '</header>' +
       '<div class="t-shell">' +
       '<nav class="t-sidebar" aria-label="التنقل">' +
-      '<button class="t-nav-item active" data-tab="home" onclick="tSetTab(\'home\')"><span class="t-nav-icon">🏠</span>الرئيسية</button>' +
-      '<button class="t-nav-item" data-tab="students" onclick="tSetTab(\'students\')"><span class="t-nav-icon">👥</span>الطلاب</button>' +
-      '<button class="t-nav-item" data-tab="results" onclick="tSetTab(\'results\')"><span class="t-nav-icon">📝</span>النتائج</button>' +
-      '<button class="t-nav-item" data-tab="profile" onclick="tSetTab(\'profile\')"><span class="t-nav-icon">👤</span>الملف الشخصي</button>' +
-      '<button class="t-nav-item" data-tab="settings" onclick="tSetTab(\'settings\')"><span class="t-nav-icon">🔒</span>كلمة المرور</button>' +
+      '<button class="t-nav-item active" data-tab="home" onclick="tSetTab(\'home\')"><span class="t-nav-icon">' + I_HOME + '</span>الرئيسية</button>' +
+      '<button class="t-nav-item" data-tab="students" onclick="tSetTab(\'students\')"><span class="t-nav-icon">' + I_USERS + '</span>الطلاب</button>' +
+      '<button class="t-nav-item" data-tab="results" onclick="tSetTab(\'results\')"><span class="t-nav-icon">' + I_RESULTS + '</span>النتائج</button>' +
+      '<button class="t-nav-item" data-tab="profile" onclick="tSetTab(\'profile\')"><span class="t-nav-icon">' + I_USER + '</span>الملف الشخصي</button>' +
+      '<button class="t-nav-item" data-tab="settings" onclick="tSetTab(\'settings\')"><span class="t-nav-icon">' + I_LOCK + '</span>كلمة المرور</button>' +
       '</nav>' +
       '<main class="t-main" id="tMain"><div class="t-loading"><div class="spin"></div></div></main>' +
       '</div>';
@@ -125,13 +137,13 @@
         '<div class="t-welcome">' +
         '<div class="tw-avatar" id="twAvatar">' + esc((d.teacher.name || '؟').slice(0, 2)) + '</div>' +
         '<div><h2>مرحبًا، ' + esc(d.teacher.name) + '</h2><div class="tw-sub">رابطك: <code dir="ltr">' + esc(location.origin + '/' + d.teacher.slug) + '</code></div></div>' +
-        '<div class="tw-link"><button class="btn ghost small" onclick="tCopyLink()">📋 نسخ رابط الطلاب</button></div>' +
+        '<div class="tw-link"><button class="btn ghost small" onclick="tCopyLink()">' + I_COPY + ' نسخ رابط الطلاب</button></div>' +
         '</div>' +
         '<div class="t-stat-grid">' +
-        stat('👥', 'الطلاب المسجّلون', t.registeredStudents || t.students) +
-        stat('📝', 'النتائج', t.results) +
-        stat('📊', 'متوسط الدرجات', t.avgPercentage + '%') +
-        stat('✅', 'نسبة النجاح', t.passRate + '%') +
+        stat(I_USERS, 'الطلاب المسجّلون', t.registeredStudents || t.students) +
+        stat(I_RESULTS, 'النتائج', t.results) +
+        stat(I_CHART, 'متوسط الدرجات', t.avgPercentage + '%') +
+        stat(I_CHECK, 'نسبة النجاح', t.passRate + '%') +
         '</div>' +
         '<div class="t-grid-2">' +
         '<div class="card"><h3 class="t-card-title">آخر النشاط</h3>' +
