@@ -59,7 +59,6 @@
     set('--gold-deep', shadeHex(accent, -0.18));
     set('--gold-soft', mixHex(accent, '#ffffff', 0.88));
     set('--accent', accent);
-    set('--accent-2', shadeHex(accent, -0.18));
     set('--bg', bg);
     set('--bg-2', shadeHex(bg, -0.035));
     set('--lav', mixHex(primary, bg, 0.85));
@@ -97,29 +96,17 @@
     for (var j = 0; j < els.length; j++) revealObs.observe(els[j]);
   }
 
-  /* ---------------- شريط التنقل السفلي (هاتف) ---------------- */
-  var BOTTOM_NAV = [
-    { key: 'home', label: 'الرئيسية', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/></svg>' },
-    { key: 'subjects', label: 'الامتحانات', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9 7h7"/><path d="M9 11h7"/></svg>' },
-    { key: 'about', label: 'عن المنصة', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>' },
-    { key: 'contact', label: 'تواصل معنا', icon: '<svg class="bn-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 2 .7 2.9a2 2 0 0 1-.5 2.1L8 10a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.5c.9.3 1.9.6 2.9.7a2 2 0 0 1 1.7 2z"/></svg>' }
-  ];
+  /* ---------------- شريط التنقل السفلي (هاتف) ----------------
+   * العناصر نفسها معرّفة في index.html (SVG + تسميات) — لا تكرار هنا. */
   var activeBottomKey = 'home';
   function bottomNav(key) {
     var el = $('bottomnav');
     if (!el) return;
     if (key) activeBottomKey = key;
-    var bars = el.querySelectorAll('.bn-item');
-    for (var i = 0; i < bars.length; i++) {
-      var it = bars[i];
-      var k = it.getAttribute('data-key');
-      if (k === activeBottomKey) it.classList.add('active'); else it.classList.remove('active');
-      it.setAttribute('aria-current', k === activeBottomKey ? 'page' : 'false');
-    }
     var onHome = S.view === 'home';
     el.classList.toggle('hidden', !onHome);
     document.body.classList.toggle('has-bottomnav', onHome);
-    /* إخفاء عناصر عن "المعلم" و"تواصل" إذا لم يوجد محتوى حقيقي لها */
+    /* إخفاء عناصر "عن المنصة"/"تواصل" إذا لم يوجد محتوى حقيقي لهما */
     var t = S.teacher;
     var links = socialLinksOf(t);
     var aboutItem = el.querySelector('.bn-item[data-key="about"]');
@@ -128,11 +115,13 @@
     if (contactItem) contactItem.style.display = links.length ? '' : 'none';
     if (activeBottomKey === 'about' && (!t || (!t.bio && !t.specialty))) activeBottomKey = 'home';
     if (activeBottomKey === 'contact' && !links.length) activeBottomKey = 'home';
-    var bars2 = el.querySelectorAll('.bn-item');
-    for (var j = 0; j < bars2.length; j++) {
-      var it2 = bars2[j];
-      var k2 = it2.getAttribute('data-key');
-      if (k2 === activeBottomKey) it2.classList.add('active'); else it2.classList.remove('active');
+    /* مزامنة الحالة النشطة + aria-current في مرور واحد */
+    var bars = el.querySelectorAll('.bn-item');
+    for (var i = 0; i < bars.length; i++) {
+      var it = bars[i];
+      var on = it.getAttribute('data-key') === activeBottomKey;
+      it.classList.toggle('active', on);
+      it.setAttribute('aria-current', on ? 'page' : 'false');
     }
   }
   function bnHome() { navTo('top'); bottomNav('home'); setMainNavActive('top'); }
@@ -147,8 +136,6 @@
   /* أيقونات خطية بسيطة (بلا ألوان صاخبة) للواجهة الرئيسية */
   var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; };
   var ARROW_L_SVG = ICO('<path d="M12 19l-7-7 7-7"/><path d="M5 12h14"/>', 2.4);
-  var SHIELD_SVG = ICO('<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="m9 12 2 2 4-4"/>');
-  var BOOK_SVG = ICO('<path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/>');
   /* فلسفة: عمود كلاسيكي (لاندمارك) — خط متناسق */
   var PHILO_SVG = ICO('<path d="M3 21h18"/><path d="M5 21v-9"/><path d="M9.5 21v-9"/><path d="M14.5 21v-9"/><path d="M19 21v-9"/><path d="M3 9h18"/><path d="M12 3l9 6H3z"/>');
   /* علم النفس: دماغ بخط متناسق */
@@ -159,13 +146,6 @@
   var CLIP_SVG = ICO('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>');
   var BOLT_SVG = ICO('<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>');
   var DEVICES_SVG = ICO('<rect x="2" y="3" width="15" height="11" rx="2"/><path d="M8 21h6"/><path d="M12 17v4"/><path d="M18 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4"/>');
-  /* نقاط تميّز مدمجة داخل الـ Hero (وفق المرجع البصري) */
-  var HERO_FEATS = [
-    { i: SHIELD_SVG, t: 'محتوى موثوق', s: 'وأسئلة دقيقة' },
-    { i: BOOK_SVG, t: 'مراجعة شاملة', s: 'لجميع الموضوعات' },
-    { i: CLIP_SVG, t: 'امتحانات منظمة', s: 'حسب المنهج' },
-    { i: BOLT_SVG, t: 'نتائج فورية', s: 'بعد كل امتحان' }
-  ];
   var SOCIAL_DEFS = [
     ['whatsapp', 'واتساب', 'M12 2a10 10 0 00-8.6 15L2 22l5.2-1.4A10 10 0 1012 2zm5 13.6c-.2.6-1.2 1.2-1.7 1.2-.4 0-1 .1-3.3-1s-3.8-3.6-4-3.9c-.1-.3-.8-1.2-.8-2.3s.6-1.6.8-1.8c.2-.2.4-.3.6-.3h.5c.2 0 .4 0 .6.4l.8 1.9c.1.2.1.4 0 .6l-.4.5c-.1.2-.3.3-.1.6.2.3.7 1.1 1.4 1.8 1 .9 1.8 1.2 2.1 1.3.2.1.4.1.6-.1l.8-.9c.2-.2.4-.2.6-.1l1.8.9c.2.1.4.2.4.3.1.2.1.8-.1 1.4z'],
     ['facebook', 'فيسبوك', 'M13 22v-8h3l.5-4H13V8c0-1.1.3-1.9 2-1.9h1.6V2.6C16.3 2.5 15.1 2.4 13.8 2.4 10.9 2.4 9 4.1 9 7.5V10H6v4h3v8h4z'],
@@ -384,8 +364,31 @@
   var spyT = false;
   window.addEventListener('scroll', function () {
     if (spyT) return; spyT = true;
-    requestAnimationFrame(function () { updateNavSpy(); spyT = false; });
+    requestAnimationFrame(function () { updateNavSpy(); updateParallax(); spyT = false; });
   }, { passive: true });
+
+  /* عمق بصري خفيف: لوحات الفلاسفة تنزلق بسرعات مختلفة أثناء التمرير.
+   * transform فقط (بلا reflow) ويُعطَّل بالكامل مع تفضيل تقليل الحركة. */
+  var REDUCED_MOTION = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+  function updateParallax() {
+    if (REDUCED_MOTION || S.view !== 'home') return;
+    var y = window.pageYOffset || 0;
+    if (y > (window.innerHeight || 800) * 1.5) return; // خرجنا من نطاق الـ Hero
+    var figs = document.querySelectorAll('.hero-fig[data-sp]');
+    for (var i = 0; i < figs.length; i++) {
+      figs[i].style.setProperty('--py', (y * parseFloat(figs[i].getAttribute('data-sp'))).toFixed(1) + 'px');
+    }
+  }
+
+  /* لوحة المفاتيح: عناصر role="button" تُفعَّل بـ Enter/Space كالأزرار الحقيقية */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Enter' && e.key !== ' ' && e.key !== 'Spacebar') return;
+    var el = document.activeElement;
+    if (!el || !el.getAttribute || el.getAttribute('role') !== 'button') return;
+    if (/^(BUTTON|A|INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return;
+    e.preventDefault();
+    el.click();
+  });
 
   /* الإجراء الثانوي في الـ Hero: النزول إلى نبذة المعلم (أو قسم لماذا المنصة) */
   function heroMore() {
@@ -451,15 +454,10 @@
 
     var bio = t && t.bio ? String(t.bio).trim() : '';
 
-    /* نقاط التميّز الأربع داخل الـ Hero */
-    var heroFeats = HERO_FEATS.map(function (f) {
-      return '<div class="hero-feat"><span class="hfi">' + f.i + '</span>' +
-        '<span class="hf-txt"><b>' + f.t + '</b><i>' + f.s + '</i></span></div>';
-    }).join('');
-
     var html =
       '<section class="hero reveal in">' +
       '<div class="hero-media">' +
+      '<span class="hero-fig fig-soc" data-sp="-0.04" aria-hidden="true"></span>' +
       '<div class="blob"></div><div class="ring"></div>' +
       '<div class="photo">' + photo + '</div>' +
       '<div class="photo-badge">' + CAP_SVG + '</div>' +
@@ -471,7 +469,6 @@
       (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
       '<p class="hero-tagline">' + esc(heroTitle) + (heroAccent ? ' <em>' + esc(heroAccent) + '</em>' : '') + '</p>' +
       (heroSubtitle ? '<p class="lead">' + esc(heroSubtitle) + '</p>' : '') +
-      '<div class="hero-feats">' + heroFeats + '</div>' +
       '<div class="hero-ctas">' +
       '<button class="btn" onclick="go(\'#/start\')">' + esc(ctaLabel) + ' ' + ARROW_L_SVG + '</button>' +
       (waUrl ? '<a class="btn wa" href="' + esc(waUrl) + '" target="_blank" rel="noopener noreferrer">' + esc(waCta) + '</a>' : '') +
@@ -484,6 +481,10 @@
       '</div>' +
       '<span class="hero-doodle doodle-a" aria-hidden="true">العلم يجعلك أكثر قدرة<br>على تغيير مستقبلك</span>' +
       '<span class="hero-doodle doodle-b" aria-hidden="true">مستقبلك يبدأ من هنا</span>' +
+      /* لوحات زخرفية خلفية (absolute + z-index:0) بعد المحتوى للحفاظ على ترتيب DOM: الصورة أولًا */
+      '<span class="hero-fig fig-plato" data-sp="0.05" aria-hidden="true"></span>' +
+      '<span class="hero-fig fig-marx" data-sp="0.09" aria-hidden="true"></span>' +
+      '<span class="hero-cols" aria-hidden="true"></span>' +
       '</section>';
 
     /* لماذا المنصة — قسم حر بعنوان مركزي وخط ذهبي (المنصة ليست داخل بطاقة) */
@@ -531,6 +532,9 @@
         '</div>';
     }
 
+    /* أقوال الفلاسفة + دعوة ختامية — امتداد تحريري للهوية قبل التذييل */
+    html += quoteBand() + ctaBand(ctaLabel);
+
     app.innerHTML = html;
     observeReveals();
     bottomNav(activeBottomKey);
@@ -546,6 +550,35 @@
   /* عنوان قسم حر: خط ذهبي أعلى العنوان (يُستخدم في الرئيسية) */
   function secHead(id, title) {
     return '<section class="sec-head" id="' + id + '"><span class="sec-gold" aria-hidden="true"></span><h3>' + esc(title) + '</h3></section>';
+  }
+
+  /* حزمة أقوال مأثورة (سقراط/أفلاطون/ماركس) — الفلاسفة هنا حضور تعليمي محرري،
+   * والصورة الشخصية للمعلم تبقى الهوية الإنسانية الوحيدة للمنصة. */
+  var QUOTES = [
+    { fig: 'fig-soc', who: 'سقراط', txt: 'اعرف نفسك.' },
+    { fig: 'fig-plato', who: 'أفلاطون', txt: 'الدهشة هي بداية الفلسفة.' },
+    { fig: 'fig-marx', who: 'كارل ماركس', txt: 'الفلاسفة فسّروا العالم فقط، أما المطلوب فتغييره.' }
+  ];
+  function quoteBand() {
+    return '<section class="quote-band reveal" aria-label="أقوال مأثورة">' +
+      '<span class="band-wave" aria-hidden="true"></span>' +
+      '<div class="quote-grid">' +
+      QUOTES.map(function (q, i) {
+        return '<figure class="quote-item" style="--d:' + (i * 90) + 'ms">' +
+          '<span class="quote-fig ' + q.fig + '" aria-hidden="true"></span>' +
+          '<blockquote>' + esc(q.txt) + '</blockquote>' +
+          '<figcaption>' + esc(q.who) + '</figcaption>' +
+          '</figure>';
+      }).join('') +
+      '</div></section>';
+  }
+  /* دعوة ختامية تمتد حتى التذييل (كحلي متصل) بدل بطاقة منفصلة */
+  function ctaBand(label) {
+    return '<section class="cta-band reveal">' +
+      '<h3>جاهز تختبر نفسك؟</h3>' +
+      '<p>اختر صفك، أدخل بياناتك، وابدأ أول امتحان — درجتك ومراجعة إجاباتك فورًا.</p>' +
+      '<button class="btn gold" onclick="go(\'#/start\')">' + esc(label) + ' ' + ARROW_L_SVG + '</button>' +
+      '</section>';
   }
 
   function socialRowHtml(links) {
@@ -660,31 +693,12 @@
     var first = S.exams[lesson.examIds[0]];
     if (!first) return '';
     var isTraining = first.type === 'training' || !!first.training;
-    var meta = (isTraining ? 'امتحان تدريبي' : 'امتحان الموضوع') + ' · اختيار من متعدد' +
-      (lesson.examIds.length > 1 ? ' · ' + lesson.examIds.length + ' نماذج مستقلة' : '');
-    /* نماذج الامتحان — خيارات امتحانات مستقلة واضحة (كل نموذج امتحان كامل بذاته) */
-    var models = '';
-    if (lesson.examIds.length > 1) {
-      models = '<div class="models" onclick="event.stopPropagation()">' +
-        '<div class="models-label">الامتحانات المتاحة</div>' +
-        '<div class="models-grid">' +
-        lesson.examIds.map(function (eid, i) {
-          var e = S.exams[eid];
-          if (!e) return '';
-          var mMeta = (e.type === 'training' || e.training ? 'امتحان تدريبي · ' : '') + e.count + ' سؤالًا';
-          return '<button type="button" class="model-btn" onclick="go(\'#/e/' + eid + '\')">' +
-            '<span class="m-top"><span class="m-name">نموذج ' + (i + 1) + '</span><span class="m-arrow" aria-hidden="true">‹</span></span>' +
-            '<span class="m-meta">' + esc(mMeta) + '</span>' +
-            '</button>';
-        }).join('') +
-        '</div></div>';
-    }
+    var meta = (isTraining ? 'امتحان تدريبي' : 'امتحان الموضوع') + ' · اختيار من متعدد';
     return '<div class="lesson" onclick="go(\'#/e/' + lesson.examIds[0] + '\')" role="button" tabindex="0">' +
       '<div class="lno"><span>الموضوع</span><b>' + lesson.no + '</b></div>' +
       '<div class="linfo">' +
       '<div class="lt">' + esc(lesson.title) + '</div>' +
       '<div class="ls"><span>' + esc(meta) + '</span></div>' +
-      models +
       '</div>' +
       '<span class="lgo" aria-hidden="true">‹</span>' +
       '</div>';
@@ -1027,7 +1041,19 @@
     try { window.scrollTo({ top: 0 }); } catch (e) { }
   }
 
-  function choose(i) { S.answers[S.current] = i; saveDraft(); renderQuiz(); }
+  function choose(i) {
+    S.answers[S.current] = i; saveDraft();
+    /* تحديث موضعي (تحديد + عدّاد + شريط التقدم) بدل إعادة بناء DOM كاملة لكل نقرة */
+    var opts = app.querySelectorAll('.opt');
+    for (var k = 0; k < opts.length; k++) opts[k].classList.toggle('selected', k === i);
+    var chips = app.querySelectorAll('.navstrip .nchip');
+    if (chips[S.current]) chips[S.current].classList.add('answered');
+    var total = S.session.questions.length, done = answeredCount();
+    var chip = app.querySelector('.quiz-top .chip');
+    if (chip) chip.textContent = 'أجبت ' + done + ' من ' + total;
+    var bar = app.querySelector('.progressbar i');
+    if (bar) bar.style.width = Math.round((done / total) * 100) + '%';
+  }
   function jumpQ(i) { S.current = i; renderQuiz(); }
   function nextQ() { if (S.current < S.session.questions.length - 1) { S.current++; renderQuiz(); } }
   function prevQ() { if (S.current > 0) { S.current--; renderQuiz(); } }

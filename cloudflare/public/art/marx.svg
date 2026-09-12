@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" fill="none">
+  <!-- كارل ماركس: شعر كثيف، لحية كاملة عريضة، معطف وكتاب — قناع أحادي اللون -->
+  <defs>
+    <radialGradient id="mrxFade" gradientUnits="userSpaceOnUse" cx="200" cy="210" r="230">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset=".86" stop-color="#fff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#mrxFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- voluminous hair mass -->
+    <path d="M130 176 C118 108 152 66 200 66 C248 66 282 108 270 176" stroke-width="5"/>
+    <path d="M136 150 C132 122 148 96 172 86" stroke-width="2.8" opacity=".7"/>
+    <path d="M264 150 C268 122 252 96 228 86" stroke-width="2.8" opacity=".7"/>
+    <path d="M152 120 C164 100 186 90 200 90 C214 90 236 100 248 120" stroke-width="2.6" opacity=".6"/>
+    <path d="M126 168 C118 178 116 192 122 202" stroke-width="3.6"/>
+    <path d="M274 168 C282 178 284 192 278 202" stroke-width="3.6"/>
+    <!-- strong brows -->
+    <path d="M154 168 Q172 158 190 168" stroke-width="5"/>
+    <path d="M210 168 Q228 158 246 168" stroke-width="5"/>
+    <!-- eyes -->
+    <path d="M158 182 Q172 176 186 182 Q172 190 158 182 Z" stroke-width="2.8"/>
+    <circle cx="172" cy="182" r="2.6" fill="url(#mrxFade)" stroke="none"/>
+    <path d="M214 182 Q228 176 242 182 Q228 190 214 182 Z" stroke-width="2.8"/>
+    <circle cx="228" cy="182" r="2.6" fill="url(#mrxFade)" stroke="none"/>
+    <!-- nose -->
+    <path d="M200 178 L200 208" stroke-width="3.4"/>
+    <path d="M192 213 Q197 219 200 216 Q203 219 208 213" stroke-width="3.2"/>
+    <!-- broad moustache flowing into beard -->
+    <path d="M176 226 Q200 218 224 226" stroke-width="4.6"/>
+    <path d="M178 230 Q164 240 152 236" stroke-width="3"/>
+    <path d="M222 230 Q236 240 248 236" stroke-width="3"/>
+    <!-- full wide beard -->
+    <path d="M136 194 C120 272 144 330 200 338 C256 330 280 272 264 194" stroke-width="5"/>
+    <path d="M154 240 C150 284 164 316 188 330" stroke-width="2.6" opacity=".75"/>
+    <path d="M176 250 C174 288 182 314 198 330" stroke-width="2.6" opacity=".75"/>
+    <path d="M200 254 C200 290 200 314 200 332" stroke-width="2.4" opacity=".7"/>
+    <path d="M224 250 C226 288 218 314 202 330" stroke-width="2.6" opacity=".75"/>
+    <path d="M246 240 C250 284 236 316 212 330" stroke-width="2.6" opacity=".75"/>
+    <path d="M164 268 Q182 278 198 272" stroke-width="2.2" opacity=".55"/>
+    <path d="M202 272 Q218 278 236 268" stroke-width="2.2" opacity=".55"/>
+    <!-- coat shoulders with lapels -->
+    <path d="M182 332 L176 356" stroke-width="4"/>
+    <path d="M218 332 L224 356" stroke-width="4"/>
+    <path d="M102 404 C114 366 146 350 178 348 L222 348 C254 350 286 366 298 404" stroke-width="5"/>
+    <path d="M178 348 L196 380 L200 360 L204 380 L222 348" stroke-width="3.4"/>
+    <path d="M160 356 L176 384 M240 356 L224 384" stroke-width="2.6" opacity=".7"/>
+    <!-- book held (رأس المال) -->
+    <rect x="272" y="352" width="58" height="74" rx="7" stroke-width="4"/>
+    <path d="M272 368 h58" stroke-width="2.6" opacity=".8"/>
+    <path d="M284 384 h34 M284 396 h34 M284 408 h24" stroke-width="2.4" opacity=".65"/>
+    <path d="M272 352 C266 360 266 418 272 426" stroke-width="2.6" opacity=".7"/>
+  </g>
+</svg>
