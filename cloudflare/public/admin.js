@@ -11,6 +11,21 @@
     session: null, settings: null, settingsDirty: false,
     teachers: [], pendingPhoto: null
   };
+  /* أيقونات SVG متناسقة بدل الإيموجي */
+  var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; };
+  var I_HOME = ICO('<path d="M3 10.5 12 3l9 7.5"/><path d="M5 9.5V21h14V9.5"/><path d="M9 21v-6h6v6"/>');
+  var I_USERS = ICO('<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.4 2.9-5.5 6.5-5.5s6.5 2.1 6.5 5.5"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8"/><path d="M18.2 14.7c2 .7 3.3 2.4 3.3 5.3"/>');
+  var I_CHART = ICO('<path d="M3 3v18h18"/><rect x="7" y="12" width="3" height="6" rx="1"/><rect x="12" y="8" width="3" height="10" rx="1"/><rect x="17" y="5" width="3" height="13" rx="1"/>');
+  var I_BRAIN = ICO('<path d="M9.5 3.5A3.2 3.2 0 0 0 6.4 7.6 3.8 3.8 0 0 0 4.5 11a3.9 3.9 0 0 0 1.6 6.9A3.3 3.3 0 0 0 12 19.5v-13a3.2 3.2 0 0 0-2.5-3z"/><path d="M14.5 3.5a3.2 3.2 0 0 1 3.1 4.1A3.8 3.8 0 0 1 19.5 11a3.9 3.9 0 0 1-1.6 6.9A3.3 3.3 0 0 1 12 19.5"/>');
+  var I_BOOK = ICO('<path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/>');
+  var I_BANK = ICO('<rect x="3" y="4" width="18" height="5" rx="1"/><path d="M5 9v9a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V9"/><path d="M10 13h4"/>');
+  var I_CLIP = ICO('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>');
+  var I_GEAR = ICO('<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.87l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.7 1.7 0 0 0-1.87-.34 1.7 1.7 0 0 0-1 1.55V21a2 2 0 1 1-4 0v-.09a1.7 1.7 0 0 0-1-1.55 1.7 1.7 0 0 0-1.87.34l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.7 1.7 0 0 0 .34-1.87 1.7 1.7 0 0 0-1.55-1H3a2 2 0 1 1 0-4h.09a1.7 1.7 0 0 0 1.55-1 1.7 1.7 0 0 0-.34-1.87l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.7 1.7 0 0 0 1.87.34h0a1.7 1.7 0 0 0 1-1.55V3a2 2 0 1 1 4 0v.09a1.7 1.7 0 0 0 1 1.55h0a1.7 1.7 0 0 0 1.87-.34l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.7 1.7 0 0 0-.34 1.87v0a1.7 1.7 0 0 0 1.55 1H21a2 2 0 1 1 0 4h-.09a1.7 1.7 0 0 0-1.55 1z"/>');
+  var I_TAG = ICO('<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.3"/>');
+  var I_LINK = ICO('<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>');
+  var I_PUZZLE = ICO('<path d="M14 3v3a2 2 0 0 0 2 2h3v5h-2a2 2 0 0 0 0 4h2v4h-6v-2a2 2 0 0 0-4 0v2H4v-6H3a2 2 0 0 1 0-4h1V6h5V5a2 2 0 0 1 5-2z"/>');
+  var I_PALETTE = ICO('<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.4-.7-.4-1.1 0-1 .9-1.5 2-1.5h2a4 4 0 0 0 4-4c0-4.5-4-8-9-8z"/><circle cx="7.5" cy="11.5" r=".6"/><circle cx="11" cy="7.5" r=".6"/><circle cx="15.5" cy="9" r=".6"/>');
+  var I_LOCK = ICO('<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -41,11 +56,11 @@
     var app = $('app');
     app.innerHTML =
       '<div class="tlogin"><div class="tlogin-brand">' +
-      '<div class="lb-logo">⚙️</div>' +
+      '<div class="lb-logo">' + I_GEAR + '</div>' +
       '<div><h1>لوحة التحكم</h1><p>إدارة المنصة بالكامل: المعلمون، الإعدادات، المحتوى، والنتائج — من مكان واحد آمن.</p></div>' +
-      '<ul><li><span class="dot">👥</span>إدارة المعلمين وروابطهم</li><li><span class="dot">🎨</span>التحكم في هوية المنصة وألوانها</li><li><span class="dot">📊</span>متابعة النتائج لحظيًا</li></ul>' +
+      '<ul><li><span class="dot">' + I_USERS + '</span>إدارة المعلمين وروابطهم</li><li><span class="dot">' + I_PALETTE + '</span>التحكم في هوية المنصة وألوانها</li><li><span class="dot">' + I_CHART + '</span>متابعة النتائج لحظيًا</li></ul>' +
       '</div><div class="tlogin-form"><div class="tlogin-card">' +
-      '<div class="tlogin-header"><div class="tlogin-icon">🔐</div><h2>' + (setupMode ? 'إنشاء حساب المسؤول' : 'تسجيل الدخول') + '</h2><p>' + (setupMode ? 'لم يُنشأ حساب مسؤول بعد — أنشئ الحساب الآن.' : 'لوحة إدارة المنصة') + '</p></div>' +
+      '<div class="tlogin-header"><div class="tlogin-icon">' + I_LOCK + '</div><h2>' + (setupMode ? 'إنشاء حساب المسؤول' : 'تسجيل الدخول') + '</h2><p>' + (setupMode ? 'لم يُنشأ حساب مسؤول بعد — أنشئ الحساب الآن.' : 'لوحة إدارة المنصة') + '</p></div>' +
       '<form onsubmit="doLogin(' + !!setupMode + ');return false">' +
       '<div class="field"><label for="admEmail">البريد الإلكتروني</label><input type="email" id="admEmail" autocomplete="username"></div>' +
       '<div class="field"><label for="admPass">كلمة المرور</label><input type="password" id="admPass" autocomplete="current-password"></div>' +
@@ -81,9 +96,9 @@
 
   /* ================= الهيكل (Sidebar + محتوى) ================= */
   var NAV = [
-    { title: 'عام', items: [['dashboard', '🏠', 'نظرة عامة'], ['teachers', '👥', 'المعلمون'], ['results', '📊', 'النتائج']] },
-    { title: 'المحتوى', items: [['psychology', '🧠', 'علم النفس'], ['philosophy', '📚', 'الفلسفة والمنطق'], ['bank', '🗂️', 'بنك الأسئلة'], ['exams', '📝', 'الامتحانات']] },
-    { title: 'النظام', items: [['settings', '⚙️', 'الإعدادات']] }
+    { title: 'عام', items: [['dashboard', I_HOME, 'نظرة عامة'], ['teachers', I_USERS, 'المعلمون'], ['results', I_CHART, 'النتائج']] },
+    { title: 'المحتوى', items: [['psychology', I_BRAIN, 'علم النفس'], ['philosophy', I_BOOK, 'الفلسفة والمنطق'], ['bank', I_BANK, 'بنك الأسئلة'], ['exams', I_CLIP, 'الامتحانات']] },
+    { title: 'النظام', items: [['settings', I_GEAR, 'الإعدادات']] }
   ];
   var TITLES = { dashboard: 'نظرة عامة', teachers: 'المعلمون', psychology: 'علم النفس', philosophy: 'الفلسفة والمنطق', bank: 'بنك الأسئلة', exams: 'الامتحانات', results: 'النتائج', settings: 'إعدادات المنصة' };
   function renderShell() {
@@ -91,7 +106,7 @@
     app.innerHTML =
       '<div class="a-shell">' +
       '<aside class="a-sidebar">' +
-      '<div class="a-brand"><div class="logo">⚙️</div><div class="t"><b>لوحة التحكم</b><span>منصة الامتحانات</span></div></div>' +
+      '<div class="a-brand"><div class="logo">' + I_GEAR + '</div><div class="t"><b>لوحة التحكم</b><span>منصة الامتحانات</span></div></div>' +
       '<nav class="a-nav">' +
       NAV.map(function (g) {
         return '<div class="a-nav-group"><div class="a-nav-title">' + g.title + '</div>' +
@@ -577,8 +592,8 @@
 
   /* ================= الإعدادات ================= */
   var SETTING_TABS = [
-    ['platform', '🏷️', 'هوية المنصة'], ['homepage', '🏠', 'الصفحة الرئيسية'], ['appearance', '🎨', 'الشكل العام'],
-    ['social', '🔗', 'التواصل'], ['sections', '🧩', 'الأقسام'], ['teacherDefaults', '👥', 'افتراضيات المعلمين'], ['account', '🔐', 'الحساب']
+    ['platform', I_TAG, 'هوية المنصة'], ['homepage', I_HOME, 'الصفحة الرئيسية'], ['appearance', I_PALETTE, 'الشكل العام'],
+    ['social', I_LINK, 'التواصل'], ['sections', I_PUZZLE, 'الأقسام'], ['teacherDefaults', I_USERS, 'افتراضيات المعلمين'], ['account', I_LOCK, 'الحساب']
   ];
   function renderSettings(body) {
     api('/api/admin/settings').then(function (d) {

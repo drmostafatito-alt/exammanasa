@@ -191,8 +191,8 @@ console.log('\n[4] المسار الكامل بالنقرات الحقيقية �
   ok('★ التسليم ينقل للنتيجة (لا عودة للرئيسية): #/result', W.location.hash === '#/result' && W.S.view === 'result' && !!doc.querySelector('.score-ring'));
   ok('النتيجة: الدرجة والنسبة فورًا', doc.querySelector('.score-ring .pct').textContent === r.percentage + '%' && doc.body.textContent.includes(r.score + ' من ' + r.total));
   ok('عدد الإجابات الصحيحة والخاطئة', doc.body.textContent.includes('إجابات صحيحة: ' + r.correct) && doc.body.textContent.includes('إجابات خاطئة: ' + r.wrong));
-  ok('مراجعة كاملة لكل سؤال مع ✅/❌ و«إجابتك» و«الإجابة الصحيحة»',
-    doc.querySelectorAll('.rq').length === r.total && doc.body.textContent.includes('✅') && doc.body.textContent.includes('❌') && doc.body.textContent.includes('إجابتك') && doc.body.textContent.includes('الإجابة الصحيحة'));
+  ok('مراجعة كاملة لكل سؤال مع علامة صح/خطأ (SVG) و«إجابتك» و«الإجابة الصحيحة»',
+    doc.querySelectorAll('.rq').length === r.total && doc.querySelectorAll('.rq .no .mark svg').length === r.total && doc.body.textContent.includes('إجابتك') && doc.body.textContent.includes('الإجابة الصحيحة'));
   // الرجوع بالمتصفح من النتيجة لا يعيد امتحانًا مُسلَّمًا
   W.location.hash = '#/quiz';
   await sleep(250);
@@ -374,7 +374,7 @@ console.log('\n[6] الفلسفة والمنطق — أسماء الموضوعا
     ok('ت2: كل موضوع يعرض دروسه فقط بأسمائها الحقيقية من JSON (الفلسفة البيئية / الأخلاق البيوطبية / … / المنطق والذكاء الاصطناعي)', allLessonsOk);
     W.location.hash = '#/s/philosophy/2'; await sleep(250); html = doc.getElementById('app').innerHTML;
   }
-  ok('ت2: الشوامل (شامل المنطق + شامل الترم 40 سؤالًا) في قسم «امتحانات شاملة» منفصل', doc.querySelectorAll('.lesson.comp').length === 2 && /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا') && html.includes('⭐ امتحان شامل'));
+  ok('ت2: الشوامل (شامل المنطق + شامل الترم 40 سؤالًا) في قسم «امتحانات شاملة» منفصل', doc.querySelectorAll('.lesson.comp').length === 2 && /40 سؤالًا/.test(html) && html.includes('الترم الثاني كاملًا') && html.includes('امتحان شامل') && doc.querySelectorAll('.comp-badge svg').length >= 2);
   const sumTr = () => [...doc.querySelectorAll('.topic-card .ls')].reduce((n, el) => n + parseInt((el.textContent.match(/(\d+) تدريب/) || [0, 0])[1], 10), 0);
   ok('ت2: عدد التدريبات في بطاقات الموضوعات = 14', sumTr() === 14);
   W.location.hash = '#/s/philosophy/1';
@@ -561,10 +561,13 @@ console.log('\n[9] الأداء وخفة الحزمة');
 {
   // Budget: student SPA + admin panel + shared CSS must stay framework-free and lean.
   // Re-baselined 140KB → 155KB (teacher-platform UI) → 190KB (settings-driven
-  // platform + six-section teacher editor + admin settings panels, all vanilla JS).
+  // platform + six-section teacher editor + admin settings panels, all vanilla JS)
+  // → 200KB (Round 2/3: coherent SVG icon system replacing ALL emoji UI icons across
+  // student/teacher/admin + premium subject-card identity; decorative artwork moved to
+  // external /art/*.svg so only the small inline icon set counts). Still no frameworks.
   // The assertion still catches any framework/bloat regression.
   const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 190);
+  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 200);
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));

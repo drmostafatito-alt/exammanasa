@@ -242,13 +242,29 @@ section { scroll-margin-top: 96px; }
 .about-card .social-row { margin-top: 18px; }
 
 /* ============ بطاقات الصفوف الكبيرة ============ */
-.grade-card { display: flex; flex-direction: column; gap: 4px; background: var(--card); border: 1.5px solid var(--line); border-radius: 22px; padding: 28px; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; position: relative; overflow: hidden; }
-.grade-card::after { content: ''; position: absolute; top: -54px; inset-inline-end: -54px; width: 150px; height: 150px; border-radius: 50%; background: var(--primary-soft); opacity: .55; pointer-events: none; }
+.grade-card { display: flex; flex-direction: column; gap: 4px; background: var(--card); border: 1px solid var(--line); border-radius: 26px; padding: 28px; cursor: pointer; box-shadow: var(--shadow-sm); transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease; position: relative; overflow: hidden; }
+.grade-card::after { content: ''; position: absolute; top: -54px; inset-inline-end: -54px; width: 160px; height: 160px; border-radius: 50%; background: var(--primary-soft); opacity: .5; pointer-events: none; }
+.grade-card::before { content: ''; position: absolute; bottom: -64px; inset-inline-start: -40px; width: 130px; height: 130px; border-radius: 46% 54% 58% 42% / 46% 42% 58% 54%; opacity: .4; pointer-events: none; }
 .grade-card:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); border-color: var(--primary); }
 .grade-card:active { transform: translateY(-1px) scale(.995); }
-.grade-card .gi { width: 60px; height: 60px; border-radius: 18px; font-size: 28px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); margin-bottom: 15px; position: relative; z-index: 1; }
-.grade-card .gi.philosophy { background: linear-gradient(145deg, var(--primary-soft), var(--primary-soft-2)); }
-.grade-card .gi.psychology { background: linear-gradient(145deg, var(--gold-soft), var(--gold-soft-2)); }
+.grade-card .gi { width: 60px; height: 60px; border-radius: 18px; display: flex; align-items: center; justify-content: center; border: 1px solid var(--line); margin-bottom: 15px; position: relative; z-index: 1; color: var(--primary-deep); }
+.grade-card .gi svg { width: 30px; height: 30px; }
+/* الفلسفة: كريمي ← ذهبي فاتح، لمسة عضووية ذهبية */
+.grade-card.philosophy { background: linear-gradient(160deg, #FFFDF6, var(--gold-soft)); border-color: rgba(201, 154, 46, .22); }
+.grade-card.philosophy::after { background: var(--gold-soft-2); opacity: .6; }
+.grade-card.philosophy::before { background: var(--gold-light); }
+.grade-card.philosophy .gi { background: linear-gradient(145deg, var(--gold-soft), var(--gold-soft-2)); color: var(--gold-deep); border-color: rgba(201, 154, 46, .25); }
+.grade-card.philosophy h3 { color: var(--navy); }
+/* علم النفس: أبيض ← أزرق فاتح، كتلة عضووية زرقاء */
+.grade-card.psychology { background: linear-gradient(160deg, #FFFFFF, var(--primary-soft)); border-color: var(--primary-soft-2); }
+.grade-card.psychology::after { background: var(--primary-soft-2); opacity: .5; }
+.grade-card.psychology::before { background: var(--primary-soft-2); }
+.grade-card.psychology .gi { background: linear-gradient(145deg, var(--primary-soft), var(--primary-soft-2)); color: var(--primary-deep); border-color: var(--primary-soft-2); }
+/* لوحة فنية مدمجة داخل بطاقة الصف (أصل SVG خارجي): باهتة، تتدفق نحو الحافة، لا تُقصّ المحتوى */
+.grade-card .gc-art { position: absolute; inset-inline-end: -18px; bottom: -14px; width: 138px; height: 138px; opacity: .16; pointer-events: none; z-index: 0; background: url(/art/philosophy-bust.svg) no-repeat center / contain; }
+.grade-card.psychology .gc-art { background-image: url(/art/psychology-books.svg); opacity: .14; }
+.comp-badge svg { width: 12px; height: 12px; }
+.rq .no .mark svg { width: 13px; height: 13px; }
 .grade-card h3 { font-size: 1.22rem; position: relative; z-index: 1; color: var(--navy); font-weight: 900; }
 .grade-card .gsub { color: var(--gold-deep); font-weight: 800; font-size: .92rem; margin-top: 3px; position: relative; z-index: 1; }
 .grade-card .desc { margin-top: 7px; position: relative; z-index: 1; }
@@ -498,7 +514,8 @@ input[type=color] { padding: 3px; height: 44px; width: 58px; flex: none; cursor:
 }
 .a-nav-item:hover { background: var(--primary-soft); color: var(--primary-deep); }
 .a-nav-item.active { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
-.a-nav-icon { font-size: 1.1rem; flex: none; width: 22px; text-align: center; }
+.a-nav-icon { flex: none; width: 20px; display: inline-flex; align-items: center; justify-content: center; }
+.a-nav-icon svg { width: 18px; height: 18px; }
 .a-sidebar-foot { margin-top: auto; padding: 14px 8px 4px; border-top: 1px solid var(--line); font-size: .74rem; color: var(--muted); display: grid; gap: 8px; }
 .a-sidebar-foot .who { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; direction: ltr; text-align: left; }
 .a-main { min-width: 0; display: flex; flex-direction: column; }
@@ -640,10 +657,16 @@ table.tbl { width: 100%; border-collapse: collapse; font-size: .84rem; backgroun
 .t-topbar .who .chip { background: rgba(255, 255, 255, .15); border-color: rgba(255, 255, 255, .2); color: #fff; }
 .t-topbar .btn.ghost { color: #fff; border-color: rgba(255, 255, 255, .3); background: transparent; }
 .t-sidebar { background: #fff; border-inline-end: 1px solid var(--line); padding: 16px 10px; display: flex; flex-direction: column; gap: 4px; }
-.t-nav-item { display: flex; align-items: center; gap: 10px; padding: 12px 14px; border: none; background: none; border-radius: 12px; cursor: pointer; font: inherit; font-size: .88rem; font-weight: 700; color: var(--muted); transition: all .15s ease; text-align: right; width: 100%; }
+.t-nav-item { display: flex; align-items: center; gap: 9px; padding: 10px 14px; border: none; background: none; border-radius: 11px; cursor: pointer; font: inherit; font-size: .86rem; font-weight: 700; color: var(--muted); transition: all .15s ease; text-align: right; width: 100%; }
 .t-nav-item:hover { background: var(--primary-soft); color: var(--primary-deep); }
-.t-nav-item.active { background: var(--primary); color: #fff; box-shadow: var(--shadow-sm); }
-.t-nav-icon { font-size: 1.15rem; flex: none; }
+.t-nav-item.active { background: var(--primary-soft); color: var(--primary-deep); box-shadow: inset 3px 0 0 0 var(--primary); }
+.t-nav-icon { flex: none; display: inline-flex; }
+.t-nav-icon svg { width: 18px; height: 18px; }
+.tlogin-brand .lb-logo svg { width: 30px; height: 30px; color: #fff; }
+.tlogin-brand li .dot svg { width: 15px; height: 15px; color: #fff; }
+.tlogin-icon svg { width: 26px; height: 26px; }
+.t-stat-icon svg { width: 22px; height: 22px; }
+.t-topbar .logo svg { width: 22px; height: 22px; color: #fff; }
 .t-main { padding: 24px; min-width: 0; max-width: 1060px; width: 100%; }
 .t-welcome { display: flex; align-items: center; gap: 16px; margin-bottom: 22px; flex-wrap: wrap; }
 .t-welcome .tw-avatar { width: 74px; height: 74px; border-radius: 20px; overflow: hidden; background: var(--primary-soft); border: 1.5px solid var(--primary-soft-2); display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.5rem; color: var(--primary-deep); flex: none; }
@@ -724,24 +747,28 @@ footer.site {
 .foot-title { font-size: .8rem; font-weight: 800; color: #fff; margin-bottom: 5px; }
 .foot-nav button { background: none; border: none; cursor: pointer; font: inherit; font-size: .84rem; font-weight: 600; color: rgba(255, 255, 255, .72); padding: 2px 0; transition: color .14s ease; }
 .foot-nav button:hover { color: var(--gold-light); }
+.foot-nav a.foot-teacher { font-size: .8rem; font-weight: 600; color: rgba(255, 255, 255, .55); padding: 2px 0; transition: color .14s ease; }
+.foot-nav a.foot-teacher:hover { color: var(--gold-light); }
 .foot-copy { margin-top: 26px; padding-top: 18px; border-top: 1px solid rgba(255, 255, 255, .14); font-size: .73rem; color: rgba(255, 255, 255, .5); }
 
 /* ============ شريط التنقل السفلي (هاتف) ============ */
-.bottomnav { position: fixed; bottom: 12px; right: 12px; left: 12px; z-index: 90; display: none; background: rgba(255, 255, 255, .97); backdrop-filter: blur(14px); border: 1px solid var(--line); border-radius: 22px; padding: 8px 8px calc(8px + env(safe-area-inset-bottom)); box-shadow: 0 14px 38px -14px rgba(15, 44, 102, .4); }
+/* شريط تنقل سفلي مدمج (بنمط تطبيقات الجوال): ارتفاع مضغوط، أيقونات SVG، لا يغطي المحتوى */
+.bottomnav { position: fixed; bottom: 0; right: 0; left: 0; z-index: 90; display: none; background: rgba(255, 255, 255, .96); backdrop-filter: blur(14px); border-top: 1px solid var(--line); padding: 6px 6px calc(6px + env(safe-area-inset-bottom)); box-shadow: 0 -6px 22px -12px rgba(15, 44, 102, .18); }
 .bottomnav .bn-item {
-  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 3px;
+  flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
   background: none; border: none; cursor: pointer; font: inherit;
-  color: var(--muted-2); padding: 7px 2px; border-radius: 15px; min-height: 52px;
+  color: var(--muted-2); padding: 6px 2px; border-radius: 10px; min-height: 48px;
   transition: color .15s ease, background .15s ease, transform .12s ease;
 }
-.bottomnav .bn-item:active { transform: scale(.94); }
-.bottomnav .bn-icon { width: 22px; height: 22px; }
-.bottomnav .bn-label { font-size: .68rem; font-weight: 800; }
-.bottomnav .bn-item.active { color: var(--primary); background: var(--primary-soft); }
-.bottomnav .bn-item.active .bn-icon { filter: drop-shadow(0 2px 5px rgba(30, 86, 200, .4)); }
+.bottomnav .bn-item:active { transform: scale(.96); }
+.bottomnav .bn-icon { width: 21px; height: 21px; }
+.bottomnav .bn-label { font-size: .66rem; font-weight: 700; }
+.bottomnav .bn-item.active { color: var(--primary-deep); background: transparent; }
+.bottomnav .bn-item.active .bn-label { color: var(--primary-deep); }
+.bottomnav .bn-item.active .bn-icon { color: var(--primary); filter: none; }
 .bottomnav.hidden { display: none !important; }
-body.has-bottomnav main.wrap { padding-bottom: 160px; }
-body.has-bottomnav footer.site .foot-inner { padding-bottom: 128px; }
+body.has-bottomnav main.wrap { padding-bottom: 124px; }
+body.has-bottomnav footer.site .foot-inner { padding-bottom: 104px; }
 
 /* ============ عام ============ */
 .empty {
@@ -844,10 +871,13 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 128px; }
   .st-grid { grid-template-columns: 1fr; }
 }
 @media (max-width: 760px) {
-  .topbar .wrap, .topbar-row { flex-wrap: wrap; gap: 8px 10px; padding-top: 9px; padding-bottom: 9px; }
+  .topbar .wrap, .topbar-row { flex-wrap: wrap; gap: 8px 10px; padding-top: 8px; padding-bottom: 8px; }
   .mainnav { display: none; }
+  /* إخفاء دخول المعلم من هيدر الطالب على الجوال — يبقى في /teacher وفي الفوتر */
+  .teacher-login { display: none; }
   .topbar-end { margin-inline-start: auto; }
   .socials { margin-inline-start: auto; }
+  .brand .logo { width: 40px; height: 40px; }
   .brand .sub { max-width: 160px; }
   .tform-grid { grid-template-columns: 1fr; }
   .tform-section.full { grid-column: auto; }
@@ -864,18 +894,26 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 128px; }
   .brand .logo { width: 42px; height: 42px; }
   .teacher-login { padding: 9px 16px; font-size: .82rem; min-height: 40px; }
   .teacher-login svg { width: 16px; height: 16px; }
-  .hero { padding: 26px 14px; margin-top: 12px; }
-  .hero .hero-media { width: 210px; height: 210px; }
-  .hero .photo .monogram { font-size: 3.6rem; }
+  .hero { padding: 20px 14px 8px; margin-top: 8px; gap: 8px; }
+  .hero .hero-media { width: 176px; height: 176px; margin: 8px auto 6px; }
+  .hero .photo .monogram { font-size: 3.2rem; }
+  .hero .photo-badge { width: 50px; height: 50px; border-radius: 15px; }
+  .hero .photo-badge svg { width: 24px; height: 24px; }
   .hero .float-chip { padding: 5px 11px; font-size: .66rem; }
-  .hero h1 { font-size: 1.9rem; }
-  .hero .hero-tagline { font-size: .98rem; }
-  .hero .lead { font-size: .93rem; }
-  .hero-feats { gap: 9px; }
-  .hero-feat { padding: 10px 11px; gap: 8px; }
-  .hero-feat .hfi { width: 34px; height: 34px; }
-  .hero .hero-ctas { flex-direction: column; gap: 10px; }
-  .hero .hero-ctas .btn { width: 100%; }
+  .hero h1 { font-size: 1.72rem; margin: 10px 0 2px; }
+  .hero .specialty { font-size: .92rem; }
+  .hero .hero-tagline { font-size: .95rem; margin-top: 10px; }
+  .hero .lead { font-size: .9rem; line-height: 1.9; margin-top: 8px; }
+  .hero-feats { gap: 8px; margin-top: 16px; }
+  .hero-feat { padding: 9px 10px; gap: 8px; }
+  .hero-feat .hfi { width: 32px; height: 32px; border-radius: 10px; }
+  .hero-feat .hfi svg { width: 17px; height: 17px; }
+  .hero-feat b { font-size: .74rem; }
+  .hero-feat i { font-size: .63rem; }
+  .hero .hero-ctas { flex-direction: column; gap: 10px; margin-top: 18px; }
+  .hero .hero-ctas .btn { min-height: 50px; padding: 12px 22px; font-size: .98rem; }
+  .hero-more { margin-top: 10px; }
+  .hero .hero-chips { margin-top: 12px; }
   .features { grid-template-columns: 1fr; gap: 13px; }
   .sec-head { padding-top: 44px; }
   .about-card .photo { width: 150px; height: 150px; }
@@ -884,9 +922,14 @@ body.has-bottomnav footer.site .foot-inner { padding-bottom: 128px; }
   .lesson { padding: 11px 11px; gap: 10px; }
   .lesson .lno { width: 48px; height: 48px; border-radius: 12px; }
   .lesson .lno b { font-size: 1.1rem; }
-  .quiz-actions { flex-direction: row; }
+  /* الامتحان على الجوال: رقائق الأسئلة صف واحد قابل للتمرير بدل شبكة عملاقة */
+  .navstrip { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; margin-top: 8px; }
+  .navstrip::-webkit-scrollbar { display: none; }
+  .nchip { flex: none; width: 32px; height: 32px; }
+  /* شريط أزرار الامتحان مثبّت أسفل الشاشة، بخلفية متدرّجة لا تغطي النص */
+  .quiz-actions { position: sticky; bottom: 0; z-index: 30; flex-direction: row; background: linear-gradient(to top, var(--bg) 72%, rgba(245, 248, 254, 0)); padding: 16px 0 calc(12px + env(safe-area-inset-bottom)); margin-top: 12px; }
+  .qcard { margin-bottom: 6px; }
   .kv { grid-template-columns: 110px 1fr; }
-  .nchip { width: 32px; height: 32px; }
   .unit-card { padding: 14px 12px 12px; }
   .topic-grid, .training-grid { grid-template-columns: 1fr; }
   .training-card { flex-wrap: wrap; padding: 14px; }
