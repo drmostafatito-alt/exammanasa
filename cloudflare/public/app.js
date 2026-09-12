@@ -549,14 +549,17 @@
   }
 
   function gradeCard(g) {
+    /* تركيب فني: خلفية متدرجة + أشكال عضوية (CSS) + توهج + لوحة SVG بقناع
+       (علامة مائية مدمجة في الزاوية) + أيقونة دائرية ناعمة + محتوى + CTA سهم. */
     return '<div class="grade-card ' + g.cls + '" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
+      '<span class="gc-glow" aria-hidden="true"></span>' +
       '<span class="gc-art" aria-hidden="true"></span>' +
-      '<div class="gi ' + g.cls + '">' + g.icon + '</div>' +
+      '<div class="gc-icon ' + g.cls + '">' + g.icon + '</div>' +
       '<h3>' + esc(g.grade) + '</h3>' +
       '<div class="gsub">' + esc(g.subject) + '</div>' +
       '<div class="desc">' + esc(g.desc) + '</div>' +
       '<div class="meta-row">' + g.stats.map(function (s) { return '<span class="badge">' + esc(s) + '</span>'; }).join('') + '</div>' +
-      '<div class="cta-row"><span class="cta-hint">بيانات الطالب ثم الامتحانات</span><span class="btn small">ابدأ الآن</span></div>' +
+      '<div class="cta-row"><span class="cta-hint">بيانات الطالب ثم الامتحانات</span><span class="btn gc-cta">ابدأ الآن ' + ARROW_L_SVG + '</span></div>' +
       '</div>';
   }
 

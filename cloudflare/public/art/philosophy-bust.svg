@@ -1,1 +1,70 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" fill="none" stroke="#A87E1E" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="32" cy="16" r="8.5"/><path d="M27 24c-1 3-3 4.5-5 5.5 2.5 1.5 4 3.5 4.5 6.5h11c.5-3 2-5 4.5-6.5-2-1-4-2.5-5-5.5"/><path d="M20 44c1.5-5 6-8 12-8s10.5 3 12 8"/><path d="M22 44h20v5H22z"/><path d="M17 49h30v6H17z"/><path d="M25 12c2-3 6-4.5 9-3"/></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 480" fill="none">
+  <defs>
+    <radialGradient id="pbFade" gradientUnits="userSpaceOnUse" cx="240" cy="200" r="222">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset="0.52" stop-color="#fff" stop-opacity="0.78"/>
+      <stop offset="0.85" stop-color="#fff" stop-opacity="0.28"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#pbFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- medallion rings -->
+    <circle cx="240" cy="195" r="152" stroke-width="5"/>
+    <circle cx="240" cy="195" r="140" stroke-width="2.5"/>
+    <circle cx="114" cy="122" r="3.4" fill="url(#pbFade)" stroke="none"/>
+    <circle cx="202" cy="54" r="3.4" fill="url(#pbFade)" stroke="none"/>
+    <circle cx="278" cy="54" r="3.4" fill="url(#pbFade)" stroke="none"/>
+    <circle cx="366" cy="122" r="3.4" fill="url(#pbFade)" stroke="none"/>
+    <!-- skull -->
+    <path d="M186 152 C184 104 208 84 240 84 C272 84 296 104 294 152" stroke-width="4.5"/>
+    <!-- hair: nested wave arcs -->
+    <path d="M190 148 C190 106 212 90 240 90 C268 90 290 106 290 148" stroke-width="2.5" opacity="0.85"/>
+    <path d="M198 140 C200 110 216 98 240 98 C264 98 280 110 282 140" stroke-width="2" opacity="0.6"/>
+    <path d="M206 132 C210 112 222 104 240 104" stroke-width="2" opacity="0.5"/>
+    <path d="M274 132 C270 112 258 104 240 104" stroke-width="2" opacity="0.5"/>
+    <!-- ears -->
+    <path d="M186 156 C177 158 175 172 184 179" stroke-width="4"/>
+    <path d="M294 156 C303 158 305 172 296 179" stroke-width="4"/>
+    <!-- brows -->
+    <path d="M200 147 Q213 138 227 145" stroke-width="4.5"/>
+    <path d="M253 145 Q267 138 280 147" stroke-width="4.5"/>
+    <!-- eyes -->
+    <path d="M202 159 Q213 153 224 159 Q213 166 202 159 Z" stroke-width="3"/>
+    <circle cx="213" cy="159" r="2.6" fill="url(#pbFade)" stroke="none"/>
+    <path d="M256 159 Q267 153 278 159 Q267 166 256 159 Z" stroke-width="3"/>
+    <circle cx="267" cy="159" r="2.6" fill="url(#pbFade)" stroke="none"/>
+    <!-- nose -->
+    <path d="M240 150 L240 182" stroke-width="3.5"/>
+    <path d="M234 188 Q238 194 240 191 Q242 194 246 188" stroke-width="3.5"/>
+    <!-- mustache -->
+    <path d="M226 198 Q240 191 254 198" stroke-width="4"/>
+    <path d="M228 201 Q217 208 207 204" stroke-width="3"/>
+    <path d="M252 201 Q263 208 273 204" stroke-width="3"/>
+    <!-- beard -->
+    <path d="M194 176 C189 238 206 276 240 278 C274 276 291 238 286 176" stroke-width="4.5"/>
+    <path d="M214 200 C210 230 216 252 228 268" stroke-width="2.5" opacity="0.75"/>
+    <path d="M232 207 C229 234 232 256 239 273" stroke-width="2.5" opacity="0.75"/>
+    <path d="M248 207 C251 234 248 256 241 273" stroke-width="2.5" opacity="0.75"/>
+    <path d="M266 200 C270 230 264 252 252 268" stroke-width="2.5" opacity="0.75"/>
+    <path d="M224 271 Q240 281 256 271" stroke-width="2.5" opacity="0.6"/>
+    <!-- neck -->
+    <path d="M221 272 L216 300" stroke-width="4"/>
+    <path d="M259 272 L264 300" stroke-width="4"/>
+    <!-- shoulders -->
+    <path d="M148 340 C160 308 186 296 216 296 L264 296 C294 296 320 308 332 340" stroke-width="4.5"/>
+    <!-- collar double line -->
+    <path d="M216 296 L240 332 L264 296" stroke-width="4"/>
+    <path d="M223 296 L240 323 L257 296" stroke-width="2" opacity="0.7"/>
+    <!-- drapery folds -->
+    <path d="M176 340 C182 318 194 305 210 301" stroke-width="2.5" opacity="0.7"/>
+    <path d="M304 340 C298 318 286 305 270 301" stroke-width="2.5" opacity="0.7"/>
+    <path d="M240 332 L240 356" stroke-width="2.5" opacity="0.7"/>
+    <path d="M227 334 C224 345 226 353 231 360" stroke-width="2" opacity="0.55"/>
+    <path d="M253 334 C256 345 254 353 249 360" stroke-width="2" opacity="0.55"/>
+    <!-- pedestal -->
+    <path d="M168 340 L312 340 L302 372 L178 372 Z" stroke-width="4"/>
+    <rect x="154" y="372" width="172" height="26" rx="6" stroke-width="4"/>
+    <path d="M186 385 h18 M214 385 h26 M250 385 h20 M280 385 h14" stroke-width="3.5" opacity="0.85"/>
+    <rect x="140" y="398" width="200" height="22" rx="5" stroke-width="5"/>
+  </g>
+</svg>
