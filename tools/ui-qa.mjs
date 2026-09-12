@@ -96,6 +96,11 @@ let dom, doc;
     hasSocials ? !doc.getElementById('navContact').hidden : (doc.getElementById('navContact').hidden === true && doc.getElementById('topSocials').children.length === 0));
   ok('لا أيقونات اجتماعية وهمية بلا روابط', doc.getElementById('topSocials').querySelectorAll('a').length === (hasSocials ? Object.values(catalog.owner.socialLinks).filter(v => /^https?:\/\//i.test(String(v || '').trim())).length : 0));
   ok('لا مبدّل لغة إنجليزية ولا وضع داكن', !html.includes('English') && !/dark/i.test(html) && !doc.querySelector('.theme-toggle'));
+  {
+    const ownerSlug = String(catalog.owner.slug || '');
+    ok('لا قيمة تقنية (slug/معرف) مكشوفة في صفحة الطالب', ownerSlug.length > 0 && !doc.getElementById('app').textContent.includes(ownerSlug) && !doc.getElementById('siteFooter').textContent.includes(ownerSlug));
+    ok('هيدر الطالب بلا زر «دخول المعلم» (يبقى عبر /teacher فقط)', !doc.querySelector('.topbar .teacher-login') && !doc.querySelector('.topbar a[href="/teacher"]'));
+  }
   harvestClasses(doc);
 }
 
@@ -173,6 +178,7 @@ console.log('\n[4] المسار الكامل بالنقرات الحقيقية �
     W.location.hash === '#/quiz' && W.S.view === 'quiz' && !!doc.querySelector('.qcard') && !doc.querySelector('.hero'));
   ok('«السؤال 1 من 20» + شريط تقدم + شريط أرقام', doc.body.textContent.includes('السؤال') && doc.body.textContent.includes('من 20') && !!doc.querySelector('.progressbar') && !!doc.querySelector('.navstrip'));
   ok('أزرار السابق/التالي', doc.body.textContent.includes('السؤال التالي'));
+  ok('شاشة الامتحان وضع تطبيق مركّز: body.exam-mode + الشريط السفلي مخفي', doc.body.classList.contains('exam-mode') && doc.getElementById('bottomnav').classList.contains('hidden'));
   // اختر إجابة بالنقر — حالة التحديد واضحة
   doc.querySelector('.opt').click();
   await sleep(80);
@@ -189,6 +195,7 @@ console.log('\n[4] المسار الكامل بالنقرات الحقيقية �
   await sleep(500);
   const r = W.S.result;
   ok('★ التسليم ينقل للنتيجة (لا عودة للرئيسية): #/result', W.location.hash === '#/result' && W.S.view === 'result' && !!doc.querySelector('.score-ring'));
+  ok('بعد الخروج من الامتحان يزول وضع التطبيق (exam-mode)', !doc.body.classList.contains('exam-mode'));
   ok('النتيجة: الدرجة والنسبة فورًا', doc.querySelector('.score-ring .pct').textContent === r.percentage + '%' && doc.body.textContent.includes(r.score + ' من ' + r.total));
   ok('عدد الإجابات الصحيحة والخاطئة', doc.body.textContent.includes('إجابات صحيحة: ' + r.correct) && doc.body.textContent.includes('إجابات خاطئة: ' + r.wrong));
   ok('مراجعة كاملة لكل سؤال مع علامة صح/خطأ (SVG) و«إجابتك» و«الإجابة الصحيحة»',

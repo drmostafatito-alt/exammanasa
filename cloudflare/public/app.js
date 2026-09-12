@@ -297,7 +297,14 @@
    * مهم: كل مسار متوقع له فرع صريح في route() — أي هاش غير معروف
    * يعود للرئيسية. هذا يمنع عودة الطالب للرئيسية بعد بدء الامتحان
    * (الخلل القديم: '#/quiz' لم يكن له فرع فكانت الرئيسية تُرسم بعد بدء الامتحان). */
+  /* غلاف التوجيه: بعد رسم أي شاشة نُزامن «الكروم» المحيط (الشريط السفلي + وضع
+   * الامتحان) — حتى لا يبقى شريط التنقل السفلي ظاهرًا داخل الامتحان/النتيجة. */
   function route() {
+    routeInner();
+    bottomNav(activeBottomKey);
+    document.body.classList.toggle('exam-mode', S.view === 'quiz');
+  }
+  function routeInner() {
     var hash = location.hash.replace(/^#\/?/, '');
     var parts = hash.split('/').filter(Boolean);
     if (!parts.length) { S.view = 'home'; renderHome(); return; }
@@ -989,17 +996,19 @@
       '<div class="row"><div class="qnum">السؤال <em>' + (S.current + 1) + '</em> من ' + total + '</div>' +
       '<div class="chip">أجبت ' + done + ' من ' + total + '</div></div>' +
       '<div class="progressbar"><i style="width:' + Math.round((done / total) * 100) + '%"></i></div>' +
+      '<div class="qtitle">' + esc(S.session.exam.title) + '</div>' +
       '<div class="navstrip">' + S.session.questions.map(function (_, i) {
         var cls = 'nchip' + (S.answers[i] !== null ? ' answered' : '') + (i === S.current ? ' current' : '');
         return '<button class="' + cls + '" onclick="jumpQ(' + i + ')" aria-label="سؤال ' + (i + 1) + '">' + (i + 1) + '</button>';
       }).join('') + '</div></div>' +
       offlineBanner +
       '<div class="qcard card">' +
+      '<div class="qsheet">' +
       '<div class="qtext"><span class="qn">' + (S.current + 1) + '</span>' + esc(q.text) + '</div>' +
       '<div class="opts">' + q.options.map(function (opt, i) {
         return '<button class="opt' + (S.answers[S.current] === i ? ' selected' : '') + '" onclick="choose(' + i + ')">' +
           '<span class="letter">' + LETTERS[i] + '</span><span class="txt">' + esc(opt) + '</span></button>';
-      }).join('') + '</div></div>' +
+      }).join('') + '</div></div></div>' +
       '<div class="quiz-actions">' +
       '<button class="btn ghost" onclick="prevQ()" ' + (S.current === 0 ? 'disabled' : '') + '>السؤال السابق</button>' +
       (S.current === total - 1
@@ -1007,6 +1016,14 @@
         : '<button class="btn" onclick="nextQ()">السؤال التالي</button>') +
       '</div>';
     app.innerHTML = html;
+    resetQuizScroll();
+  }
+
+  /* بعد كل انتقال بين الأسئلة: السؤال الجديد يبدأ من أوله دائمًا —
+   * منطقة السؤال قابلة للتمرير داخليًا على الجوال فلا يبحث الطالب عن زر التالي. */
+  function resetQuizScroll() {
+    var area = app.querySelector('.qcard, .rv-list');
+    if (area) area.scrollTop = 0;
     try { window.scrollTo({ top: 0 }); } catch (e) { }
   }
 
@@ -1031,8 +1048,9 @@
     var html =
       '<div class="quiz-top"><div class="row"><div class="qnum">مراجعة الإجابات</div>' +
       '<div class="chip">أجبت ' + done + ' من ' + total + '</div></div>' +
-      '<div class="progressbar"><i style="width:' + Math.round((done / total) * 100) + '%"></i></div></div>' +
-      '<div style="margin-top:16px">';
+      '<div class="progressbar"><i style="width:' + Math.round((done / total) * 100) + '%"></i></div>' +
+      '<div class="qtitle">' + esc(S.session.exam.title) + '</div></div>' +
+      '<div class="rv-list">';
     if (missing.length) {
       html += '<div class="rv-note warn">' + WARN_SVG +
         '<span>لم تُجب على ' + missing.length + ' ' + (missing.length === 1 ? 'سؤال' : 'أسئلة') + ' (رقم ' +
@@ -1058,7 +1076,7 @@
         : '<button class="btn" id="submitBtn" onclick="submitExam()">تسليم الامتحان</button>') +
       '</div>';
     app.innerHTML = html;
-    try { window.scrollTo({ top: 0 }); } catch (e) { }
+    resetQuizScroll();
   }
 
   function jumpFromReview(i) { S.reviewMode = false; S.current = i; renderQuiz(); }

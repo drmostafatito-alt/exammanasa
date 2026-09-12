@@ -109,14 +109,21 @@
     return api('/api/t/session').then(function (d) {
       T.session = d;
       renderShell();
+      focusActiveTab();
       $('teacherName').textContent = d.name;
       if (T.settings && T.settings.identity) $('tPlatformSub').textContent = T.settings.identity.platformName || 'منصة الامتحانات';
       renderTab();
     }).catch(function () { renderLogin(); });
   }
+  /* على الجوال الشريط أفقي قابل للتمرير: نُظهر التبويب النشط داخل الرؤية دائمًا */
+  function focusActiveTab() {
+    var act = document.querySelector('.t-nav-item.active');
+    if (act && act.scrollIntoView) { try { act.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) { } }
+  }
   function tSetTab(t) {
     T.tab = t;
     document.querySelectorAll('.t-nav-item').forEach(function (el) { el.classList.toggle('active', el.getAttribute('data-tab') === t); });
+    focusActiveTab();
     renderTab();
   }
   function renderTab() {

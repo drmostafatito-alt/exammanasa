@@ -110,11 +110,14 @@ console.log('\n[V2] Mobile 360\u00d7800 \u2014 hero stack + bottom nav');
   ok('عنصر نشط واضح (الرئيسية)', active === 'الرئيسية', active);
 
   // content must not be covered by the bottom nav
-  const mainPad = await p.evaluate(() => {
+  const pad = await p.evaluate(() => {
     const m = document.querySelector('main.wrap');
-    return getComputedStyle(m).paddingBottom;
+    const bn = document.querySelector('#bottomnav');
+    return { mainPad: parseInt(getComputedStyle(m).paddingBottom), navH: Math.round(bn.getBoundingClientRect().height) };
   });
-  ok('padding أسفل المحتوى يكفي لعدم تغطية الشريط', parseInt(mainPad) >= 120, 'paddingBottom=' + mainPad);
+  ok('padding أسفل المحتوى يغطي الشريط السفلي بالكامل + هامش', pad.mainPad >= pad.navH + 24, JSON.stringify(pad));
+  const bnBox = await p.evaluate(() => Math.round(document.querySelector('#bottomnav').getBoundingClientRect().height));
+  ok('ارتفاع الشريط السفلي مضغوط بنمط التطبيقات (52-72px)', bnBox >= 52 && bnBox <= 72, 'h=' + bnBox);
 
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok('لا overflow أفقي على 360', overflow <= 0, 'delta=' + overflow);

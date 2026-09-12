@@ -129,6 +129,9 @@
     document.querySelectorAll('.a-nav-item').forEach(function (el) {
       el.classList.toggle('active', el.getAttribute('onclick') && el.getAttribute('onclick').indexOf("setTab('" + t + "')") !== -1);
     });
+    /* على الجوال الشريط أفقي: نُبقي التبويب النشط داخل الرؤية */
+    var act = document.querySelector('.a-nav-item.active');
+    if (act && act.scrollIntoView) { try { act.scrollIntoView({ block: 'nearest', inline: 'center' }); } catch (e) { } }
     renderTab();
   }
   function renderTab() {
