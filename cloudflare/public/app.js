@@ -149,6 +149,13 @@
   var ARROW_L_SVG = ICO('<path d="M12 19l-7-7 7-7"/><path d="M5 12h14"/>', 2.4);
   var SHIELD_SVG = ICO('<path d="M12 3l7 3v5c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"/><path d="m9 12 2 2 4-4"/>');
   var BOOK_SVG = ICO('<path d="M2 4h6a4 4 0 0 1 4 4v12a3 3 0 0 0-3-3H2z"/><path d="M22 4h-6a4 4 0 0 0-4 4v12a3 3 0 0 1 3-3h7z"/>');
+  /* فلسفة: عمود كلاسيكي (لاندمارك) — خط متناسق */
+  var PHILO_SVG = ICO('<path d="M3 21h18"/><path d="M5 21v-9"/><path d="M9.5 21v-9"/><path d="M14.5 21v-9"/><path d="M19 21v-9"/><path d="M3 9h18"/><path d="M12 3l9 6H3z"/>');
+  /* علم النفس: دماغ بخط متناسق */
+  var PSY_SVG = ICO('<path d="M9.5 3.5A3.2 3.2 0 0 0 6.4 7.6 3.8 3.8 0 0 0 4.5 11a3.9 3.9 0 0 0 1.6 6.9A3.3 3.3 0 0 0 12 19.5v-13a3.2 3.2 0 0 0-2.5-3z"/><path d="M14.5 3.5a3.2 3.2 0 0 1 3.1 4.1A3.8 3.8 0 0 1 19.5 11a3.9 3.9 0 0 1-1.6 6.9A3.3 3.3 0 0 1 12 19.5"/><path d="M12 8h-2"/><path d="M12 12h3"/>');
+  var X_SVG = ICO('<path d="M18 6 6 18"/><path d="M6 6l12 12"/>', 2.4);
+  var STAR_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2.5l2.9 6.2 6.6.8-4.9 4.6 1.3 6.6-5.9-3.3-5.9 3.3 1.3-6.6L2.5 9.5l6.6-.8z"/></svg>';
+  /* اللوحات الفنية (تمثال الفيلسوف / كومة الكتب) أصول SVG خارجية في /art/ — تُحمّل عبر CSS */
   var CLIP_SVG = ICO('<rect x="8" y="2" width="8" height="4" rx="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="M9 12h6"/><path d="M9 16h4"/>');
   var BOLT_SVG = ICO('<path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z"/>');
   var DEVICES_SVG = ICO('<rect x="2" y="3" width="15" height="11" rx="2"/><path d="M8 21h6"/><path d="M12 17v4"/><path d="M18 15h2a2 2 0 0 1 2 2v3a2 2 0 0 1-2 2h-4"/>');
@@ -389,7 +396,7 @@
       var p = S.catalog.psychology;
       var topics = p.units.reduce(function (n, u) { return n + u.lessons.length; }, 0);
       return {
-        subjectId: 'psychology', icon: '🧠', cls: 'psychology',
+        subjectId: 'psychology', icon: PSY_SVG, cls: 'psychology',
         grade: 'الصف الثاني الثانوي', subject: 'بكالوريا — علم النفس',
         subName: p.name,
         stats: [p.units.length + ' وحدات', topics + ' موضوعات', countExams('psychology') + ' امتحانًا إلكترونيًا'],
@@ -400,7 +407,7 @@
     var phTopics = 0, phTrainings = 0;
     ph.terms.forEach(function (t) { (t.sections || []).forEach(function (sec) { sec.topics.forEach(function (tp) { phTopics++; tp.lessons.forEach(function (l) { phTrainings += l.trainings.length; }); }); }); });
     return {
-      subjectId: 'philosophy', icon: '📚', cls: 'philosophy',
+      subjectId: 'philosophy', icon: PHILO_SVG, cls: 'philosophy',
       grade: 'الصف الأول الثانوي', subject: 'الفلسفة والمنطق',
       subName: ph.name,
       stats: ['ترمان دراسيان', phTopics + ' موضوعًا', phTrainings + ' تدريبًا (امتحانًا إلكترونيًا)'],
@@ -542,7 +549,8 @@
   }
 
   function gradeCard(g) {
-    return '<div class="grade-card" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
+    return '<div class="grade-card ' + g.cls + '" onclick="startWithGrade(\'' + g.subjectId + '\')" role="button" tabindex="0">' +
+      '<span class="gc-art" aria-hidden="true"></span>' +
       '<div class="gi ' + g.cls + '">' + g.icon + '</div>' +
       '<h3>' + esc(g.grade) + '</h3>' +
       '<div class="gsub">' + esc(g.subject) + '</div>' +
@@ -682,7 +690,7 @@
       '<div class="lt">' + esc(e.title) + '</div>' +
       '<div class="ls"><span>' + e.count + ' سؤالًا · اختيار من متعدد' + (scope ? ' · ' + esc(scope) : '') + '</span></div>' +
       '</div>' +
-      '<span class="comp-badge">⭐ امتحان شامل</span>' +
+      '<span class="comp-badge">' + STAR_SVG + ' امتحان شامل</span>' +
       '</div>';
   }
 
@@ -1162,7 +1170,7 @@
     var html =
       '<div class="score-hero">' +
       '<div class="score-ring ' + cls + '"><div class="pct">' + r.percentage + '%</div><div class="frac">' + r.score + ' من ' + r.total + '</div></div>' +
-      '<h2 style="font-size:1.3rem;color:var(--ink)">' + (r.pass ? '🎉 أحسنت — نتيجة ناجحة' : 'تحتاج مراجعة الموضوع') + '</h2>' +
+      '<h2 style="font-size:1.3rem;color:var(--ink)">' + (r.pass ? 'أحسنت — نتيجة ناجحة' : 'تحتاج مراجعة الموضوع') + '</h2>' +
       '<div class="res-badges">' +
       '<span class="badge green">إجابات صحيحة: ' + r.correct + '</span>' +
       '<span class="badge red">إجابات خاطئة: ' + r.wrong + '</span>' +
@@ -1179,7 +1187,7 @@
       '<button class="tab ' + (S.resultFilter === 'wrong' ? 'active' : '') + '" onclick="filterResult(\'wrong\')">إجابات خاطئة (' + r.wrong + ')</button></div>' +
       list.map(function (q) {
         return '<div class="rq ' + (q.isCorrect ? 'correct' : 'wrong') + '">' +
-          '<div class="no"><span class="mark">' + (q.isCorrect ? '✅' : '❌') + '</span>السؤال ' + q.no + ' · ' + (q.isCorrect ? 'إجابة صحيحة' : 'إجابة خاطئة') + '</div>' +
+          '<div class="no"><span class="mark">' + (q.isCorrect ? CHECK_SVG : X_SVG) + '</span>السؤال ' + q.no + ' · ' + (q.isCorrect ? 'إجابة صحيحة' : 'إجابة خاطئة') + '</div>' +
           '<div class="q">' + esc(q.questionText) + '</div>' +
           '<div class="ans mine ' + (q.isCorrect ? 'correct' : 'wrong') + '"><span class="lbl">إجابتك</span>' + esc(q.studentAnswerText) + '</div>' +
           (q.isCorrect ? '' : '<div class="ans correct"><span class="lbl">الإجابة الصحيحة</span>' + esc(q.correctAnswerText) + '</div>') +
