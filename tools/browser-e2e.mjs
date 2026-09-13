@@ -558,7 +558,8 @@ try {
 
   /* ============ 12. cookie attributes / transport ============ */
   console.log('\n[12] كوكيز وترويسات أمان');
-  const rawLogin = await fetch(BASE + '/api/t/login', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'baker@qa.test', password: T_B.pass }) });
+  // الترويسة المخصّصة مطلوبة الآن على /api/t/login (حماية login-CSRF) — التطبيق يرسلها دائمًا.
+  const rawLogin = await fetch(BASE + '/api/t/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ email: 'baker@qa.test', password: T_B.pass }) });
   const sc = rawLogin.headers.get('set-cookie') || '';
   ok('Set-Cookie للمعلم: HttpOnly + Secure + SameSite=Strict + Max-Age', /HttpOnly/.test(sc) && /Secure/.test(sc) && /SameSite=Strict/.test(sc) && /Max-Age=\d+/.test(sc), sc);
   const secHdrs = rawLogin.headers;
