@@ -936,6 +936,55 @@ try {
     await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 19ج. CSRF حقيقي + تعقيم المخرجات ============ */
+  console.log('\n[19ج] CSRF (ترويسة + Origin) وتعقيم CSV/النصوص');
+  {
+    // CSRF على الإعداد الأولي: صفحة خارجية لا تستطيع إنشاء مالك المنصة
+    const setupCsrf = await fetch(BASE + '/api/admin/setup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'x@y.test', password: 'AnotherPass#1' })
+    });
+    ok('POST /api/admin/setup بلا ترويسة مخصّصة → 403', setupCsrf.status === 403, 'got ' + setupCsrf.status);
+    const loginCsrf = await fetch(BASE + '/api/t/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a@b.test', password: 'whatever123' })
+    });
+    ok('POST /api/t/login بلا ترويسة مخصّصة → 403 (لا login-CSRF)', loginCsrf.status === 403, 'got ' + loginCsrf.status);
+    // Origin بين المواقع مرفوض حتى مع الترويسة الصحيحة
+    const originBad = await fetch(BASE + '/api/admin/teachers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'Origin': 'https://evil.example', Cookie: cookie },
+      body: JSON.stringify({ name: 'evil', slug: 'evil1' })
+    });
+    ok('POST بمصدر خارجي (Origin مختلف عن Host) → 403', originBad.status === 403, 'got ' + originBad.status);
+    const originOk = await fetch(BASE + '/api/admin/teachers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'Origin': new URL(BASE).origin, Cookie: cookie },
+      body: JSON.stringify({ name: 'من نفس المصدر', slug: 'sameorigin1' })
+    });
+    const originOkBody = await originOk.json().catch(() => ({}));
+    ok('POST من نفس المصدر مقبول (Origin = Host)', originOk.status === 200, 'got ' + originOk.status);
+    if (originOkBody.teacher && originOkBody.teacher.id) {
+      await jfetch('/api/admin/teachers/' + originOkBody.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+
+    // تعقيم CSV: صيغة تبدأ بـ = لا تُنفَّذ عند فتح الملف
+    const sF = await post('/api/exam/start', { examId: 'U1-T1', name: '=cmd|\' /c calc\'!A1', phone: '01090000031', slug: 'mostafa' });
+    ok('اسم طالب بصيغة CSV مقبول كنص', sF.status === 200, 'got ' + sF.status);
+    if (sF.status === 200) {
+      await post('/api/exam/submit', { token: sF.data.token, answers: correctPositions('U1-T1', decodeToken(sF.data.token).seed) });
+      await new Promise(r => setTimeout(r, 900));
+      const csv = await jfetch('/api/admin/results.csv', { headers: { Cookie: cookie } });
+      ok('CSV يجرّد صيغة Excel (قيمة تبدأ بـ = تُسبَق بـ \')', csv.text.includes('"\'=cmd|'), (csv.text.match(/.{0,40}cmd.{0,20}/) || [''])[0]);
+      ok('CSV لا يحتوي أي خلية تبدأ بـ "=', !/,"=/.test(csv.text), (csv.text.match(/,"=[^"]*/) || [''])[0]);
+    }
+    // محارف التحكم تُزال من الاسم (لا تسميم سجلات/CSV)
+    const sC = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب\u0000\u0007خبيث', phone: '01090000032', slug: 'mostafa' });
+    ok('محارف التحكم تُزال من اسم الطالب', sC.status === 200 && decodeToken(sC.data.token).name === 'طالب خبيث', 'got ' + JSON.stringify(decodeToken(sC.data.token).name));
+    // نص السؤال لم يُمسّ (الأسئلة لا تمرّ عبر stripControl)
+    const bankQ = BANKS.questions[BANKS.examDefs['U1-T1'][0]];
+    const sQ = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01090000033', slug: 'mostafa' });
+    ok('نص السؤال يصل حرفيًا كما في البنك (لا تعقيم)', sQ.status === 200 && sQ.data.questions[0].text === bankQ.text);
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {

@@ -93,6 +93,33 @@ function securityHeaders(res) {
   return new Response(res.body, { status: res.status, headers: h });
 }
 
+/* إزالة محارف التحكم (CR/LF/TAB… ) من النصوص الحرة: تمنع تسميم CSV/السجلات وتمنع
+ * كسر العرض، دون المساس بأي نص سؤال (الأسئلة لا تمرّ عبر هذه الدالة أبدًا). */
+function stripControl(value, max) {
+  let s = String(value == null ? '' : value).replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+  return max ? s.slice(0, max) : s;
+}
+
+/* طبقة حماية ثانية ضد CSRF: المتصفح يرسل Origin دائمًا مع الطلبات بين المواقع.
+ * غياب الترويسة يعني عميلًا غير متصفح (اختبارات/curl) — مسموح. */
+function hostOf(value) {
+  try { return new URL(String(value)).host; } catch (e) { return ''; }
+}
+function isLoopbackHost(h) {
+  const name = String(h || '').replace(/:\d+$/, '').toLowerCase();
+  return name === 'localhost' || name === '127.0.0.1' || name === '[::1]' || name === '::1';
+}
+function crossSiteRequest(request) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return false;
+  const oh = hostOf(origin);
+  if (!oh) return true; // Origin غير قابل للتحليل → ارفض احتياطًا
+  const rh = request.headers.get('Host') || '';
+  if (oh === rh) return false;
+  if (isLoopbackHost(oh) && isLoopbackHost(rh)) return false; // تطوير محلي بمنفذ مختلف
+  return true;
+}
+
 /* ---- seeded shuffle — ported verbatim from Code.gs (prng_/shuffledOrder_) ---- */
 function prng(seed) {
   let a = seed >>> 0;
@@ -148,7 +175,8 @@ async function verifyToken(token, secret) {
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const expected = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, parts[0]))));
-  if (expected !== parts[1]) return null; // non-constant-time compare is acceptable here: sig is 256-bit random-keyed
+  // constant-time: the comparison must not leak where a forged signature diverged
+  if (!safeEqualHex(expected, parts[1])) return null;
   try {
     const payload = JSON.parse(fromB64url(parts[0]));
     if (!payload || typeof payload !== 'object') return null;
@@ -811,7 +839,8 @@ async function handleApi(request, env, ctx, pathname) {
     const ids = cv.view.examDefs[examId];
     if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
 
-    const name = String(body.name || '').trim();
+    // محارف التحكم تُزال (تمنع تسميم CSV/السجلات) — نص السؤال لا يمرّ هنا أبدًا.
+    const name = stripControl(body.name, 120);
     const rawPhone = String(body.phone || '').trim();
     if (!name) return fail('اسم الطالب مطلوب.');
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
@@ -906,13 +935,14 @@ async function handleApi(request, env, ctx, pathname) {
     const sessDefs = cv.view.examDefs[sess.examId];
     const sessMeta = cv.view.exams[sess.examId];
     if (!sessDefs || !sessMeta || sessMeta.enabled === false) return fail('الامتحان غير متاح حاليًا — أعد فتحه من قائمة الامتحانات.', 404);
-    if (!Array.isArray(answers) || answers.length !== sessDefs.length) {
-      return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
-    }
     // A live content edit that changed the exam size after this session started would
-    // desync the seeded shuffle — refuse politely instead of mis-grading.
+    // desync the seeded shuffle — refuse politely instead of mis-grading. يجب أن يسبق
+    // فحص عدد الإجابات، وإلا استحال الوصول إليه (تغيير الحجم يغيّر الطول أيضًا).
     if (Number.isInteger(sess.qcount) && sess.qcount !== sessDefs.length) {
       return fail('تم تحديث هذا الامتحان أثناء الجلسة — أعد فتح الامتحان ثم سلّم إجاباتك.', 409);
+    }
+    if (!Array.isArray(answers) || answers.length !== sessDefs.length) {
+      return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
     }
     const unanswered = [];
     answers.forEach((a, i) => { if (!Number.isInteger(a) || a < 0 || a > 3) unanswered.push(i + 1); });
@@ -1119,6 +1149,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     const fails = loginFails.get(ip) || { n: 0, until: 0 };
     if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة. حاول بعد قليل.', 429);
 
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
     const body = await readJson(request);
     // Existence check FIRST: the admin SPA boot probes login with empty credentials to
     // detect first run — a fresh deployment must receive the 404 "not created yet"
@@ -1150,6 +1181,11 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- initial setup (only when no admin exists) ---------- */
   if (pathname === '/api/admin/setup' && method === 'POST') {
+    // الإعداد الأولي يُنشئ مالك المنصة — يجب ألا يكون قابلًا للاستدعاء من صفحة
+    // أخرى (CSRF)، لذا يُشترط نفس ترويسة الطلب المخصّصة (المتصفح لا يستطيع
+    // إضافتها عبر المصادر دون preflight فاشل).
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
     const existing = await getAdminRecord(env);
     if (existing) return fail('حساب المسؤول موجود بالفعل.', 409);
     const body = await readJson(request);
@@ -1181,9 +1217,10 @@ async function handleAdmin(request, env, ctx, pathname) {
     return new Response(res.body, { status: res.status, headers });
   }
   if (!authed) return fail('غير مصرح.', 401);
-  // CSRF defense for state-changing endpoints: SameSite=Strict cookie + custom header
-  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') {
-    return fail('طلب غير مصرح.', 403);
+  // CSRF defense for state-changing endpoints: SameSite=Strict cookie + custom header + Origin/Host check
+  if (method !== 'GET') {
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
   }
 
   /* ---------- platform settings (admin) ---------- */
@@ -1752,7 +1789,13 @@ async function handleAdmin(request, env, ctx, pathname) {
   }
   if (pathname === '/api/admin/results.csv' && method === 'GET') {
     const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
-    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    /* حقن الصيغ (CSV injection): أي قيمة تبدأ بـ = + - @ أو تبويب تُعتبر صيغة عند
+     * فتح الملف في Excel/Sheets — تُسبَق بفاصلة عليا لتُقرأ كنص. */
+    const esc = (v) => {
+      let x = String(v == null ? '' : v).replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, ' ');
+      if (/^[=+\-@\t\r]/.test(x)) x = "'" + x;
+      return '"' + x.replace(/"/g, '""') + '"';
+    };
     const rows = [['التاريخ', 'اسم الطالب', 'رقم الهاتف', 'الامتحان', 'المادة', 'الدرجة', 'النسبة %', 'المعلم'].map(esc).join(',')];
     recent.forEach(r => rows.push([
       new Date(r.date).toLocaleString('ar-EG'), r.name, r.phone, r.examLabel, r.subject,
@@ -1767,7 +1810,9 @@ async function handleAdmin(request, env, ctx, pathname) {
 }
 
 async function sanitizeTeacher(body, existing, env) {
-  const name = String(body.name || '').trim();
+  // اسم/نبذة/تخصص المعلم تظهر في صفحته العامة — تُهرَّب عند العرض، وتُنظَّف هنا
+  // من محارف التحكم حتى لا تُستخدم لتسميم CSV أو السجلات.
+  const name = stripControl(body.name, 80);
   if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
@@ -1831,8 +1876,8 @@ async function sanitizeTeacher(body, existing, env) {
 
   return {
     slug, name, phone, email, username, passHash, passSalt, passIterations,
-    specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
-    bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
+    specialty: stripControl(body.specialty ?? existing?.specialty ?? '', 120),
+    bio: stripControl(body.bio ?? existing?.bio ?? '', 500),
     photo,
     // عرض الصورة: contain (افتراضي للشفاف) أو cover (قص متناسق) — فارغ = تلقائي حسب نوع الملف
     photoFit: body.photoFit === 'cover' || body.photoFit === 'contain' ? body.photoFit
@@ -1876,6 +1921,10 @@ async function handleTeacherLogin(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
   const fails = teacherLoginFails.get(ip) || { n: 0, until: 0 };
   if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة.', 429);
+  // نفس قواعد الحماية من CSRF: لا تسجيل دخول مُجبر من موقع آخر (login CSRF)،
+  // ولا مصدر خارجي (ترويسة مخصّصة + تطابق Origin/Host).
+  if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+  if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
   const body = await readJson(request);
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
@@ -1917,7 +1966,10 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
   const method = request.method;
   const teacher = await requireTeacher(request, env);
   if (!teacher) return fail('غير مصرح.', 401);
-  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+  if (method !== 'GET') {
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
+  }
   if (pathname === '/api/t/password' && method === 'POST') {
     const body = await readJson(request);
     const current = String(body.current || ''); const next = String(body.next || '');
@@ -1958,7 +2010,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     const existing = teachers[idx]; const updated = { ...existing };
-    updated.name = String(body.name || '').trim() || existing.name;
+    updated.name = stripControl(body.name, 80) || existing.name;
     if (updated.name.length > 80) throw bad('اسم المعلم طويل.');
     updated.phone = String(body.phone ?? existing.phone ?? '').trim();
     if (updated.phone) { const np = normalizePhone(updated.phone); updated.phone = isValidEgMobile(np) ? np : updated.phone.replace(/[\s\-.()]/g, ''); }
@@ -1972,7 +2024,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
       }
     }
     updated.socialLinks = social;
-    updated.bio = String(body.bio ?? existing.bio ?? '').trim().slice(0, 500);
+    updated.bio = stripControl(body.bio ?? existing.bio ?? '', 500);
     if (body.photo !== undefined) {
       let photo = String(body.photo || '');
       if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
