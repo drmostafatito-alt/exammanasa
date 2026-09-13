@@ -903,6 +903,39 @@ try {
     await jfetch('/api/admin/teachers/' + mk19.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 19ب. سلامة الرابط (slug): لا تغيير بعد وجود بيانات ============ */
+  console.log('\n[19ب] الرابط (slug) ثابت — لا يُفقد بيانات ولا يُصفّر الحدود');
+  {
+    // انحدار: تغيير slug معلم لديه نتائج كان (١) يُخفي نتائجه للأبد (فهرس
+    // results:teacher:<slug>) و(٢) يُصفّر سجل الطلاب وعدادات المحاولات فيسمح
+    // بتجاوز حد الطلاب بمجرد إعادة التسمية.
+    const mk = await post('/api/admin/teachers', { name: 'معلم رابط', slug: 'slugx', email: 'slugx@test.com', password: 'password123', requirePhone: true }, { Cookie: cookie });
+    const id = mk.data.teacher.id;
+    // معلم بلا بيانات: يُسمح بتصحيح الرابط
+    const ren0 = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم رابط', slug: 'slugy' })
+    });
+    ok('تغيير الرابط مسموح قبل وجود أي بيانات', ren0.status === 200 && ren0.data.teacher.slug === 'slugy', 'got ' + ren0.status);
+    // أنتج نتيجة + سجّل طالبًا تحت الرابط الجديد
+    const ss = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب الرابط', phone: '01090000021', slug: 'slugy' });
+    ok('بدء تحت الرابط الجديد يعمل', ss.status === 200);
+    await post('/api/exam/submit', { token: ss.data.token, answers: correctPositions('U1-T1', decodeToken(ss.data.token).seed) });
+    await new Promise(r => setTimeout(r, 900));
+    const ren1 = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم رابط', slug: 'slugz' })
+    });
+    ok('تغيير الرابط مرفوض (409) بعد وجود نتائج/طلاب — لا ضياع بيانات', ren1.status === 409, 'got ' + ren1.status + ' ' + ren1.text.slice(0, 120));
+    const st = await jfetch('/api/admin/teachers/' + id + '/stats', { headers: { Cookie: cookie } });
+    ok('نتائج المعلم وطلابه ما زالوا مرتبطين به بعد الرفض',
+      st.status === 200 && st.data.totals.results >= 1 && st.data.studentLimit.current >= 1, JSON.stringify(st.data && st.data.totals));
+    // كود المعلم فريد فعلًا (كان يُكرَّر بعد الحذف)
+    const codes = (await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } })).data.teachers.map(t => t.teacherCode);
+    ok('أكواد المعلمين فريدة (لا تكرار بعد أرشفة)', new Set(codes).size === codes.length, codes.join(','));
+    await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {

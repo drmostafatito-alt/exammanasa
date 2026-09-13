@@ -1289,7 +1289,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     const archivedNow = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
     if (archivedNow.some(x => x.slug === t.slug)) return fail('هذا الرابط يخص معلمًا مؤرشفًا — استعده من الأرشيف أو اختر رابطًا مختلفًا.', 409);
     t.id = 't_' + randomHex(6);
-    t.teacherCode = 'TCH-' + String(teachers.length + 1).padStart(4, '0');
+    t.teacherCode = nextTeacherCode(teachers);
     t.createdAt = new Date().toISOString();
     t.updatedAt = t.createdAt;
     teachers.push(t);
@@ -1331,10 +1331,23 @@ async function handleAdmin(request, env, ctx, pathname) {
       const body = await readJson(request, 3 * 1024 * 1024);
       const t = await sanitizeTeacher(body, teachers[idx], env);
       if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+      /* تغيير الرابط (slug) ممنوع بعد وجود بيانات مرتبطة به — لأن فهرس النتائج
+       * (results:teacher:<slug>) وسجل الطلاب (students:<slug>) وعدادات المحاولات
+       * كلها مفتاحها هو الرابط. تغييره كان: (١) يُخفي نتائج المعلم عنه وعن
+       * الإدارة نهائيًا، و(٢) يُصفّر عدد الطلاب المسجلين وعدد المحاولات فيسمح
+       * بتجاوز حد الطلاب/حد المحاولات بمجرد إعادة التسمية. مسموح فقط قبل أي بيانات. */
+      if (t.slug !== teachers[idx].slug) {
+        const prev = teachers[idx];
+        const prevResults = await kvGetJson(env, 'results:teacher:' + prev.slug).catch(() => null);
+        const prevStudents = await studentCount(env, prev);
+        if ((Array.isArray(prevResults) && prevResults.length > 0) || prevStudents > 0) {
+          return fail('لا يمكن تغيير رابط معلم لديه نتائج أو طلاب مسجلون — الرابط هو مفتاح بياناته على الخادم. أرشف الحساب وأنشئ معلمًا جديدًا برابط جديد إن لزم.', 409);
+        }
+      }
       // setting/clearing the password through the edit form is a credential change → revoke sessions
       if ((teachers[idx].passHash || '') !== (t.passHash || '')) await clearV(env, 'sessv:t:' + teachers[idx].id);
       t.id = teachers[idx].id;
-      t.teacherCode = teachers[idx].teacherCode || ('TCH-' + String(idx + 1).padStart(4, '0'));
+      t.teacherCode = teachers[idx].teacherCode || nextTeacherCode(teachers);
       t.createdAt = teachers[idx].createdAt;
       t.updatedAt = new Date().toISOString();
       if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
@@ -1346,7 +1359,8 @@ async function handleAdmin(request, env, ctx, pathname) {
     }
     if (method === 'DELETE') {
       // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
-      // and the student registry are never deleted. The slug is released for reuse.
+      // and the student registry are never deleted. The slug STAYS reserved: creating a new
+      // teacher on an archived slug is rejected (409) so nobody inherits that history.
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
       await clearV(env, 'sessv:t:' + teachers[idx].id); // archive = sign out everywhere
       const [removed] = teachers.splice(idx, 1);
@@ -2010,6 +2024,16 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     return json({ total, page, perPage, results: slice.map(r => ({ id: r.id, date: r.date, name: r.name, phone: r.phone, examId: r.examId, examLabel: r.examLabel, subject: r.subject, score: r.score, total: r.total, percentage: r.percentage })) });
   }
   return fail('المسار غير موجود.', 404);
+}
+
+/* كود معلم فريد فعلًا: 'TCH-' + (count+1) كان يُكرَّر بعد أي حذف/أرشفة. */
+function nextTeacherCode(teachers) {
+  const used = new Set((teachers || []).map(x => x.teacherCode).filter(Boolean));
+  for (let n = (teachers || []).length + 1; n < 10000; n++) {
+    const code = 'TCH-' + String(n).padStart(4, '0');
+    if (!used.has(code)) return code;
+  }
+  return 'TCH-' + randomHex(3).toUpperCase();
 }
 
 function teacherAdminPayload(t) {
