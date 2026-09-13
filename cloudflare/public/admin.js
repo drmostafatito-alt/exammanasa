@@ -1481,7 +1481,10 @@
   function boot() {
     return api('/api/admin/status').then(function (d) {
       if (d && d.setup === true) return renderLogin({ setup: true });
-      return api('/api/admin/session').then(enter).catch(function () { renderLogin(); });
+      /* /api/admin/status يخبرنا مباشرة إن كانت الجلسة سارية (والبريد معها) —
+       * فلا حاجة لطلب /api/admin/session إضافي عند كل تحميل للوحة. */
+      if (d && d.authed === true) { A.session = d.email || ''; renderShell(); renderTab(); return undefined; }
+      return renderLogin();
     }).catch(function () {
       // احتياط للتوافق مع نشر قديم لا يعرف /api/admin/status
       api('/api/admin/login', { method: 'POST', body: JSON.stringify({ email: '', password: '' }) })

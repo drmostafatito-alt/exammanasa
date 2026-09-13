@@ -1192,8 +1192,18 @@ async function handleAdmin(request, env, ctx, pathname) {
    * وبما أن هذا المسار خاضع لحد المحاولات، كان استنفاد المحاولات من نفس IP يخفي
    * شاشة الإعداد الأولي عن المالك على نشر جديد. نقطة حالة مخصّصة تحل المشكلة. */
   if (pathname === '/api/admin/status' && method === 'GET') {
+    /* نقطة حالة واحدة لبدء التشغيل: هل يحتاج المالك إعدادًا أوليًا؟ وهل لديه جلسة
+     * سارية؟ — دمجتهما في طلب واحد حتى لا يبدأ التطبيق بطلب /status ثم /session.
+     * البريد يُرسَل فقط مع جلسة سارية (لا كشف لحساب بلا مصادقة). */
     const admin = await getAdminRecord(env).catch(() => null);
-    return json({ setup: !admin, envBootstrap: !!(env.ADMIN_INITIAL_EMAIL && env.ADMIN_INITIAL_PASSWORD) }, 200, { 'Cache-Control': 'no-store' });
+    const session = await adminCookiePayload(request, env).catch(() => null);
+    const authed = !!(admin && session && session.t === 'admin' && await hasV(env, 'sessv:admin', session.v));
+    return json({
+      setup: !admin,
+      authed,
+      email: authed ? session.email : undefined,
+      envBootstrap: !!(env.ADMIN_INITIAL_EMAIL && env.ADMIN_INITIAL_PASSWORD)
+    }, 200, { 'Cache-Control': 'no-store' });
   }
 
   /* ---------- login ---------- */

@@ -369,6 +369,7 @@ try {
   {
     const st0 = await jfetch('/api/admin/status');
     ok('GET /api/admin/status قبل الإعداد → setup:true', st0.status === 200 && st0.data.setup === true, JSON.stringify(st0.data));
+    ok('GET /api/admin/status بلا كوكي → authed:false ولا يكشف البريد', st0.data.authed === false && !('email' in st0.data), JSON.stringify(st0.data));
     const noAdmin = await post('/api/admin/login', { email: 'x@y.z', password: 'whatever1' });
     ok('لا دخول قبل إنشاء الحساب (رسالة إعداد)', noAdmin.status === 404);
     const weak = await post('/api/admin/setup', { email: 'bad', password: 'short' });
@@ -388,6 +389,8 @@ try {
     cookie = sc.split(';')[0];
     const sessionOk = await jfetch('/api/admin/session', { headers: { Cookie: cookie } });
     ok('الجلسة تعمل', sessionOk.status === 200 && sessionOk.data.email === 'admin@test.local');
+    const stAuth = await jfetch('/api/admin/status', { headers: { Cookie: cookie } });
+    ok('GET /api/admin/status مع جلسة سارية → authed:true + البريد (طلب واحد يكفي لبدء اللوحة)', stAuth.data.authed === true && stAuth.data.email === 'admin@test.local', JSON.stringify(stAuth.data));
     const unauth = await jfetch('/api/admin/overview');
     ok('رفض الوصول بدون جلسة', unauth.status === 401);
     const noCsrf = await fetch(BASE + '/api/admin/teachers', {
