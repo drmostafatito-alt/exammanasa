@@ -71,8 +71,13 @@ console.log('\n[V1] Desktop 1280\u00d7900 \u2014 hierarchy & premium visuals');
 
   const foot = await facts(p, '#siteFooter', []);
   ok('التذييل معروض', !!foot);
+  /* لا تُقارَن باسم المنصة الافتراضي المكتوب في الكود: الإعدادات قابلة للتعديل من
+   * لوحة التحكم، و browser-e2e.mjs يغيّرها فعليًا أثناء تشغيله — فكان هذا الفحص
+   * يعتمد على ترتيب التشغيل (ينجح على KV نظيفة ويفشل بعد browser-e2e). المصدر
+   * الصحيح هو الخادم نفسه: التذييل يجب أن يعرض الاسم الذي يخدمه /api/settings. */
   const footBrand = await p.locator('#footBrand').textContent();
-  ok('التذييل يحمل اسم المنصة', footBrand.includes('منصة الامتحانات'));
+  const srvName = await p.evaluate(() => fetch('/api/settings').then(r => r.json()).then(d => (d.identity && d.identity.platformName) || '').catch(() => ''));
+  ok('التذييل يحمل اسم المنصة (المخدوم من /api/settings)', !!srvName && footBrand.includes(srvName), 'footer=' + JSON.stringify(footBrand) + ' server=' + JSON.stringify(srvName));
 
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok('لا overflow أفقي على 1280', overflow <= 0, 'delta=' + overflow);
