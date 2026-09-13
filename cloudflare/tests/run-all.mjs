@@ -1061,6 +1061,43 @@ try {
     await jfetch('/api/admin/exams/' + cm.data.examId, { method: 'DELETE', headers: AH });
   }
 
+  /* ============ 19و. فهرس النتائج: تسليمات متزامنة لا تُفقد ============ */
+  console.log('\n[19و] فهرس النتائج ذريًا (تسليمات متزامنة)');
+  {
+    const AH = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie };
+    const mkT = await post('/api/admin/teachers', { name: 'معلم التزامن', slug: 'conc1', email: 'conc1@test.com', username: 'conc1', password: 'securePass123' }, AH);
+    const slug = mkT.data.teacher.slug;
+    // 6 طلاب يبدؤون معًا ثم يسلّمون معًا (Promise.all = نفس اللحظة على الخادم)
+    const N = 6;
+    const starts = await Promise.all(Array.from({ length: N }, (_, i) =>
+      post('/api/exam/start', { examId: 'U1-T1', name: 'متزامن ' + i, phone: '0107770000' + i, slug })));
+    ok('بدء ' + N + ' جلسات متزامنة', starts.every(s => s.status === 200), starts.map(s => s.status).join(','));
+    const subs = await Promise.all(starts.map(s => {
+      const seed = decodeToken(s.data.token).seed;
+      return post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', seed) });
+    }));
+    ok('كل التسليمات المتزامنة نجحت', subs.every(s => s.status === 200 && s.data.score === BANKS.examDefs['U1-T1'].length), subs.map(s => s.status + '/' + (s.data && s.data.score)).join(' '));
+    const ids = subs.map(s => s.data.id);
+    ok('معرّفات نتائج متمايزة (لا تصادم)', new Set(ids).size === N, ids.join(','));
+    const adminRes = await jfetch('/api/admin/results', { headers: AH });
+    const seen = (adminRes.data.results || []).map(r => r.id);
+    const missing = ids.filter(id => !seen.includes(id));
+    ok('فهرس الإدارة يحوي كل النتائج المتزامنة (لا lost update)', missing.length === 0, 'مفقود: ' + missing.join(','));
+    ok('لا تكرار في الفهرس بعد الدمج', new Set(seen).size === seen.length);
+    // نفس الشيء من جانب المعلم
+    const lg = await post('/api/t/login', { email: 'conc1@test.com', password: 'securePass123' });
+    const tc = 'teacher_session=' + lg.headers.get('set-cookie').match(/teacher_session=([^;]+)/)[1];
+    const tres = await jfetch('/api/t/results', { headers: { Cookie: tc } });
+    const tseen = tres.data.results.map(r => r.id);
+    ok('فهرس المعلم يحوي كل نتائج طلابه المتزامنة', ids.every(id => tseen.includes(id)), 'مفقود: ' + ids.filter(id => !tseen.includes(id)).join(','));
+    const dash = await jfetch('/api/t/dashboard', { headers: { Cookie: tc } });
+    ok('لوحة المعلم تحسب ' + N + ' طلاب متمايزين', dash.data.totals.students === N && dash.data.totals.results === N, JSON.stringify(dash.data.totals));
+    // العزل: نتائج معلم آخر لا تظهر هنا
+    const other = await jfetch('/api/admin/results', { headers: AH });
+    ok('نتائج هذا المعلم موسومة به ولا تُنسب لغيره', (other.data.results || []).filter(r => r.teacherSlug === slug).length === N);
+    await jfetch('/api/admin/teachers/' + mkT.data.teacher.id, { method: 'DELETE', headers: AH });
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {

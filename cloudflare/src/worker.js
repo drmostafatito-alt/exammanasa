@@ -1089,21 +1089,20 @@ async function handleApi(request, env, ctx, pathname) {
         if (env.PLATFORM_KV) {
           await env.PLATFORM_KV.put('dedupe:' + tokenHash, responseJson, { expirationTtl: 7 * 24 * 3600 }).catch(() => {});
           await env.PLATFORM_KV.put('result:' + result.id, JSON.stringify(result)).catch(() => {});
-          const recent = await env.PLATFORM_KV.get('results:recent').catch(() => null);
-          let list = [];
-          try { list = recent ? JSON.parse(recent) : []; } catch {}
-          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
-          if (list.length > 100) list = list.slice(0, 100);
-          await env.PLATFORM_KV.put('results:recent', JSON.stringify(list)).catch(() => {});
-          // per-teacher index (powers the teacher dashboard; bank/exams stay shared)
           const tslug = result.teacherSlug || '';
-          if (tslug) {
-            const tprev = await env.PLATFORM_KV.get('results:teacher:' + tslug).catch(() => null);
-            let tlist = [];
-            try { tlist = tprev ? JSON.parse(tprev) : []; } catch {}
-            tlist.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage });
-            if (tlist.length > 200) tlist = tlist.slice(0, 200);
-            await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(tlist)).catch(() => {});
+          const entry = { id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: tslug };
+          /* The indices are a single KV key each, so a plain read-modify-write loses
+           * an entry whenever two submissions interleave. The limiter DO appends
+           * inside a storage transaction (serialised), so ordering is atomic; KV is
+           * then overwritten with the DO's authoritative list (no read-modify-write). */
+          const idx = await resultIndexAppend(env, entry, tslug).catch(() => null);
+          if (idx) {
+            await env.PLATFORM_KV.put('results:recent', JSON.stringify(idx.recent)).catch(() => {});
+            if (tslug && idx.mine) await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(idx.mine)).catch(() => {});
+          } else {
+            // DO unavailable → degrade to the previous best-effort append
+            await kvAppendResult(env, 'results:recent', entry, 100, true).catch(() => {});
+            if (tslug) await kvAppendResult(env, 'results:teacher:' + tslug, entry, 200, false).catch(() => {});
           }
         }
       } catch { /* storage failure must not lose the student's result response */ }
@@ -1844,11 +1843,11 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- results ---------- */
   if (pathname === '/api/admin/results' && method === 'GET') {
-    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    const recent = await resultsRecent(env, 100);
     return json({ results: recent });
   }
   if (pathname === '/api/admin/results.csv' && method === 'GET') {
-    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    const recent = await resultsRecent(env, 200);
     /* حقن الصيغ (CSV injection): أي قيمة تبدأ بـ = + - @ أو تبويب تُعتبر صيغة عند
      * فتح الملف في Excel/Sheets — تُسبَق بفاصلة عليا لتُقرأ كنص. */
     const esc = (v) => {
@@ -2103,7 +2102,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     return json({ ok: true, teacher: teacherPublic(updated) });
   }
   if (pathname === '/api/t/dashboard' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const slStatus = await studentLimitStatus(env, teacher);
     const students = Math.max(slStatus.current, new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size);
     const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
@@ -2118,7 +2117,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
       recent: tlist.slice(0, 10) });
   }
   if (pathname === '/api/t/students' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const slStatus = await studentLimitStatus(env, teacher);
     const studentMap = new Map();
     tlist.forEach(r => { const key = (r.phone || '') + '|' + normalizeName(r.name); if (!studentMap.has(key)) studentMap.set(key, { name: r.name, phone: r.phone || '', examCount: 0, totalScore: 0, totalPossible: 0, lastActivity: r.date, firstSeen: r.date }); const s = studentMap.get(key); s.examCount++; s.totalScore += r.score; s.totalPossible += r.total; if (new Date(r.date) > new Date(s.lastActivity)) s.lastActivity = r.date; if (new Date(r.date) < new Date(s.firstSeen)) s.firstSeen = r.date; });
@@ -2129,7 +2128,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     return json({ total: students.length, registered: slStatus.current, students: students.map(s => ({ name: s.name, phone: s.phone, examCount: s.examCount, avgPercentage: s.totalPossible > 0 ? Math.round(s.totalScore / s.totalPossible * 10000) / 100 : 0, lastActivity: s.lastActivity, firstSeen: s.firstSeen })) });
   }
   if (pathname === '/api/t/results' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const url = new URL(request.url); const search = (url.searchParams.get('q') || '').trim().toLowerCase(); const subject = (url.searchParams.get('subject') || '').trim(); const examId = (url.searchParams.get('examId') || '').trim();
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1); const perPage = 50;
     let results = tlist;
@@ -2239,6 +2238,39 @@ export class AttemptLimiter {
       });
       return Response.json(result);
     }
+    /* ---- results index: serialised, transactional append ---- */
+    if (url.pathname === '/results/append' && request.method === 'POST') {
+      let b = null;
+      try { b = await request.json(); } catch {}
+      const e = b && b.entry;
+      if (!e || !e.id) return Response.json({ error: 'entry required' }, 400);
+      const scope = String(b.scope || '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 90);
+      const lean = { id: String(e.id).slice(0, 64), date: String(e.date || '').slice(0, 40), name: String(e.name || '').slice(0, 120), phone: String(e.phone || '').slice(0, 40), examId: String(e.examId || '').slice(0, 60), examLabel: String(e.examLabel || '').slice(0, 200), subject: String(e.subject || '').slice(0, 60), total: Number(e.total) || 0, score: Number(e.score) || 0, percentage: Number(e.percentage) || 0, teacherSlug: String(e.teacherSlug || '').slice(0, 80) };
+      const out = await this.state.storage.transaction(async (txn) => {
+        const all = (await txn.get('recent')) || [];
+        if (all.some((r) => r.id === lean.id)) {
+          return { recent: all.slice(0, 200), mine: scope ? ((await txn.get(scope)) || []).slice(0, 200) : null, duplicate: true };
+        }
+        const next = [lean, ...all].slice(0, RESULT_INDEX_CAP);
+        await txn.put('recent', next);
+        let mine = null;
+        if (scope) {
+          const prev = (await txn.get(scope)) || [];
+          if (!prev.some((r) => r.id === lean.id)) {
+            mine = [lean, ...prev].slice(0, RESULT_INDEX_CAP);
+            await txn.put(scope, mine);
+          } else mine = prev;
+        }
+        return { recent: next.slice(0, 200), mine: mine ? mine.slice(0, 200) : null, duplicate: false };
+      });
+      return Response.json(out);
+    }
+    if (url.pathname === '/results/list' && request.method === 'GET') {
+      const scope = String(url.searchParams.get('scope') || '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 90);
+      const limit = Math.max(1, Math.min(200, parseInt(url.searchParams.get('limit') || '200', 10) || 200));
+      const list = scope ? ((await this.state.storage.get(scope)) || []) : ((await this.state.storage.get('recent')) || []);
+      return Response.json({ items: Array.isArray(list) ? list.slice(0, limit) : [] });
+    }
     if (url.pathname === '/consume' && request.method === 'POST') {
       let limit = 0;
       try { limit = Math.max(1, Math.min(50, parseInt((await request.json()).limit, 10) || 0)); } catch {}
@@ -2261,6 +2293,68 @@ export class AttemptLimiter {
 async function limiterStub(env, key) {
   if (!env.ATTEMPT_LIMITER) return null;
   return env.ATTEMPT_LIMITER.get(env.ATTEMPT_LIMITER.idFromName('v1:' + key));
+}
+
+/* ---------- results index: KV cannot do read-modify-write atomically ----------
+ * Two submissions finishing together both read `results:recent`, both prepend and
+ * both write back — the slower write drops the other result from the index (the
+ * result body at `result:<id>` survives, but it vanishes from every dashboard).
+ * The Durable Object serialises the append in a storage transaction, so the list
+ * is never lost; KV is kept as a write-through mirror (and as history for results
+ * recorded before this existed), and readers merge the two and de-duplicate by id.
+ */
+const RESULT_INDEX_CAP = 400;
+async function resultIndexAppend(env, entry, teacherSlug) {
+  const stub = await limiterStub(env, '__results__');
+  if (!stub) return null;
+  const r = await stub.fetch('https://limiter/results/append', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entry, scope: 't:' + String(teacherSlug || 'unknown').replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80) })
+  }).catch(() => null);
+  if (!r || !r.ok) return null;
+  return await r.json().catch(() => null);
+}
+async function resultIndexList(env, scope, limit) {
+  const stub = await limiterStub(env, '__results__');
+  if (!stub) return null;
+  const r = await stub.fetch('https://limiter/results/list?scope=' + encodeURIComponent(scope || '') + '&limit=' + limit, { method: 'GET' }).catch(() => null);
+  if (!r || !r.ok) return null;
+  const d = await r.json().catch(() => null);
+  return Array.isArray(d && d.items) ? d.items : null;
+}
+function mergeResultLists(a, b, limit) {
+  const seen = new Set(); const out = [];
+  for (const r of (a || []).concat(b || [])) {
+    if (!r || !r.id || seen.has(r.id)) continue;   // de-dup: KV mirror + DO overlap
+    seen.add(r.id); out.push(r);
+  }
+  out.sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')));
+  return out.slice(0, limit);
+}
+async function resultsRecent(env, limit) {
+  const [fromDo, fromKv] = await Promise.all([
+    resultIndexList(env, '', 200),
+    kvGetJson(env, 'results:recent').catch(() => null)
+  ]);
+  return mergeResultLists(fromDo, fromKv, limit);
+}
+async function resultsForTeacher(env, slug, limit) {
+  const [fromDo, fromKv] = await Promise.all([
+    slug ? resultIndexList(env, 't:' + slug, 200) : null,
+    kvGetJson(env, 'results:teacher:' + slug).catch(() => null)
+  ]);
+  return mergeResultLists(fromDo, fromKv, limit);
+}
+async function kvAppendResult(env, key, entry, cap, withSlug) {
+  const raw = await env.PLATFORM_KV.get(key).catch(() => null);
+  let list = [];
+  try { list = raw ? JSON.parse(raw) : []; } catch {}
+  if (!Array.isArray(list)) list = [];
+  list.unshift(withSlug ? entry : { id: entry.id, date: entry.date, name: entry.name, phone: entry.phone, examId: entry.examId, examLabel: entry.examLabel, subject: entry.subject, total: entry.total, score: entry.score, percentage: entry.percentage });
+  if (list.length > cap) list = list.slice(0, cap);
+  await env.PLATFORM_KV.put(key, JSON.stringify(list)).catch(() => {});
+  return list;
 }
 async function limitKey(slug, examId, identity) {
   const digest = await crypto.subtle.digest('SHA-256', enc.encode(slug + '|' + examId + '|' + identity));
