@@ -16,8 +16,8 @@
  * (هذا الملف وثيقة QA — لا يدخل npm test الذي يعمل بلا متصفح.)
  */
 import fs from 'node:fs';
-import chromiumMin from '@sparticuz/chromium-min';
 import { chromium as pw } from 'playwright-core';
+import { launchQaBrowser } from './qa-browser.mjs';
 
 const BASE = process.env.QABASE || 'http://127.0.0.1:8787';
 const SHOTS = process.env.QASHOTS || (import.meta.dirname + '/shots');
@@ -40,9 +40,7 @@ const T_A = {
 const T_B = { name: 'BakerQA', email: 'baker@qa.test', pass: 'Baker#Pass22' };
 const STUDENT = { name: 'طالب تجريبي واحد', phone: '01144445551' };
 
-const exe = await chromiumMin.executablePath('/tmp/chrm');
-process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/crlibs/lib';
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--lang=ar'], headless: true });
+const browser = await launchQaBrowser(pw);
 
 /* مراقب أخطاء الكونسول: المسموح فقط ما سببه بيئة الاختبار (خطوط Google محجوبة offline،
  * ومسبارات الجلسة/الدخول الفارغ 401/400 المتوقعة في تدفق الاختبار نفسه). */

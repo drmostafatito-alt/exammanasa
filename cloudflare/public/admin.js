@@ -104,12 +104,16 @@
     var err = $('loginErr');
     err.textContent = '';
     if (isSetup && pass !== $('admPass2').value) { err.textContent = 'كلمتا المرور غير متطابقتين.'; return; }
+    /* feedback فوري أثناء الطلب (كزر دخول المعلم) + منع النقر المزدوج */
+    var btn = document.querySelector('.tlogin-card form button[type="submit"]');
+    var btnLabel = btn ? btn.textContent : '';
+    if (btn) { btn.disabled = true; btn.textContent = isSetup ? 'جارٍ إنشاء الحساب…' : 'جارٍ الدخول…'; }
     api(isSetup ? '/api/admin/setup' : '/api/admin/login', { method: 'POST', body: JSON.stringify({ email: email, password: pass }) })
       .then(function () {
         if (isSetup) { toast('تم إنشاء الحساب — سجّل الدخول الآن.'); renderLogin(); }
         else enter();
       })
-      .catch(function (e) { err.textContent = e.message; });
+      .catch(function (e) { err.textContent = e.message; if (btn) { btn.disabled = false; btn.textContent = btnLabel; } });
   }
   function enter() {
     return api('/api/admin/session').then(function (d) {
@@ -191,7 +195,7 @@
         '</div>' +
         '<div class="stat-grid">' +
         stat(d.exams, 'امتحانًا') + stat(d.questions, 'سؤالًا فريدًا') +
-        stat(d.teachersCount, 'معلمًا') + stat(d.recentResultsCount, 'نتيجة أخيرة') +
+        stat(d.teachersCount, d.teachersCount === 1 ? 'معلم' : (d.teachersCount === 2 ? 'معلمان' : (d.teachersCount <= 10 ? 'معلمين' : 'معلمًا'))) + stat(d.recentResultsCount, 'من النتائج الأخيرة') +
         '</div>' +
         ((d.customExams || d.customQuestions || d.editedQuestions || d.editedExams || d.disabledExams || d.deletedQuestions || d.deletedExams)
           ? '<div class="section-title"><h3>طبقة التعديلات (فوق البنك الأصلي)</h3></div>' +
@@ -260,7 +264,7 @@
         (t.enabled ? '<span class="badge green">مفعّل</span>' : '<span class="badge">معطّل</span>') +
         (t.hasPassword ? '<span class="badge blue">دخول مضبوط</span>' : '<span class="badge">بدون دخول</span>') + '</div>' +
         (t.specialty ? '<div class="desc" style="font-size:.76rem;margin-top:3px;color:var(--gold-deep);font-weight:700">' + esc(t.specialty) + '</div>' : '') +
-        '<div class="tmeta-row"><span class="tmeta-k">الرابط:</span><a dir="ltr" href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a>' +
+        '<div class="tmeta-row link"><span class="tmeta-k">الرابط:</span><a dir="ltr" href="/' + esc(t.slug) + '" target="_blank">' + esc(location.host + '/' + t.slug) + '</a>' +
         '<button class="btn small ghost" style="padding:3px 10px;min-height:0" onclick="copyLink(\'' + esc(t.slug) + '\')">نسخ</button></div>' +
         (t.email ? '<div class="tmeta-row"><span class="tmeta-k">البريد:</span><span dir="ltr">' + esc(t.email) + '</span></div>' : '') +
         studentLimitLine(sl) +
@@ -373,7 +377,7 @@
         '<div class="field"><label>نبذة المدرس (تظهر في صفحتك العامة)</label><textarea id="tBio" rows="3" maxlength="500" placeholder="اكتب نبذة حقيقية عنك وعن خبرتك…">' + esc(t.bio || '') + '</textarea></div>' +
         '<div class="field"><label>صورة المدرس</label>' +
         '<div class="photo-upload"><div class="prev" id="tPhotoPrev" data-fit="' + esc(t.photoFit || '') + '">' + (t.photo ? '<img src="' + esc(t.photo) + '" alt="">' : '<span class="mono">' + esc((t.name || 'م ت').slice(0, 2)) + '</span>') + '</div>' +
-        '<div class="actions"><input type="file" id="tPhoto" accept="image/png,image/jpeg,image/webp" style="font-size:.78rem">' +
+        '<div class="actions"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label class="btn small ghost" for="tPhoto" style="cursor:pointer">اختيار صورة…</label><input type="file" id="tPhoto" class="file-hidden" tabindex="-1" accept="image/png,image/jpeg,image/webp"><span class="file-name" id="tPhotoName">لم تُختر صورة جديدة</span></div>' +
         '<button class="btn small ghost" id="tPhotoClear" type="button">إزالة الصورة</button>' +
         '<select id="tPhotoFit" style="font-size:.78rem"><option value=""' + (!t.photoFit ? ' selected' : '') + '>تلقائي (شفاف ⇒ احتواء كامل)</option><option value="contain"' + (t.photoFit === 'contain' ? ' selected' : '') + '>احتواء كامل بلا قص</option><option value="cover"' + (t.photoFit === 'cover' ? ' selected' : '') + '>قص متناسق (صور فوتوغرافية)</option></select>' +
         '</div></div>' +
@@ -522,7 +526,7 @@
     document.body.appendChild(overlay);
     api('/api/admin/teachers/' + id + '/stats').then(function (d) {
       var sl = d.studentLimit || { unlimited: true, current: d.totals.students };
-      var h = '<div class="stat-grid" style="margin-top:12px">' +
+      var h = '<div class="stat-grid cols-4" style="margin-top:12px">' +
         stat(d.totals.results, 'نتيجة') + stat(d.totals.students, 'طالبًا') +
         stat(d.totals.avgPercentage + '%', 'متوسط النسب') + stat(d.totals.passRate + '%', 'نسبة النجاح') + '</div>' +
         '<div class="section-title"><h3>حد الطلاب</h3></div><div class="stat-grid">' +
@@ -1172,8 +1176,8 @@
         return;
       }
       body.innerHTML =
-        '<div style="display:flex;justify-content:flex-end;margin-bottom:10px"><a class="btn small ghost" href="/api/admin/results.csv" download>تصدير CSV</a></div>' +
-        '<div class="card"><div style="overflow-x:auto"><table class="tbl">' +
+        '<div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;align-items:center"><input type="search" id="resQ" placeholder="ابحث بالاسم أو الهاتف أو الامتحان أو المعلم…" style="flex:1;min-width:200px"><a class="btn small ghost" href="/api/admin/results.csv" download>تصدير CSV</a></div>' +
+        '<div class="card"><div style="overflow-x:auto"><table class="tbl" id="resTbl">' +
         '<tr><th>التاريخ</th><th>الطالب</th><th>الهاتف</th><th>الامتحان</th><th>المادة</th><th>الدرجة</th><th>النسبة</th><th>المعلم</th></tr>' +
         d.results.map(function (r) {
           var pct = Math.round(r.percentage);
@@ -1183,7 +1187,18 @@
             '<td style="font-size:.8rem;max-width:220px">' + esc(r.examLabel) + '</td><td>' + esc(r.subject) + '</td>' +
             '<td><b>' + r.score + '/' + r.total + '</b></td><td style="color:' + color + ';font-weight:800">' + pct + '%</td>' +
             '<td><code>/' + esc(r.teacherSlug || '') + '</code></td></tr>';
-        }).join('') + '</table></div></div>';
+        }).join('') + '</table><div class="empty" id="resEmpty" style="display:none">لا نتائج مطابقة للبحث.</div></div></div>';
+      $('resQ').addEventListener('input', function () {
+        var q = this.value.trim();
+        var rows = document.querySelectorAll('#resTbl tr');
+        var shown = 0;
+        for (var i = 1; i < rows.length; i++) {
+          var hit = !q || rows[i].textContent.indexOf(q) !== -1;
+          rows[i].style.display = hit ? '' : 'none';
+          if (hit) shown++;
+        }
+        $('resEmpty').style.display = shown ? 'none' : '';
+      });
     }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
   }
 
@@ -1324,7 +1339,7 @@
       '<input type="color" value="' + esc(normalizeColor(val)) + '"></div></div>';
   }
   function stLogo(key, label, val) {
-    return '<div class="field full"><label>' + label + '</label><div class="photo-upload"><div class="prev" id="logoPrev">' + (val ? '<img src="' + esc(val) + '" alt="">' : 'شعار') + '</div><div class="actions"><input type="file" id="logoFile" accept="image/*" style="font-size:.78rem"><button class="btn small ghost" id="logoClear" type="button">إزالة الشعار</button></div></div></div>';
+    return '<div class="field full"><label>' + label + '</label><div class="photo-upload"><div class="prev" id="logoPrev">' + (val ? '<img src="' + esc(val) + '" alt="">' : 'شعار') + '</div><div class="actions"><div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap"><label class="btn small ghost" for="logoFile" style="cursor:pointer">اختيار شعار…</label><input type="file" id="logoFile" class="file-hidden" tabindex="-1" accept="image/*"><span class="file-name" id="logoFileName">لم يُختر ملف جديد</span></div><button class="btn small ghost" id="logoClear" type="button">إزالة الشعار</button></div></div></div>';
   }
   function normalizeColor(v) {
     var s = String(v || '').trim();
@@ -1427,6 +1442,31 @@
   /* ================= التصدير ================= */
   window.doLogin = doLogin;
   window.logout = logout;
+  /* إغلاق النوافذ بلوحة المفاتيح: Esc يُغلق أحدث نافذة مفتوحة عبر زرّ الإلغاء نفسه —
+   * والنقر على الخلفية المعتمة يُغلق نوافذ العرض/التأكيد فقط (لا النماذج حمايةً من فقدان البيانات). */
+  document.addEventListener('keydown', function (e) {
+    if (e.key !== 'Escape' && e.key !== 'Esc') return;
+    var bgs = document.querySelectorAll('.tform-bg, .modal-bg');
+    if (!bgs.length) return;
+    var top = bgs[bgs.length - 1];
+    var btn = top.querySelector('.close') || top.querySelector('.acts .btn.ghost') || top.querySelector('.acts .btn');
+    e.preventDefault();
+    if (btn) btn.click(); else top.remove();
+  });
+  document.addEventListener('click', function (e) {
+    var t = e.target;
+    if (!t || !t.classList || (!t.classList.contains('modal-bg') && !t.classList.contains('tform-bg'))) return;
+    var box = t.querySelector('.modal, .tform');
+    if (box && box.querySelector('input, textarea, select')) return;
+    var btn = t.querySelector('.close') || t.querySelector('.acts .btn.ghost') || t.querySelector('.acts .btn');
+    if (btn) btn.click(); else t.remove();
+  });
+  /* اسم الملف المختار بجانب زرّ الاختيار العربي (الصورة/الشعار) */
+  document.addEventListener('change', function (e) {
+    var t = e.target || {};
+    if (t.id === 'tPhoto') { var n = $('tPhotoName'); if (n) n.textContent = (t.files && t.files[0]) ? t.files[0].name : 'لم تُختر صورة جديدة'; }
+    if (t.id === 'logoFile') { var m = $('logoFileName'); if (m) m.textContent = (t.files && t.files[0]) ? t.files[0].name : 'لم يُختر ملف جديد'; }
+  });
   window.setTab = setTab;
   window.editTeacher = editTeacher;
   window.saveTeacher = saveTeacher;

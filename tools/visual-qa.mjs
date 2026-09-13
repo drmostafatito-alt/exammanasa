@@ -3,12 +3,10 @@
  * premium RTL design: hierarchy order, circular portrait, card rounding/shadow,
  * bottom-nav (mobile only, safe-area, active state), footer, no overlap/overflow. */
 import { chromium as pw } from 'playwright-core';
-import chromiumMin from '@sparticuz/chromium-min';
+import { launchQaBrowser } from './qa-browser.mjs';
 
 const BASE = process.env.QABASE || 'http://127.0.0.1:8787';
-const exe = await chromiumMin.executablePath('/tmp/chrm');
-process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/crlibs/lib';
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--lang=ar'], headless: true });
+const browser = await launchQaBrowser(pw);
 
 let pass = 0, fail = 0;
 const ok = (name, cond, extra) => { if (cond) { pass++; console.log('  \u2713 ' + name); } else { fail++; console.log('  \u2717 ' + name + (extra ? ' \u2014 ' + extra : '')); } };
@@ -249,6 +247,201 @@ for (const W of [360, 390, 430]) {
   ok(W + 'px: ارتفاع الشريط 56–68px (مضغوط، لا مستطيل ضخم)', m.h >= 56 && m.h <= 68, 'h=' + m.h);
   ok(W + 'px: ٤ عناصر بأيقونات صغيرة ونص صغير', m.count === 4 && m.icon <= 24 && m.font <= 13, JSON.stringify(m));
   ok(W + 'px: المحتوى والتذييل لا يُغطَّيان بالشريط', m.mainPad >= m.h - 4 && m.footPad >= 60, JSON.stringify({ main: m.mainPad, foot: m.footPad, h: m.h }));
+  await ctx.close();
+}
+
+/* ---------- V6: انحدار الجولة البصرية (إصلاحات F1–F10) ---------- */
+console.log('\n[V6] انحدار الجولة البصرية');
+{
+  // F1: الزخارف اليدوية مخفية في النطاق المكدّس (721–920) حيث كانت تتداخل مع الشارات
+  for (const W of [768, 834]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: 1000 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    const d = await facts(p, '.hero-doodle', ['display']);
+    ok(W + 'px: hero-doodle مخفية (لا تداخل مع الشارات)', d && d.display === 'none', JSON.stringify(d));
+    await ctx.close();
+  }
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    const d = await facts(p, '.hero-doodle', ['display']);
+    ok('1280px: hero-doodle ظاهرة (لا إخفاء زائد)', d && d.display !== 'none', JSON.stringify(d));
+    await ctx.close();
+  }
+  // F2: صفحة الرابط غير المتاح — بلا شريط سفلي، وأي تنقل يعيد الرسالة نفسها
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ar-EG', isMobile: true, hasTouch: true });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/ghost-teacher-xyz', { waitUntil: 'networkidle' });
+    const st = await p.evaluate(() => ({
+      hidden: document.querySelector('#bottomnav').classList.contains('hidden'),
+      disp: getComputedStyle(document.querySelector('#bottomnav')).display,
+      pad: document.body.classList.contains('has-bottomnav')
+    }));
+    ok('رابط معطّل: الشريط السفلي مخفي وبلا has-bottomnav', st.hidden && st.disp === 'none' && !st.pad, JSON.stringify(st));
+    await p.goto(BASE + '/ghost-teacher-xyz#/s/philosophy', { waitUntil: 'networkidle' });
+    await p.waitForTimeout(400);
+    const h3 = await p.locator('h3').first().textContent().catch(() => '');
+    ok('رابط معطّل: التنقل بالهاش يعيد رسالة عدم التوفر (لا شاشة محطمة)', (h3 || '').includes('غير متاح'), h3);
+    await ctx.close();
+  }
+  // F3: الجمع العربي من الفهرس نفسه (8 موضوعات / 24 موضوعًا)
+  {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    const chk = await p.evaluate(async () => {
+      const d = await fetch('/api/catalog').then(r => r.json());
+      let ph = 0; d.catalog.philosophy.terms.forEach(t => (t.sections || []).forEach(s => s.topics.forEach(() => ph++)));
+      const psy = d.catalog.psychology.units.reduce((n, u) => n + u.lessons.length, 0);
+      const html = document.body.innerHTML;
+      const cw = (n, one, few) => n === 1 ? n + ' ' + one : n === 2 ? n + ' ' + one + 'ان' : (n >= 3 && n <= 10) ? n + ' ' + few : n + ' ' + one + 'ًا';
+      return { ph, psy, expPh: cw(ph, 'موضوع', 'موضوعات'), expPsy: cw(psy, 'موضوع', 'موضوعات'), hasPh: html.includes(cw(ph, 'موضوع', 'موضوعات')), hasPsy: html.includes(cw(psy, 'موضوع', 'موضوعات')) };
+    });
+    ok('بطاقات الصفوف: صيغة الجمع الصحيحة (' + chk.expPh + ' / ' + chk.expPsy + ')', chk.hasPh && chk.hasPsy, JSON.stringify(chk));
+    await ctx.close();
+  }
+  // F4: لوحة الدخول — طبقة التوهج فوق الكحلي (لا نص أبيض على أبيض)
+  for (const path of ['/admin', '/teacher']) {
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + path, { waitUntil: 'networkidle' });
+    const bg = await p.evaluate(() => { const el = document.querySelector('.tlogin-brand'); return el ? getComputedStyle(el).backgroundImage : null; });
+    ok(path + ': خلفية قسم العلامة طبقية (توهج + كحلي)', !!bg && bg.includes('radial-gradient') && bg.includes('linear-gradient'), (bg || '').slice(0, 90));
+    await ctx.close();
+  }
+  // G1: أيقونة اختيار الصف 24px بجانب العنوان (كانت بلا قيد فملأت البطاقة)
+  for (const W of [1280, 390]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: 900 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/#/start', { waitUntil: 'networkidle' });
+    await p.waitForSelector('.grade-opt .g1 svg', { timeout: 8000 }).catch(() => {});
+    const g = await p.evaluate(() => {
+      const svg = document.querySelector('.grade-opt .g1 svg');
+      const r = svg ? svg.getBoundingClientRect() : { width: -1, height: -1 };
+      const card = document.querySelector('.grade-opt');
+      const cr = card ? card.getBoundingClientRect() : { height: 0 };
+      return { w: Math.round(r.width), h: Math.round(r.height), cardH: Math.round(cr.height) };
+    });
+    ok(W + 'px: أيقونة الصف 24×24 ولا تطغى على البطاقة', g.w === 24 && g.h === 24 && g.cardH < 320, JSON.stringify(g));
+    await ctx.close();
+  }
+  // G2: صف رابط المعلم — الزر لا يسقط لسطر وحده مع الروابط الطويلة
+  {
+    const ctx = await browser.newContext({ viewport: { width: 390, height: 844 }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    // تحقق CSS صرف: القاعدة موجودة ومفعّلة على الصف
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    const css = await p.evaluate(async () => {
+      const t = await fetch('/styles.css').then(r => r.text());
+      return t.includes('.tmeta-row.link') && t.includes('text-overflow: ellipsis');
+    });
+    ok('قاعدة tmeta-row.link للتقليص موجودة في styles.css', css);
+    await ctx.close();
+  }
+}
+/* V6b: فحوص الإدارة — تهيئة ذاتية آمنة الترتيب: دخول معروف إن وُجد،
+ * وإلا إعداد أولي على KV نظيفة فقط (409 على غيرها) — وتُتخطى بصمت عند التعذر. */
+console.log('\n[V6b] انحدار لوحة الإدارة (مشروط بالدخول)');
+{
+  const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ar-EG' });
+  const p = await ctx.newPage();
+  await p.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+  const authed = await p.evaluate(async () => {
+    for (const c of [['qa-admin@exam.test', 'QaAdmin#2026y'], ['qa-admin@exam.test', 'QaAdmin#2026x'], ['visual@audit.local', 'Visual#Audit9']]) {
+      try {
+        const r = await fetch('/api/admin/login', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ email: c[0], password: c[1] }) });
+        if (r.ok) return true;
+      } catch {}
+    }
+    try {
+      const st = await fetch('/api/admin/status').then(r => r.json());
+      if (st && st.setup) {
+        const hdrs = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' };
+        const s = await fetch('/api/admin/setup', { method: 'POST', headers: hdrs, body: JSON.stringify({ email: 'qa-admin@exam.test', password: 'QaAdmin#2026x' }) });
+        if (s.ok) {
+          const r = await fetch('/api/admin/login', { method: 'POST', headers: hdrs, body: JSON.stringify({ email: 'qa-admin@exam.test', password: 'QaAdmin#2026x' }) });
+          if (r.ok) return true;
+        }
+      }
+    } catch {}
+    return false;
+  });
+  if (!authed) {
+    console.log('  … تخطي (لا دخول مسؤول معروف على هذا الخادم)');
+  } else {
+    await p.goto(BASE + '/admin', { waitUntil: 'networkidle' });
+    try { await p.waitForSelector('.a-sidebar', { timeout: 12000 }); } catch {}
+    // F5: أيقونات تبويبات الإعدادات 16px + التسميات ظاهرة
+    await p.click('.a-nav-item:has-text("الإعدادات")');
+    await p.waitForSelector('.st-tabs', { timeout: 10000 });
+    const st = await p.evaluate(() => {
+      const svg = document.querySelector('.st-tabs .tab svg');
+      const tab = document.querySelector('.st-tabs .tab');
+      return svg ? { w: Math.round(svg.getBoundingClientRect().width), label: (tab.innerText || '').trim(), tabH: Math.round(tab.getBoundingClientRect().height) } : null;
+    });
+    ok('تبويبات الإعدادات: أيقونة 16px وتسمية ظاهرة', !!st && st.w === 16 && st.label.length > 2 && st.tabH < 60, JSON.stringify(st));
+    // F7: زر اختيار الصورة عربي + الإدخال الأصلي مخفي
+    await p.click('.a-nav-item:has-text("المعلمون")');
+    await p.waitForSelector('.teacher-card', { timeout: 10000 });
+    await p.click('button:has-text("+ إضافة معلم جديد")');
+    await p.waitForSelector('#tName', { timeout: 8000 });
+    const fi = await p.evaluate(() => {
+      const l = document.querySelector('label[for="tPhoto"]');
+      const inp = document.querySelector('#tPhoto');
+      return { hasLabel: !!l && (l.textContent || '').includes('اختيار صورة'), hidden: !!inp && inp.offsetWidth <= 1, name: (document.querySelector('#tPhotoName') || {}).textContent || '' };
+    });
+    ok('رفع الصورة: زر عربي وإدخال مخفي وتسمية ملف', fi.hasLabel && fi.hidden && fi.name.length > 2, JSON.stringify(fi));
+    // F6: Esc يُغلق النموذج
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(400);
+    ok('Esc يُغلق نموذج المعلم', (await p.locator('.tform-bg').count()) === 0);
+    // F6: النقر على الخلفية لا يُغلق النماذج (حماية البيانات)
+    await p.click('button:has-text("+ إضافة معلم جديد")');
+    await p.waitForSelector('#tName', { timeout: 8000 });
+    await p.evaluate(() => { const bg = document.querySelector('.tform-bg'); bg.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    await p.waitForTimeout(300);
+    ok('الخلفية لا تُغلق نموذجًا فيه حقول', (await p.locator('.tform-bg').count()) === 1);
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(300);
+    // F6: الخلفية تُغلق نوافذ العرض (لوحة المعلم) + F10: شبكة 4 أعمدة
+    await p.locator('.teacher-card').first().locator('button:has-text("لوحة المعلم")').click();
+    await p.waitForTimeout(1000);
+    const dash = await p.evaluate(() => {
+      const g = document.querySelector('#tdBody .stat-grid');
+      return g ? { cols4: g.classList.contains('cols-4'), cols: getComputedStyle(g).gridTemplateColumns.split(' ').length } : null;
+    });
+    ok('لوحة المعلم: شبكة الإحصاءات 4 أعمدة', !!dash && dash.cols4 && dash.cols === 4, JSON.stringify(dash));
+    await p.evaluate(() => { const bgs = document.querySelectorAll('.modal-bg'); const bg = bgs[bgs.length - 1]; if (bg) bg.dispatchEvent(new MouseEvent('click', { bubbles: true })); });
+    await p.waitForTimeout(300);
+    ok('الخلفية تُغلق نافذة العرض', (await p.locator('.modal-bg').count()) === 0);
+    // F8: بحث النتائج — انتظار المحتوى الفعلي لا مؤشر التحميل (.empty يُستخدم للسبينر أيضًا)
+    await p.click('.a-nav-item:has-text("النتائج")');
+    await p.waitForFunction(() => document.querySelector('#resTbl') || /لا توجد نتائج محفوظة/.test(document.body.innerText), null, { timeout: 15000 });
+    if (await p.locator('#resQ').count()) {
+      await p.fill('#resQ', 'zzz-no-such-student');
+      await p.waitForTimeout(300);
+      const emptyVis = await p.locator('#resEmpty').isVisible();
+      await p.fill('#resQ', '');
+      await p.waitForTimeout(300);
+      const rows = await p.locator('#resTbl tr').count();
+      ok('بحث النتائج يُرشّح الصفوف ويُظهر تنبيه عدم التطابق', emptyVis && rows > 1);
+    } else {
+      const t = await p.locator('#aContent').innerText();
+      ok('صفحة النتائج خالية بلا كسر (حالة الفراغ مصممة)', /لا توجد نتائج محفوظة/.test(t), t.slice(0, 60));
+    }
+    // F9: شريط أزرار المحرر لاصق
+    await p.click('.a-nav-item:has-text("بنك الأسئلة")');
+    await p.waitForSelector('#bankList .cms-q', { timeout: 15000 });
+    await p.locator('#bankList .cms-q').first().locator('.ibtn, button').first().click();
+    await p.waitForTimeout(700);
+    const sticky = await p.evaluate(() => { const a = document.querySelector('.modal .acts'); return a ? getComputedStyle(a).position : null; });
+    ok('أزرار محرر السؤال لاصقة أسفل النافذة', sticky === 'sticky', sticky);
+    await p.keyboard.press('Escape');
+    await p.waitForTimeout(300);
+  }
   await ctx.close();
 }
 

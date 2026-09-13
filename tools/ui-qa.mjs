@@ -132,7 +132,7 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
     html.includes('الصف الأول الثانوي') && html.includes('الفلسفة والمنطق') && html.includes('الصف الثاني الثانوي') && html.includes('بكالوريا — علم النفس'));
   const phTrainings = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.reduce((k, tp) => k + tp.lessons.reduce((z, l) => z + l.trainings.length, 0), 0), 0), 0);
   const phTopics = catalog.catalog.philosophy.terms.reduce((n, t) => n + t.sections.reduce((m, sec) => m + sec.topics.length, 0), 0);
-  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعًا و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعًا') && phTrainings === 44 && phExams > phTrainings);
+  ok('إحصاءات فعلية من الفهرس (' + psyExams + ' علم نفس / ' + phTopics + ' موضوعات و' + phTrainings + ' تدريبًا فلسفة — لا تُحتسب النماذج القديمة المخفية)', html.includes(psyExams + ' امتحانًا') && html.includes(phTrainings + ' تدريبًا') && html.includes(phTopics + ' موضوعات') && phTrainings === 44 && phExams > phTrainings);
   ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات/اعمل من أي جهاز',
     doc.querySelectorAll('.feature').length === 4 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات') && html.includes('اعمل من أي جهاز'));
   ok('قسم «نبذة عن المعلم» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
@@ -457,8 +457,9 @@ console.log('\n[6ب] تعدد المعلمين — /mostafa → /ahmed → /moha
   ok('Back/Forward يحافظان على المعلم (mostafa) والصفحة الصحيحة', lastWin.S.slug === 'mostafa' && lastWin.document.getElementById('brandName').textContent === owner.name && lastWin.location.hash === '#/s/philosophy/1');
   // بدء امتحان من صفحة أحمد: التوكن يحمل slug أحمد؛ النتيجة تحمل teacherSlug
   const st = await fetch(new URL('/api/exam/start', BASE), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify({ examId: 'T1-PH-01', name: 'طالب أحمد', phone: '', slug: AHMED }) }).then(r => r.json());
-  const payload = JSON.parse(Buffer.from(st.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8'));
-  ok('جلسة من صفحة /ahmed*: التوكن الموقّع يحمل slug المعلم (هاتف اختياري حسب إعداد المعلم)', payload.slug === AHMED && st.questions && st.questions.length === 20);
+  // إن فشل بدء الجلسة (slug غير موجود مثلًا) سجّل فشلًا نظيفًا بدل انهيار المجموعة كلها
+  const payload = st.token ? JSON.parse(Buffer.from(st.token.split('.')[0].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')) : {};
+  ok('جلسة من صفحة /ahmed*: التوكن الموقّع يحمل slug المعلم (هاتف اختياري حسب إعداد المعلم)', !!st.token && payload.slug === AHMED && st.questions && st.questions.length === 20, st.error || ('slug=' + payload.slug));
   const ghost = await fetch(new URL('/ghost-teacher', BASE));
   const ghostApi = await fetch(new URL('/api/teacher/ghost-teacher', BASE));
   ok('معلم غير موجود: الصفحة 404 و/api/teacher 404 بلا fallback لمعلم آخر', ghost.status === 404 && ghostApi.status === 404 && !(await ghost.text()).includes(owner.name));
