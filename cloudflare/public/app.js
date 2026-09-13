@@ -265,6 +265,31 @@
     return (parts.length >= 2 ? parts[0][0] + parts[1][0] : clean.slice(0, 2)) || 'م‌ت';
   }
 
+  /* ---------------- صورة المعلم: تكوين تحريري لا قصّ دائري ----------------
+   * الخلفية زخرفية مولّدة بالكامل (CSS/SVG): تدرّج أزرق فاتح + توهج كريمي +
+   * قوس ذهبي + ظل ناعم. الصورة نفسها لا تُقصّ دائريًا أبدًا: PNG الشفاف يبقى
+   * شفافًا فوق الخلفية (object-fit:contain)، والصورة الفوتوغرافية يُسمح بقصّها
+   * المتحكم به (cover) فقط عندما يكون ذلك مناسبًا (photoFit من الإدارة أو تلقائيًا
+   * حسب نوع الملف). لا خلفية سوداء، لا border-radius:50% إلزامي. */
+  function photoFitOf(t) {
+    if (t && (t.photoFit === 'contain' || t.photoFit === 'cover')) return t.photoFit;
+    var p = (t && t.photo) || '';
+    // شفافية محتملة (PNG/WebP) ⇒ احتواء كامل؛ JPG ⇒ قص متناسق
+    return /data:image\/(png|webp)|\.png([\?#]|$)|\.webp([\?#]|$)/i.test(p) ? 'contain' : 'cover';
+  }
+  function portraitHtml(extraCls) {
+    var t = S.teacher;
+    var inner = (t && t.photo)
+      ? '<img src="' + esc(t.photo) + '" alt="صورة ' + esc(t.name) + '">'
+      : '<div class="monogram">' + esc(monogramOf(t ? t.name : 'م ت')) + '</div>';
+    return '<div class="portrait' + (extraCls ? ' ' + extraCls : '') + '" data-fit="' + photoFitOf(t) + '">' +
+      '<span class="pt-blob" aria-hidden="true"></span>' +
+      '<span class="pt-glow" aria-hidden="true"></span>' +
+      '<span class="pt-arc" aria-hidden="true"></span>' +
+      '<div class="pt-img">' + inner + '</div>' +
+      '</div>';
+  }
+
   /* صفحة غير موجودة/معطّلة: رابط صريح لا يعمل — رسالة واضحة بدل الصفحة المحايدة */
   function renderTeacherUnavailable() {
     app.innerHTML = '<div class="card" style="max-width:520px;margin:60px auto;text-align:center;padding:44px">' +
@@ -435,9 +460,6 @@
     var year = st.academicYear || cat.philosophy.academicYear || '';
     var links = socialLinksOf(t);
     var tname = t ? t.name : 'منصة الامتحانات التعليمية';
-    var photo = (t && t.photo)
-      ? '<img src="' + esc(t.photo) + '" alt="صورة ' + esc(t.name) + '">'
-      : '<div class="monogram">' + esc(monogramOf(t ? t.name : 'م ت')) + '</div>';
     var g1 = gradeInfo('philosophy');
     var g2 = gradeInfo('psychology');
     var waUrl = '';
@@ -458,8 +480,7 @@
       '<section class="hero reveal in">' +
       '<div class="hero-media">' +
       '<span class="hero-fig fig-soc" data-sp="-0.04" aria-hidden="true"></span>' +
-      '<div class="blob"></div><div class="ring"></div>' +
-      '<div class="photo">' + photo + '</div>' +
+      portraitHtml('') +
       '<div class="photo-badge">' + CAP_SVG + '</div>' +
       '<div class="float-chip">' + CHECK_SVG + ' ' + esc(floatChip) + '</div>' +
       '</div>' +
@@ -484,13 +505,22 @@
       /* لوحات زخرفية خلفية (absolute + z-index:0) بعد المحتوى للحفاظ على ترتيب DOM: الصورة أولًا */
       '<span class="hero-fig fig-plato" data-sp="0.05" aria-hidden="true"></span>' +
       '<span class="hero-fig fig-marx" data-sp="0.09" aria-hidden="true"></span>' +
+      '<span class="hero-fig fig-arist" data-sp="0.07" aria-hidden="true"></span>' +
       '<span class="hero-cols" aria-hidden="true"></span>' +
       '</section>';
 
-    /* لماذا المنصة — قسم حر بعنوان مركزي وخط ذهبي (المنصة ليست داخل بطاقة) */
+    /* ١) اختيار الصف مباشرة بعد الـ Hero — أول إجراء يحتاجه الطالب */
+    html += secHead('subjects', hp.subjectsTitle || 'اختر صفك للبدء') +
+      '<div class="grid two">' +
+      '<div class="reveal" style="--d:0ms">' + gradeCard(g1) + '</div>' +
+      '<div class="reveal" style="--d:90ms">' + gradeCard(g2) + '</div>' +
+      '</div>';
+
+    /* ٢) لماذا المنصة — قسم حر بعنوان مركزي وخط ذهبي (المنصة ليست داخل بطاقة) */
     if (sec.showFeatures !== false) {
       html += secHead('features', hp.featuresTitle || 'لماذا منصة الامتحانات؟') +
         '<div class="features">' +
+        '<span class="feat-art" aria-hidden="true"></span>' +
         '<div class="feature reveal" style="--d:0ms"><div class="fi f1">' + CLIP_SVG + '</div><h3>' + esc(hp.feature1Title || 'امتحانات منظمة') + '</h3><p>' + esc(hp.feature1Text || '') + '</p></div>' +
         '<div class="feature reveal" style="--d:70ms"><div class="fi f2">' + BOLT_SVG + '</div><h3>' + esc(hp.feature2Title || 'نتيجتك فورًا') + '</h3><p>' + esc(hp.feature2Text || '') + '</p></div>' +
         '<div class="feature reveal" style="--d:140ms"><div class="fi f3">' + CHECK_SVG + '</div><h3>' + esc(hp.feature3Title || 'مراجعة الإجابات') + '</h3><p>' + esc(hp.feature3Text || '') + '</p></div>' +
@@ -498,11 +528,11 @@
         '</div>';
     }
 
-    /* نبذة المعلم — قسم مفتوح (ليس بطاقة) */
+    /* ٣) نبذة المعلم — قسم مفتوح (ليس بطاقة) قرب نهاية الصفحة */
     if (bio) {
       html += secHead('about', hp.aboutTitle || 'نبذة عن المعلم') +
         '<div class="about-card reveal">' +
-        '<div class="photo">' + photo + '</div>' +
+        portraitHtml('about') +
         '<div class="abody">' +
         '<h3>' + esc(tname) + '</h3>' +
         (t && t.specialty ? '<div class="specialty">' + esc(t.specialty) + '</div>' : '') +
@@ -513,13 +543,6 @@
     } else if (t) {
       html += '<div id="about"></div>';
     }
-
-    /* الصفوف/المواد — بطاقات كبيرة واضحة */
-    html += secHead('subjects', hp.subjectsTitle || 'اختر صفك للبدء') +
-      '<div class="grid two">' +
-      '<div class="reveal" style="--d:0ms">' + gradeCard(g1) + '</div>' +
-      '<div class="reveal" style="--d:90ms">' + gradeCard(g2) + '</div>' +
-      '</div>';
 
     /* تواصل معنا — أزرار فعلية فقط */
     if (sec.showContact !== false && links.length) {
@@ -856,6 +879,7 @@
       });
       html += '<div class="section-title" style="margin-top:26px"><h3>الامتحان الشامل للمنهج</h3></div>' +
         '<div class="final-comp">' + compRow(sub.subjectComprehensiveExamId, 'المنهج كاملًا — ' + sub.units.length + ' وحدات') + '</div>';
+      html += customExamsSection(sub.custom);
       app.innerHTML = html;
     } else if (S.sub === 'philosophy') {
       var sub2 = cat.philosophy;
@@ -874,14 +898,29 @@
         html2 += '</div></div>';
       });
       html2 += comprehensiveSection(term);
+      html2 += customExamsSection(sub2.custom);
       app.innerHTML = html2;
     } else {
       go('#/');
     }
   }
 
+  /* امتحانات مخصّصة (أنشأها/استوردها المسؤول) — مجموعة مستقلة أسفل خريطة المادة */
+  function customExamsSection(list) {
+    if (!list || !list.length) return '';
+    return '<div class="section-title" style="margin-top:26px"><h3>امتحانات مضافة</h3><span class="count">' + list.length + ' امتحانًا</span></div>' +
+      '<div class="exam-list">' + list.map(function (e) {
+        return '<div class="lesson comp" onclick="go(\'#/e/' + esc(e.id) + '\')" role="button" tabindex="0">' +
+          '<div class="lno"><span>سؤال</span><b>' + e.count + '</b></div>' +
+          '<div class="linfo"><div class="lt">' + esc(e.title) + '</div>' +
+          '<div class="ls"><span class="comp-badge">امتحان مضاف</span><span>' + e.count + ' سؤالًا</span>' + (e.grade ? '<span>' + esc(e.grade) + '</span>' : '') + '</div></div>' +
+          '<div class="lgo">‹</div></div>';
+      }).join('') + '</div>';
+  }
+
   /* ---------------- صفحة بدء الامتحان ---------------- */
   function examScopeText(e) {
+    if (e.custom) return e.grade || 'امتحان مضاف';
     if (e.type === 'subject-comprehensive') return 'شامل المنهج كاملًا';
     if (e.type === 'term-comprehensive') return 'شامل ' + (e.term === 1 ? 'الترم الأول' : 'الترم الثاني') + ' كاملًا';
     if (e.type === 'unit-comprehensive' || e.type === 'comprehensive') return 'شامل الوحدة: ' + (e.unitTitle || '');
@@ -898,6 +937,7 @@
       [sub.name, "go('#/s/" + e.subjectId + (e.subjectId === 'philosophy' && e.term ? '/' + e.term : '') + "')"]
     ];
     if (e.topicKey) crumbs.push(['الموضوع ' + e.topicNo, "go('#/s/philosophy/" + e.term + "/t/" + encodeURIComponent(e.topicKey) + "')"], ['الدرس ' + e.lessonNo, "go('" + lessonHashFor(e) + "')"], [e.title]);
+    else if (e.custom) crumbs.push(['امتحان مضاف']);
     else crumbs.push([e.type === 'topic' || e.type === 'training' ? 'الموضوع ' + e.lessonNo : 'الامتحان الشامل']);
     var html = crumb(crumbs);
     var st = S.student || {};

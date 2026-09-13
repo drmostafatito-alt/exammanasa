@@ -35,15 +35,18 @@ console.log('\n[V1] Desktop 1280\u00d7900 \u2014 hierarchy & premium visuals');
 
   const order = await p.evaluate(() => [...document.querySelector('#app').children].map(c => (c.id || c.className.split(' ')[0])));
   const idx = (arr, v) => arr.findIndex(x => x === v);
-  ok('ترتيب الأقسام: features \u2192 about(bio) \u2192 subjects', order[0] === 'hero' && idx(order, 'features') < idx(order, 'about') && idx(order, 'about') < idx(order, 'subjects'), order.join(' \u2192 '));
+  ok('ترتيب الأقسام: hero \u2192 subjects \u2192 features \u2192 about', order[0] === 'hero' && idx(order, 'subjects') < idx(order, 'features') && idx(order, 'features') < idx(order, 'about'), order.join(' \u2192 '));
 
   const hero = await facts(p, '.hero', ['grid-template-columns', 'border-radius', 'box-shadow', 'background-image']);
   ok('Hero شبكة عمودين (media+body)', hero && hero['grid-template-columns'].trim().split(/\s+/).length === 2, hero && hero['grid-template-columns']);
   ok('Hero مفتوح بلا خلفية بطاقة (transparent)', hero && hero['background-image'] === 'none', hero && hero['background-image']);
   ok('Hero بلا حواف/ظل بطاقة (radius 0 + shadow none)', hero && (parseInt(hero['border-radius']) === 0 || hero['border-radius'] === '0px') && hero['box-shadow'] === 'none', JSON.stringify(hero));
 
-  const photo = await facts(p, '.hero .photo', ['border-radius', 'border-width']);
-  ok('صورة المعلم دائرية/عضوية (radius غير حادة) + إطار', photo && parseInt(photo['border-radius']) > 20 && parseInt(photo['border-width']) >= 4, JSON.stringify(photo));
+  const photo = await facts(p, '.hero .portrait .pt-img', ['border-radius', 'background-image']);
+  ok('إطار الصورة عضوي (radius > 20%) وليس دائرة كاملة', photo && parseInt(photo['border-radius']) > 20 && photo['border-radius'] !== '50%', JSON.stringify(photo));
+  ok('خلفية الصورة مولّدة فاتحة (لا أسود خلف الشفافية)', photo && photo['background-image'].includes('gradient'), photo && photo['background-image']);
+  const fit = await p.evaluate(() => { const el = document.querySelector('.hero .portrait'); const img = el && el.querySelector('img'); return { fit: el && el.getAttribute('data-fit'), obj: img ? getComputedStyle(img).objectFit : getComputedStyle(el.querySelector('.monogram') || el).display }; });
+  ok('strategy العرض معلنة (contain/cover) بلا قص إجباري دائري', !!fit.fit, JSON.stringify(fit));
 
   const badge = await facts(p, '.hero .photo-badge', ['background-image', 'border-radius']);
   ok('شارة ذهبية أسفل الصورة', badge && badge['background-image'].includes('gradient'));
@@ -117,7 +120,7 @@ console.log('\n[V2] Mobile 360\u00d7800 \u2014 hero stack + bottom nav');
   });
   ok('padding أسفل المحتوى يغطي الشريط السفلي بالكامل + هامش', pad.mainPad >= pad.navH + 24, JSON.stringify(pad));
   const bnBox = await p.evaluate(() => Math.round(document.querySelector('#bottomnav').getBoundingClientRect().height));
-  ok('ارتفاع الشريط السفلي مضغوط بنمط التطبيقات (52-72px)', bnBox >= 52 && bnBox <= 72, 'h=' + bnBox);
+  ok('ارتفاع الشريط السفلي مضغوط بنمط التطبيقات (46-68px)', bnBox >= 46 && bnBox <= 68, 'h=' + bnBox);
 
   const overflow = await p.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   ok('لا overflow أفقي على 360', overflow <= 0, 'delta=' + overflow);

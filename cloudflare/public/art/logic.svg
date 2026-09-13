@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 320" fill="none">
+  <!-- مخطط منطق: دوائر قياس + أسهم استلزام + رموز — قناع أحادي اللون -->
+  <defs>
+    <radialGradient id="logFade" gradientUnits="userSpaceOnUse" cx="240" cy="160" r="250">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset=".86" stop-color="#fff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#logFade)" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="150" cy="150" r="86" stroke-width="4"/>
+    <circle cx="150" cy="150" r="52" stroke-width="3" opacity=".7"/>
+    <circle cx="150" cy="150" r="20" stroke-width="2.6" opacity=".6"/>
+    <circle cx="330" cy="120" r="56" stroke-width="3.4" opacity=".8"/>
+    <circle cx="368" cy="176" r="34" stroke-width="2.8" opacity=".65"/>
+    <path d="M236 150 L274 132" stroke-width="3"/>
+    <path d="M266 128 L276 132 L272 142" stroke-width="3"/>
+    <path d="M96 262 L182 262" stroke-width="3" opacity=".7"/>
+    <path d="M118 250 L104 262 L118 274" stroke-width="3" opacity=".7"/>
+    <path d="M160 250 L174 262 L160 274" stroke-width="3" opacity=".7"/>
+    <path d="M250 244 C262 232 282 232 294 244 C282 256 262 256 250 244 Z" stroke-width="2.8" opacity=".7"/>
+    <path d="M330 236 L330 268 M316 252 L344 252" stroke-width="2.8" opacity=".7"/>
+    <path d="M382 236 L382 268 M368 244 L396 244 M368 260 L396 260" stroke-width="2.8" opacity=".7"/>
+  </g>
+</svg>

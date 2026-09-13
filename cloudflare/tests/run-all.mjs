@@ -394,6 +394,29 @@ try {
     const reserved = await post('/api/admin/teachers', { name: 'س', slug: 'api' }, { Cookie: cookie });
     ok('رفض slug محجوز (api)', reserved.status === 400);
 
+    /* ---- صورة المعلم (بورتريه مرن: PNG شفاف + استراتيجية عرض + إزالة) ---- */
+    const PNG1 = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const putT = (body) => jfetch('/api/admin/teachers/' + create.data.teacher.id, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify(Object.assign({ name: 'أ. سارة أحمد', slug: 'sara' }, body))
+    });
+    const setPhoto = await putT({ photo: PNG1, photoFit: 'contain' });
+    ok('حفظ صورة PNG مع استراتيجية «احتواء» (شفافية بلا تسطيح)',
+      setPhoto.status === 200 && /^data:image\/png;base64,/.test(setPhoto.data.teacher.photo || '') && setPhoto.data.teacher.photoFit === 'contain');
+    const pubFit = await jfetch('/api/teacher/sara');
+    ok('الملف العام يعرض photoFit للطالب بلا حقول داخلية',
+      pubFit.status === 200 && pubFit.data.teacher.photoFit === 'contain' && pubFit.data.teacher.photo === PNG1 &&
+      !('passHash' in pubFit.data.teacher) && !('passSalt' in pubFit.data.teacher));
+    ok('رفض صورة بصيغة غير صور (لا data:text/html)', (await putT({ photo: 'data:text/html;base64,PHNjcmlwdD4=' })).status === 400);
+    ok('photoFit=cover يُحفظ للصور الفوتوغرافية', (await putT({ photoFit: 'cover' })).data.teacher.photoFit === 'cover');
+    ok('photoFit="" يعيد الاستراتيجية إلى «تلقائي»', (await putT({ photoFit: '' })).data.teacher.photoFit === '');
+    const keepPhoto = await putT({ enabled: true });
+    ok('التعديل دون حقل الصورة يحافظ عليها', keepPhoto.data.teacher.photo === PNG1);
+    const cleared = await putT({ photo: '' });
+    ok('إزالة الصورة من اللوحة (photo:"") تمسحها فعلًا',
+      cleared.status === 200 && cleared.data.teacher.photo === '' && (await jfetch('/api/teacher/sara')).data.teacher.photo === '');
+
     const tid = create.data.teacher.id;
     const upd = await jfetch('/api/admin/teachers/' + tid, {
       method: 'PUT',
@@ -926,6 +949,138 @@ try {
       method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
       body: JSON.stringify({ identity: { academicYear: 'العام الدراسي 2026 / 2027', platformName: 'منصة الامتحانات' }, homepage: { heroTitle: 'اختبر نفسك', chip1: 'اختبارات وفق المنهج الرسمي' }, appearance: { primary: '#1E56C8', accent: '#C99A2E', background: '#F5F7FD', text: '#1B2540', button: '#1E56C8' }, teacherDefaults: { requirePhone: true, unlimited: true, maxAttempts: 3, offlineMode: false, studentLimitUnlimited: true, studentLimit: 0 } })
     });
+  }
+
+  /* ============ 22. ADMIN CMS: question/exam editor, import/export, key protection ============ */
+  console.log('\n[22] إدارة المحتوى (CMS): محرر الأسئلة/الامتحانات، الاستيراد/التصدير، حماية المفاتيح');
+  {
+    const AH = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie };
+    const baseQid = 'PSY-U1-T1-Q01';
+    const baseQ = BANKS.questions[baseQid];
+
+    // 22a: authorization — content endpoints are admin-only
+    const anonQ = await jfetch('/api/admin/questions');
+    ok('بنك الأسئلة (بالمفاتيح) محجوب بدون جلسة مسؤول', anonQ.status === 401);
+    const mkT = await post('/api/admin/teachers', { name: 'معلم CMS', slug: 'cms-t', email: 'cms@t.test', password: 'CmsTeacher#1' }, { Cookie: cookie });
+    const tLog = await post('/api/t/login', { email: 'cms@t.test', password: 'CmsTeacher#1' });
+    const tCook = 'teacher_session=' + ((tLog.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/) || [])[1];
+    const teacherQ = await jfetch('/api/admin/questions', { headers: { Cookie: tCook } });
+    const teacherEx = await jfetch('/api/admin/exams/U1-T1', { headers: { Cookie: tCook } });
+    const teacherImport = await post('/api/admin/import/commit', { confirm: true, text: '{}' }, { Cookie: tCook.replace('teacher_session', 'admin_session') });
+    ok('المعلم لا يصل لإدارة المحتوى (أسئلة/امتحان/استيراد) → 401', teacherQ.status === 401 && teacherEx.status === 401 && teacherImport.status === 401);
+    const studentStart = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01000000001', slug: 'cms-t' });
+    ok('واجهة الطالب لا تحمل أي مفتاح إجابة', studentStart.status === 200 && !/correctAnswer|"answer"/.test(JSON.stringify(studentStart.data)));
+
+    // 22b: question editor — create with validation
+    const badNoText = await post('/api/admin/questions', { text: '   ', options: ['أ', 'ب', 'ج', 'د'], answer: 'A' }, { Cookie: cookie });
+    const badAns = await post('/api/admin/questions', { text: 'س؟', options: ['أ', 'ب', 'ج', 'د'], answer: 'E' }, { Cookie: cookie });
+    const badOpts = await post('/api/admin/questions', { text: 'س؟', options: ['أ', 'ب', 'ج'], answer: 'A' }, { Cookie: cookie });
+    ok('رفض إنشاء سؤال: نص فارغ/مفتاح غير A-D/ثلاثة خيارات', badNoText.status === 400 && badAns.status === 400 && badOpts.status === 400);
+    const mkQ1 = await post('/api/admin/questions', { text: 'سؤال CMS تجريبي أول: ما ناتج 1+1؟', options: ['1', '2', '3', '4'], answer: 'B', meta: { subjectId: 'psychology', term: 1, lesson: 'درس CMS' } }, { Cookie: cookie });
+    const mkQ2 = await post('/api/admin/questions', { text: 'سؤال CMS تجريبي ثانٍ: عاصمة مصر؟', options: ['الإسكندرية', 'القاهرة', 'أسوان', 'طنطا'], answer: 'B', meta: { subjectId: 'psychology' } }, { Cookie: cookie });
+    ok('إنشاء سؤالين جديدين بمعرفات مخصّصة CQ-', mkQ1.status === 200 && /^CQ-/.test(mkQ1.data.id) && mkQ2.status === 200 && /^CQ-/.test(mkQ2.data.id));
+    const gotQ = await jfetch('/api/admin/questions/' + mkQ1.data.id, { headers: { Cookie: cookie } });
+    ok('قراءة سؤال واحد تشمل المفتاح والاستخدام', gotQ.status === 200 && gotQ.data.question.answer === 'B' && Array.isArray(gotQ.data.usedBy));
+
+    // 22c: edit question text/options/key (privileged)
+    const editQ = await jfetch('/api/admin/questions/' + mkQ1.data.id, { method: 'PUT', headers: AH, body: JSON.stringify({ text: 'سؤال CMS تجريبي أول (معدّل): ما ناتج 2+2؟', options: ['2', '4', '6', '8'], answer: 'B' }) });
+    const gotQ2 = await jfetch('/api/admin/questions/' + mkQ1.data.id, { headers: { Cookie: cookie } });
+    ok('تعديل نص/خيارات/مفتاح سؤال يحفظ فعليًا', editQ.status === 200 && gotQ2.data.question.text.includes('(معدّل)') && gotQ2.data.question.options[1] === '4');
+
+    // 22d: duplicate + delete/restore of a custom question
+    const dup = await post('/api/admin/questions/' + mkQ2.data.id + '/duplicate', {}, { Cookie: cookie });
+    const dupGot = await jfetch('/api/admin/questions/' + dup.data.id, { headers: { Cookie: cookie } });
+    ok('تكرار سؤال ينشئ نسخة مخصّصة مستقلة', dup.status === 200 && dup.data.id !== mkQ2.data.id && dupGot.data.question.text === dupGot.data.question.text && dupGot.data.question.custom === true);
+    const delDup = await jfetch('/api/admin/questions/' + dup.data.id, { method: 'DELETE', headers: AH });
+    const delList = await jfetch('/api/admin/questions/deleted', { headers: { Cookie: cookie } });
+    const restDup = await post('/api/admin/questions/' + dup.data.id + '/restore', {}, { Cookie: cookie });
+    ok('حذف سؤال (سلة محذوفات) + استعادة', delDup.status === 200 && delList.data.questions.some(x => x.id === dup.data.id) && restDup.status === 200);
+
+    // 22e: editing a BASE question is an overlay; revert restores the pristine bank copy
+    const editBase = await jfetch('/api/admin/questions/' + baseQid, { method: 'PUT', headers: AH, body: JSON.stringify({ text: baseQ.text + ' [تعديل مسؤول]', answer: baseQ.answer }) });
+    const gotBase = await jfetch('/api/admin/questions/' + baseQid, { headers: { Cookie: cookie } });
+    ok('تعديل سؤال من البنك الأصلي يُخزَّن كطبقة فوقية', editBase.status === 200 && gotBase.data.question.text.endsWith('[تعديل مسؤول]') && gotBase.data.edited === true);
+    const revBase = await post('/api/admin/questions/' + baseQid + '/revert', {}, { Cookie: cookie });
+    const gotBase2 = await jfetch('/api/admin/questions/' + baseQid, { headers: { Cookie: cookie } });
+    ok('استعادة الأصل تعيد نص/مفتاح البنك حرفيًا (diff=0)', revBase.status === 200 && gotBase2.data.question.text === baseQ.text && gotBase2.data.question.answer === baseQ.answer && gotBase2.data.edited === false);
+
+    // 22f: exam editor — create, reorder, remove, rename, enable/disable
+    const mkExam = await post('/api/admin/exams', { title: 'امتحان CMS تجريبي', subjectId: 'psychology', term: 1, grade: 'الصف الثاني الثانوي', questionIds: [mkQ1.data.id, mkQ2.data.id] }, { Cookie: cookie });
+    ok('إنشاء امتحان مخصّص بمعرف CX-', mkExam.status === 200 && /^CX-/.test(mkExam.data.id));
+    const exId = mkExam.data.id;
+    const gotEx = await jfetch('/api/admin/exams/' + exId, { headers: { Cookie: cookie } });
+    ok('محرر الامتحان يعيد الأسئلة بمفاتيحها بالترتيب', gotEx.status === 200 && gotEx.data.questionIds.join() === [mkQ1.data.id, mkQ2.data.id].join() && gotEx.data.questions[0].answer === 'B');
+    const reorder = await jfetch('/api/admin/exams/' + exId, { method: 'PUT', headers: AH, body: JSON.stringify({ questionIds: [mkQ2.data.id, mkQ1.data.id], title: 'امتحان CMS (معاد ترتيبه)' }) });
+    const gotEx2 = await jfetch('/api/admin/exams/' + exId, { headers: { Cookie: cookie } });
+    ok('إعادة ترتيب الأسئلة + تغيير العنوان تُحفظ', reorder.status === 200 && gotEx2.data.questionIds[0] === mkQ2.data.id && gotEx2.data.exam.title.includes('معاد ترتيبه'));
+    const badRef = await jfetch('/api/admin/exams/' + exId, { method: 'PUT', headers: AH, body: JSON.stringify({ questionIds: ['NOPE-1'] }) });
+    const badEmpty = await jfetch('/api/admin/exams/' + exId, { method: 'PUT', headers: AH, body: JSON.stringify({ questionIds: [] }) });
+    ok('رفض مرجع سؤال غير موجود/قائمة فارغة في الامتحان', badRef.status === 400 && badEmpty.status === 400);
+    // a student can actually sit the custom exam end-to-end (server-side grading)
+    const startCustom = await post('/api/exam/start', { examId: exId, name: 'طالب CMS', phone: '01000000002', slug: 'cms-t' });
+    ok('طالب يبدأ امتحانًا مخصّصًا (بلا مفاتيح)', startCustom.status === 200 && startCustom.data.questions.length === 2 && !/correctAnswer|"answer"/.test(JSON.stringify(startCustom.data.questions)));
+    const submitCustom = await post('/api/exam/submit', { token: startCustom.data.token, answers: startCustom.data.questions.map((q, i) => q.options.indexOf(i === 0 ? 'القاهرة' : '4')) });
+    ok('تصحيح الامتحان المخصّص على الخادم (درجة 2/2)', submitCustom.status === 200 && submitCustom.data.score === 2 && submitCustom.data.total === 2);
+    // disable → hidden from students entirely
+    const disable = await jfetch('/api/admin/exams/' + exId, { method: 'PUT', headers: AH, body: JSON.stringify({ enabled: false }) });
+    const catAfter = await jfetch('/api/catalog');
+    const startDisabled = await post('/api/exam/start', { examId: exId, name: 'طالب', phone: '01000000003', slug: 'cms-t' });
+    ok('تعطيل امتحان يخفيه من فهرس الطلاب ويرفض البدء', disable.status === 200 && !JSON.stringify(catAfter.data.exams).includes(exId) && startDisabled.status === 404);
+    await jfetch('/api/admin/exams/' + exId, { method: 'PUT', headers: AH, body: JSON.stringify({ enabled: true }) });
+
+    // 22g: export = canonical format (admin only, includes keys)
+    const expNoAuth = await jfetch('/api/admin/exams/' + exId + '/export');
+    const exp = await jfetch('/api/admin/exams/' + exId + '/export', { headers: { Cookie: cookie } });
+    ok('التصدير بصيغة قانية ومحمي (401 بدون جلسة)', expNoAuth.status === 401 && exp.status === 200 && exp.data.version === 1 && exp.data.exam.title.includes('CMS') && exp.data.questions.length === 2 && /^[ABCD]$/.test(exp.data.questions[0].correctAnswer) && exp.data.questions[0].options.A);
+
+    // 22h: import — validation & preview commit nothing
+    const bankText = baseQ.text;
+    const fileOk = JSON.stringify({
+      version: 1,
+      exam: { title: 'امتحان مستورد تجريبي', subject: 'علم النفس', term: 'الترم الأول', grade: 'الصف الثاني الثانوي' },
+      questions: [
+        { text: bankText, options: { A: baseQ.options[0], B: baseQ.options[1], C: baseQ.options[2], D: baseQ.options[3] }, correctAnswer: baseQ.answer },
+        { text: 'سؤال مستورد جديد تمامًا: عاصمة فرنسا؟', options: { A: 'ليون', B: 'باريس', C: 'نيس', D: 'كان' }, correctAnswer: 'B' },
+        { text: 'سؤال مستورد جديد تمامًا: عاصمة فرنسا؟', options: { A: 'ليون', B: 'باريس', C: 'نيس', D: 'كان' }, correctAnswer: 'B' }
+      ]
+    });
+    const beforeCounts = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
+    const prev = await post('/api/admin/import/preview', { text: fileOk }, { Cookie: cookie });
+    ok('معاينة الاستيراد: 3 أسئلة، 1 موجود، 1 جديد، 1 مكرر داخليًا', prev.status === 200 && prev.data.report.ok === true && prev.data.report.stats.total === 3 && prev.data.report.stats.existsInBank === 1 && prev.data.report.stats.newCount === 1 && prev.data.report.stats.duplicateInFile === 1);
+    const midCounts = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
+    ok('المعاينة لا تحفظ شيئًا (العدّادات دون تغيير)', JSON.stringify(midCounts.data.customExams) === JSON.stringify(beforeCounts.data.customExams) && midCounts.data.customQuestions === beforeCounts.data.customQuestions);
+    const impBadJson = await post('/api/admin/import/preview', { text: '{ليس json' }, { Cookie: cookie });
+    const impBadAnswer = await post('/api/admin/import/preview', { text: JSON.stringify({ exam: { title: 'س', subject: 'علم النفس' }, questions: [{ text: 'س؟', options: { A: '1', B: '2', C: '3', D: '4' }, correctAnswer: 'Z' }] }) }, { Cookie: cookie });
+    const impBadOpts = await post('/api/admin/import/preview', { text: JSON.stringify({ exam: { title: 'س', subject: 'علم النفس' }, questions: [{ text: 'س؟', options: { A: '1', B: '2' }, correctAnswer: 'A' }] }) }, { Cookie: cookie });
+    const impNoTitle = await post('/api/admin/import/preview', { text: JSON.stringify({ exam: { subject: 'علم النفس' }, questions: [{ text: 'س؟', options: { A: '1', B: '2', C: '3', D: '4' }, correctAnswer: 'A' }] }) }, { Cookie: cookie });
+    const impEmptyQ = await post('/api/admin/import/preview', { text: JSON.stringify({ exam: { title: 'س', subject: 'علم النفس' }, questions: [{ text: '  ', options: { A: '1', B: '2', C: '3', D: '4' }, correctAnswer: 'A' }] }) }, { Cookie: cookie });
+    ok('تحقق الاستيراد يرفض: JSON تالف/مفتاح خاطئ/خياران/بلا عنوان/نص فارغ', impBadJson.status === 400 && impBadAnswer.data.report.ok === false && impBadOpts.data.report.ok === false && impNoTitle.data.report.ok === false && impEmptyQ.data.report.ok === false);
+    const noConfirm = await post('/api/admin/import/commit', { text: fileOk }, { Cookie: cookie });
+    ok('لا استيراد بلا تأكيد صريح (confirm=true)', noConfirm.status === 400);
+    const commit = await post('/api/admin/import/commit', { text: fileOk, confirm: true }, { Cookie: cookie });
+    ok('الاستيراد المؤكَّد: سؤال جديد واحد + ربط الموجود دون تكرار', commit.status === 200 && commit.data.createdQuestions === 1 && commit.data.reusedQuestions === 1 && commit.data.total === 2);
+    const afterCounts = await jfetch('/api/admin/overview', { headers: { Cookie: cookie } });
+    ok('عدّادات المحتوى تعكس الاستيراد (امتحانان مخصّصان + أسئلة مخصّصة)', afterCounts.data.customExams === beforeCounts.data.customExams + 1 && afterCounts.data.customQuestions === beforeCounts.data.customQuestions + 1);
+    // the imported exam is live for students and appears in the public catalog custom list
+    const catImp = await jfetch('/api/catalog');
+    const impListed = JSON.stringify(catImp.data.catalog).includes(commit.data.examId);
+    const startImp = await post('/api/exam/start', { examId: commit.data.examId, name: 'طالب مستورد', phone: '01000000004', slug: 'cms-t' });
+    ok('الامتحان المستورد يظهر للطلاب ويبدأ بلا مفاتيح', impListed && startImp.status === 200 && startImp.data.questions.length === 2 && !/correctAnswer|"answer"/.test(JSON.stringify(startImp.data)));
+    // the reused bank question kept its pristine key in grading
+    const reusedId = Object.keys(BANKS.questions).find(k => BANKS.questions[k].text === bankText);
+    const impEx = await jfetch('/api/admin/exams/' + commit.data.examId, { headers: { Cookie: cookie } });
+    ok('السؤال المرتبط من البنك يحتفظ بمفتاحه الأصلي', impEx.data.questions.some(q => q.id === reusedId && q.answer === BANKS.questions[reusedId].answer));
+
+    // 22i: answer-key protection on every public surface after content edits
+    const pubAll = await Promise.all([jfetch('/api/catalog'), jfetch('/api/settings'), jfetch('/api/teacher/cms-t')]);
+    ok('لا مفاتيح في أي واجهة عامة بعد التعديلات', pubAll.every(p => p.status === 200 && !/correctAnswer|"answer"\s*:/.test(JSON.stringify(p.data))));
+    // cleanup: delete the CMS artifacts so later suites see a clean bank
+    await jfetch('/api/admin/exams/' + commit.data.examId, { method: 'DELETE', headers: AH });
+    await jfetch('/api/admin/exams/' + exId, { method: 'DELETE', headers: AH });
+    for (const qid of [mkQ1.data.id, mkQ2.data.id, dup.data.id]) await jfetch('/api/admin/questions/' + qid, { method: 'DELETE', headers: AH });
+    const catClean = await jfetch('/api/catalog');
+    ok('حذف المخصّص يعيد فهرس الطلاب لحالة البنك الأصلي', !JSON.stringify(catClean.data.catalog).includes('CX-') && Object.keys(catClean.data.exams).length === Object.keys(BANKS.exams).length);
+    await jfetch('/api/admin/teachers/' + mkT.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
   /* ============ 20. LOGIN THROTTLE (MUST BE LAST — locks out this dev instance) ============ */

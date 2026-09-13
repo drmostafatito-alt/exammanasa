@@ -5,7 +5,8 @@
  * إعادة تعيين كلمة مرور → تغيير كلمة مرور المسؤول → إعدادات المنصة)، معلم (/teacher بلا تسجيل، لوحة،
  * ملف شخصي مع النبذة ويوتيوب، عزل تام، منع CSRF)، طالب (تدفق كامل من رابط المعلم حتى النتيجة)،
  * أمان حي (slug وهمي 404، حقن درجة، بلا تسريب مفاتيح)، ومصفوفة عرض حقيقية
- * 360×800 / 390×844 / 412×915 / 1280×720 / 1440×900 / 1920×1080 (RTL بلا overflow).
+ * 360×800 / 390×844 / 430×932 / 768×1024 / 1280×800 / 1366×768 / 1440×900 / 1920×1080
+ * (RTL بلا overflow أفقي ولا نص مقصوص)، مع مراقب أخطاء console/pageerror لكل الصفحات.
  *
  * التشغيل (يتطلب شبكة لـnpm ولقطات في مجلد tools/shots):
  *   cd cloudflare && npx wrangler dev --port 8787 --persist-to /tmp/wrangler-qa &   # KV نظيف
@@ -42,6 +43,31 @@ const STUDENT = { name: 'طالب تجريبي واحد', phone: '01144445551' }
 const exe = await chromiumMin.executablePath('/tmp/chrm');
 process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/crlibs/lib';
 const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--lang=ar'], headless: true });
+
+/* مراقب أخطاء الكونسول: المسموح فقط ما سببه بيئة الاختبار (خطوط Google محجوبة offline،
+ * ومسبارات الجلسة/الدخول الفارغ 401/400 المتوقعة في تدفق الاختبار نفسه). */
+const consoleIssues = [];
+const CONSOLE_ALLOW = [
+  /fonts\.(googleapis|gstatic)\.com/, /net::/, /ERR_[A-Z_]+/,
+  /Failed to load resource: the server responded with a status of 4(01|00|03|04|29)/, // 403 = مسبار CSRF المتعمّد داخل الاختبار
+  /googleapis|gstatic/
+];
+const _newContext = browser.newContext.bind(browser);
+browser.newContext = async (...args) => {
+  const ctx = await _newContext(...args);
+  const _newPage = ctx.newPage.bind(ctx);
+  ctx.newPage = async (...a2) => {
+    const pg = await _newPage(...a2);
+    pg.on('console', (m) => {
+      if (m.type() !== 'error') return;
+      const t = m.text() || '';
+      if (!CONSOLE_ALLOW.some(re => re.test(t))) consoleIssues.push('[' + pg.url().slice(0, 60) + '] ' + t.slice(0, 160));
+    });
+    pg.on('pageerror', (e) => consoleIssues.push('pageerror [' + pg.url().slice(0, 60) + '] ' + String(e && e.message).slice(0, 160)));
+    return pg;
+  };
+  return ctx;
+};
 
 let apiAudit = [];
 async function noCache(ctx) {
@@ -484,10 +510,10 @@ try {
   ok('لوحة المسؤول 360px بلا overflow أفقي', aOv <= 360, 'scrollWidth=' + aOv);
 
   /* ============ 11. VIEWPORT MATRIX ============ */
-  console.log('\n[11] مصفوفة العرض 360/390/412/1280/1440/1920 — بلا overflow أفقي + RTL');
+  console.log('\n[11] مصفوفة العرض 360/390/430/768/1280/1366/1440/1920 — بلا overflow أفقي ولا نص مقصوص + RTL');
   const sizes = [
-    [360, 800, true], [390, 844, true], [412, 915, true],
-    [1280, 720, false], [1440, 900, false], [1920, 1080, false]
+    [360, 800, true], [390, 844, true], [430, 932, true],
+    [768, 1024, false], [1280, 800, false], [1366, 768, false], [1440, 900, false], [1920, 1080, false]
   ];
   for (const [w, h, isMobile] of sizes) {
     const c = await browser.newContext({
@@ -508,6 +534,25 @@ try {
     const aSW = await pg.evaluate(() => document.documentElement.scrollWidth);
     ok('دخول المسؤول ' + w + 'px بلا overflow أفقي', aSW <= w, 'scrollWidth=' + aSW);
     ok('RTL مفعّل على ' + w + 'px', (await pg.evaluate(() => document.documentElement.dir)) === 'rtl');
+    // نص مقصوص: أي عنصر نصي ضيق عن محتواه أفقيًا (بلا تمرير أو ellipsis مقصود)
+    await pg.goto(BASE + '/', { waitUntil: 'networkidle' });
+    await pg.evaluate(() => document.querySelectorAll('.reveal').forEach(e => e.classList.add('in')));
+    await sleep(300);
+    const clipped = await pg.evaluate(() => {
+      const bad = [];
+      document.querySelectorAll('h1, h2, h3, h4, p, button, a, .bn-label, .chip, .badge, .ktag, .lead, .desc').forEach(el => {
+        const cs = getComputedStyle(el);
+        if (el.clientWidth > 0 && el.scrollWidth > el.clientWidth + 2 &&
+          cs.overflowX !== 'auto' && cs.overflowX !== 'scroll' && cs.textOverflow !== 'ellipsis') {
+          bad.push(el.tagName + '.' + String(el.className).split(' ')[0] + ' ' + el.scrollWidth + '>' + el.clientWidth);
+        }
+      });
+      return bad.slice(0, 6);
+    });
+    ok('لا نص مقصوص على ' + w + 'px', clipped.length === 0, clipped.join(' | '));
+    const bnVisible = await pg.evaluate(() => { const b = document.querySelector('#bottomnav'); return b ? getComputedStyle(b).display !== 'none' : false; });
+    ok('الشريط السفلي ' + (w <= 760 ? 'ظاهر' : 'مخفي') + ' على ' + w + 'px', bnVisible === (w <= 760), 'visible=' + bnVisible);
+    await pg.screenshot({ path: SHOTS + '/e2e-home-' + w + '.png' });
     await c.close();
   }
 
@@ -520,6 +565,9 @@ try {
   ok('ترويسات أمان (nosniff, X-Frame-Options DENY, Referrer-Policy)', secHdrs.get('x-content-type-options') === 'nosniff' && secHdrs.get('x-frame-options') === 'DENY' && String(secHdrs.get('referrer-policy')).includes('when-cross-origin'));
   const robots = await (await fetch(BASE + '/robots.txt')).text();
   ok('robots.txt يمنع فهرسة لوحات التحكم', /admin|Disallow/i.test(robots));
+
+  console.log('\n[13] أخطاء الكونسول عبر كل التدفقات');
+  ok('لا أخطاء console/pageerror غير متوقعة (خارج المسموح البيئي)', consoleIssues.length === 0, consoleIssues.slice(0, 6).join(' | '));
 
   console.log('\n════════════════════════════════');
   console.log(`BROWSER E2E: ${pass} pass ✓ / ${fail} fail ✗`);
