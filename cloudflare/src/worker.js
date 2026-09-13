@@ -66,13 +66,58 @@ function normalizePhone(raw) {
 function isValidEgMobile(d) { return /^01[0125][0-9]{8}$/.test(d); }
 function normalizeName(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 
+/* سياسة محتوى مقيدة قدر الإمكان بدون كسر التطبيق (الواجهة تستخدم معالجات
+ * onclick داخلية وألوانًا تُضبط عبر CSSOM، لذا 'unsafe-inline' مطلوب فعليًا).
+ * القيمة الحقيقية هنا: frame-ancestors 'none' (يمنع التأطير/النقر المخفي)،
+ * object-src 'none'، base-uri 'self'، form-action 'self'. */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'"
+].join('; ');
+
 function securityHeaders(res) {
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options', 'nosniff');
   h.set('X-Frame-Options', 'DENY');
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  h.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
   return new Response(res.body, { status: res.status, headers: h });
+}
+
+/* إزالة محارف التحكم (CR/LF/TAB… ) من النصوص الحرة: تمنع تسميم CSV/السجلات وتمنع
+ * كسر العرض، دون المساس بأي نص سؤال (الأسئلة لا تمرّ عبر هذه الدالة أبدًا). */
+function stripControl(value, max) {
+  let s = String(value == null ? '' : value).replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, ' ').replace(/\s+/g, ' ').trim();
+  return max ? s.slice(0, max) : s;
+}
+
+/* طبقة حماية ثانية ضد CSRF: المتصفح يرسل Origin دائمًا مع الطلبات بين المواقع.
+ * غياب الترويسة يعني عميلًا غير متصفح (اختبارات/curl) — مسموح. */
+function hostOf(value) {
+  try { return new URL(String(value)).host; } catch (e) { return ''; }
+}
+function isLoopbackHost(h) {
+  const name = String(h || '').replace(/:\d+$/, '').toLowerCase();
+  return name === 'localhost' || name === '127.0.0.1' || name === '[::1]' || name === '::1';
+}
+function crossSiteRequest(request) {
+  const origin = request.headers.get('Origin');
+  if (!origin) return false;
+  const oh = hostOf(origin);
+  if (!oh) return true; // Origin غير قابل للتحليل → ارفض احتياطًا
+  const rh = request.headers.get('Host') || '';
+  if (oh === rh) return false;
+  if (isLoopbackHost(oh) && isLoopbackHost(rh)) return false; // تطوير محلي بمنفذ مختلف
+  return true;
 }
 
 /* ---- seeded shuffle — ported verbatim from Code.gs (prng_/shuffledOrder_) ---- */
@@ -130,7 +175,8 @@ async function verifyToken(token, secret) {
   const parts = token.split('.');
   if (parts.length !== 2) return null;
   const expected = b64url(String.fromCharCode(...new Uint8Array(await hmac(secret, parts[0]))));
-  if (expected !== parts[1]) return null; // non-constant-time compare is acceptable here: sig is 256-bit random-keyed
+  // constant-time: the comparison must not leak where a forged signature diverged
+  if (!safeEqualHex(expected, parts[1])) return null;
   try {
     const payload = JSON.parse(fromB64url(parts[0]));
     if (!payload || typeof payload !== 'object') return null;
@@ -358,7 +404,50 @@ async function kvPut(env, key, value, ttlSeconds) {
 async function getTeachers(env) {
   const stored = await kvGetJson(env, 'teachers').catch(() => null);
   if (Array.isArray(stored) && stored.length) return stored;
-  return DEFAULT_TEACHERS;
+  return DEFAULT_TEACHERS.map(t => Object.assign({}, t));
+}
+
+/* صور المعلمين تُخزَّن في مفتاح منفصل لكل معلم (teacher:photo:<id>) بدل أن توضع
+ * داخل مستند `teachers` نفسه. سبب القرار: حد القيمة الواحدة في KV هو ٢٥ ميجابايت،
+ * وصورة واحدة بصيغة data-URL قد تصل إلى ٢.٥ ميجابايت — أي أن ~١٠ معلمين بصور كان
+ * يكفي لإيقاف كتابة قائمة المعلمين كلها (فشل إضافة/تعديل أي معلم). بهذا الفصل يبقى
+ * مستند القائمة خفيفًا مهما كثر المعلمون، ومفتاح الصورة يُكتب فقط عند تغيّرها. */
+async function kvDelete(env, key) { try { if (env.PLATFORM_KV) await env.PLATFORM_KV.delete(key); } catch (e) { } }
+async function getTeacherPhoto(env, id) {
+  if (!id) return '';
+  return (await kvGet(env, 'teacher:photo:' + id).catch(() => null)) || '';
+}
+/* تحميل الصور فقط حيث يحتاجها العرض فعليًا (لا تُقرأ في المسار الساخن للامتحان). */
+async function hydratePhotos(env, list) {
+  if (!Array.isArray(list) || !list.length) return list;
+  await Promise.all(list.map(async t => { if (!t.photo) t.photo = await getTeacherPhoto(env, t.id); }));
+  return list;
+}
+async function hydrateTeacher(env, t) {
+  if (!t) return t;
+  if (!t.photo) t.photo = await getTeacherPhoto(env, t.id);
+  return t;
+}
+function leanTeacher(t) { const c = Object.assign({}, t); delete c.photo; return c; }
+function leanTeachers(list) { return (list || []).map(leanTeacher); }
+/* يكتب القائمة (بلا صور) + مفاتيح الصور المُعدَّلة فقط (photoUpdates: { id: dataUrl }).
+ * تمرير {} يعني «لا تغيير على الصور» — لا قراءة ولا كتابة إضافية (حصة KV المجانية). */
+async function saveTeachers(env, teachers, photoUpdates) {
+  const payload = JSON.stringify(leanTeachers(teachers));
+  // حد القيمة الواحدة في KV هو ٢٥ ميجابايت — نرفض مبكرًا برسالة واضحة بدل
+  // فشل كتابة غامض (500) يترك المسؤول بلا تفسير.
+  if (payload.length > 20 * 1024 * 1024) {
+    throw bad('حجم بيانات المعلمين تجاوز الحد المسموح (٢٠ ميجابايت). احذف بعض الحسابات المؤرشفة أو ارفع مساحة التخزين.', 413);
+  }
+  await kvPut(env, 'teachers', payload);
+  for (const id of Object.keys(photoUpdates || {})) {
+    const photo = photoUpdates[id] || '';
+    if (photo) await kvPut(env, 'teacher:photo:' + id, photo);
+    else await kvDelete(env, 'teacher:photo:' + id);
+  }
+}
+async function saveArchived(env, archived) {
+  await kvPut(env, 'teachers:archived', JSON.stringify(leanTeachers(archived).slice(0, 200)));
 }
 async function getSessionSecret(env) {
   if (env.SESSION_SECRET) return env.SESSION_SECRET;
@@ -715,8 +804,8 @@ function ownerTeacher(teachers) {
 }
 
 async function publicCatalog(env) {
-  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
-  const owner = ownerTeacher(teachers);
+  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS.map(t => Object.assign({}, t)));
+  const owner = await hydrateTeacher(env, ownerTeacher(teachers));
   const { catalog, pubExams } = await contentView(env);
   return {
     version: BANKS.version, generatedAt: BANKS.generatedAt,
@@ -735,7 +824,8 @@ function teacherPublic(t) {
 }
 
 async function handleApi(request, env, ctx, pathname) {
-  const method = request.method;
+  // HEAD must behave exactly like GET (same routing, empty body).
+  const method = request.method === 'HEAD' ? 'GET' : request.method;
 
   /* ---------- public: catalog ---------- */
   if (pathname === '/api/catalog' && method === 'GET') {
@@ -753,6 +843,7 @@ async function handleApi(request, env, ctx, pathname) {
     const teachers = await getTeachers(env);
     const t = teachers.find(x => x.slug === teacherMatch[1] && x.enabled !== false);
     if (!t) return fail('لا يوجد معلم بهذا الرابط.', 404);
+    await hydrateTeacher(env, t);
     return json({ teacher: teacherPublic(t) }, 200, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
   }
 
@@ -792,7 +883,8 @@ async function handleApi(request, env, ctx, pathname) {
     const ids = cv.view.examDefs[examId];
     if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
 
-    const name = String(body.name || '').trim();
+    // محارف التحكم تُزال (تمنع تسميم CSV/السجلات) — نص السؤال لا يمرّ هنا أبدًا.
+    const name = stripControl(body.name, 120);
     const rawPhone = String(body.phone || '').trim();
     if (!name) return fail('اسم الطالب مطلوب.');
     if (name.length > 120) return fail('اسم الطالب طويل جدًا.');
@@ -887,13 +979,14 @@ async function handleApi(request, env, ctx, pathname) {
     const sessDefs = cv.view.examDefs[sess.examId];
     const sessMeta = cv.view.exams[sess.examId];
     if (!sessDefs || !sessMeta || sessMeta.enabled === false) return fail('الامتحان غير متاح حاليًا — أعد فتحه من قائمة الامتحانات.', 404);
-    if (!Array.isArray(answers) || answers.length !== sessDefs.length) {
-      return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
-    }
     // A live content edit that changed the exam size after this session started would
-    // desync the seeded shuffle — refuse politely instead of mis-grading.
+    // desync the seeded shuffle — refuse politely instead of mis-grading. يجب أن يسبق
+    // فحص عدد الإجابات، وإلا استحال الوصول إليه (تغيير الحجم يغيّر الطول أيضًا).
     if (Number.isInteger(sess.qcount) && sess.qcount !== sessDefs.length) {
       return fail('تم تحديث هذا الامتحان أثناء الجلسة — أعد فتح الامتحان ثم سلّم إجاباتك.', 409);
+    }
+    if (!Array.isArray(answers) || answers.length !== sessDefs.length) {
+      return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
     }
     const unanswered = [];
     answers.forEach((a, i) => { if (!Number.isInteger(a) || a < 0 || a > 3) unanswered.push(i + 1); });
@@ -996,21 +1089,20 @@ async function handleApi(request, env, ctx, pathname) {
         if (env.PLATFORM_KV) {
           await env.PLATFORM_KV.put('dedupe:' + tokenHash, responseJson, { expirationTtl: 7 * 24 * 3600 }).catch(() => {});
           await env.PLATFORM_KV.put('result:' + result.id, JSON.stringify(result)).catch(() => {});
-          const recent = await env.PLATFORM_KV.get('results:recent').catch(() => null);
-          let list = [];
-          try { list = recent ? JSON.parse(recent) : []; } catch {}
-          list.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: result.teacherSlug });
-          if (list.length > 100) list = list.slice(0, 100);
-          await env.PLATFORM_KV.put('results:recent', JSON.stringify(list)).catch(() => {});
-          // per-teacher index (powers the teacher dashboard; bank/exams stay shared)
           const tslug = result.teacherSlug || '';
-          if (tslug) {
-            const tprev = await env.PLATFORM_KV.get('results:teacher:' + tslug).catch(() => null);
-            let tlist = [];
-            try { tlist = tprev ? JSON.parse(tprev) : []; } catch {}
-            tlist.unshift({ id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage });
-            if (tlist.length > 200) tlist = tlist.slice(0, 200);
-            await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(tlist)).catch(() => {});
+          const entry = { id: result.id, date: result.date, name: result.name, phone: result.phone, examId: result.examId, examLabel: result.examLabel, subject: result.subject, total, score, percentage, teacherSlug: tslug };
+          /* The indices are a single KV key each, so a plain read-modify-write loses
+           * an entry whenever two submissions interleave. The limiter DO appends
+           * inside a storage transaction (serialised), so ordering is atomic; KV is
+           * then overwritten with the DO's authoritative list (no read-modify-write). */
+          const idx = await resultIndexAppend(env, entry, tslug).catch(() => null);
+          if (idx) {
+            await env.PLATFORM_KV.put('results:recent', JSON.stringify(idx.recent)).catch(() => {});
+            if (tslug && idx.mine) await env.PLATFORM_KV.put('results:teacher:' + tslug, JSON.stringify(idx.mine)).catch(() => {});
+          } else {
+            // DO unavailable → degrade to the previous best-effort append
+            await kvAppendResult(env, 'results:recent', entry, 100, true).catch(() => {});
+            if (tslug) await kvAppendResult(env, 'results:teacher:' + tslug, entry, 200, false).catch(() => {});
           }
         }
       } catch { /* storage failure must not lose the student's result response */ }
@@ -1057,6 +1149,20 @@ async function handleApi(request, env, ctx, pathname) {
 
 /* ============================ admin API ============================ */
 const loginFails = new Map(); // per-isolate best effort
+/* خريطة الإخفاقات تعيش بعمر الـisolate نفسِه — فلو لم تُنظَّف لأمكن لرشٍّ من محاولات
+ * دخول فاشلة من آلاف الـIP أن يضخّمها بلا حد (تسريب ذاكرة/تضخيم). كنس الداخل المنتهي
+ * عند كل محاولة، وسقف صلب يتخلص من الأقدم عند تجاوزه. */
+function sweepThrottles(map) {
+  const now = Date.now();
+  if (map.size >= 256) {
+    for (const [k, v] of map) if (!v.until || v.until <= now) map.delete(k);
+  }
+  if (map.size > 4096) {
+    let excess = map.size - 4096;
+    for (const k of map.keys()) { if (excess-- <= 0) break; map.delete(k); }
+  }
+  return map;
+}
 
 async function getAdminRecord(env) {
   return kvGetJson(env, 'admin');
@@ -1095,11 +1201,32 @@ async function handleAdmin(request, env, ctx, pathname) {
   // First-run: if initial-admin secrets are configured, provision now (idempotent).
   await ensureAdminBootstrap(env).catch(() => {});
 
+  /* ---------- حالة الإعداد الأولي (عام — لا يكشف إلا وجود حساب من عدمه) ----------
+   * كان اكتشاف «أول تشغيل» يتم بمحاولة دخول ببيانات فارغة على /api/admin/login؛
+   * وبما أن هذا المسار خاضع لحد المحاولات، كان استنفاد المحاولات من نفس IP يخفي
+   * شاشة الإعداد الأولي عن المالك على نشر جديد. نقطة حالة مخصّصة تحل المشكلة. */
+  if (pathname === '/api/admin/status' && method === 'GET') {
+    /* نقطة حالة واحدة لبدء التشغيل: هل يحتاج المالك إعدادًا أوليًا؟ وهل لديه جلسة
+     * سارية؟ — دمجتهما في طلب واحد حتى لا يبدأ التطبيق بطلب /status ثم /session.
+     * البريد يُرسَل فقط مع جلسة سارية (لا كشف لحساب بلا مصادقة). */
+    const admin = await getAdminRecord(env).catch(() => null);
+    const session = await adminCookiePayload(request, env).catch(() => null);
+    const authed = !!(admin && session && session.t === 'admin' && await hasV(env, 'sessv:admin', session.v));
+    return json({
+      setup: !admin,
+      authed,
+      email: authed ? session.email : undefined,
+      envBootstrap: !!(env.ADMIN_INITIAL_EMAIL && env.ADMIN_INITIAL_PASSWORD)
+    }, 200, { 'Cache-Control': 'no-store' });
+  }
+
   /* ---------- login ---------- */
   if (pathname === '/api/admin/login' && method === 'POST') {
+    sweepThrottles(loginFails);
     const fails = loginFails.get(ip) || { n: 0, until: 0 };
     if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة. حاول بعد قليل.', 429);
 
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
     const body = await readJson(request);
     // Existence check FIRST: the admin SPA boot probes login with empty credentials to
     // detect first run — a fresh deployment must receive the 404 "not created yet"
@@ -1131,6 +1258,11 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- initial setup (only when no admin exists) ---------- */
   if (pathname === '/api/admin/setup' && method === 'POST') {
+    // الإعداد الأولي يُنشئ مالك المنصة — يجب ألا يكون قابلًا للاستدعاء من صفحة
+    // أخرى (CSRF)، لذا يُشترط نفس ترويسة الطلب المخصّصة (المتصفح لا يستطيع
+    // إضافتها عبر المصادر دون preflight فاشل).
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
     const existing = await getAdminRecord(env);
     if (existing) return fail('حساب المسؤول موجود بالفعل.', 409);
     const body = await readJson(request);
@@ -1162,9 +1294,10 @@ async function handleAdmin(request, env, ctx, pathname) {
     return new Response(res.body, { status: res.status, headers });
   }
   if (!authed) return fail('غير مصرح.', 401);
-  // CSRF defense for state-changing endpoints: SameSite=Strict cookie + custom header
-  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') {
-    return fail('طلب غير مصرح.', 403);
+  // CSRF defense for state-changing endpoints: SameSite=Strict cookie + custom header + Origin/Host check
+  if (method !== 'GET') {
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
   }
 
   /* ---------- platform settings (admin) ---------- */
@@ -1238,6 +1371,8 @@ async function handleAdmin(request, env, ctx, pathname) {
     const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
     // NEVER return raw KV records: they carry passHash/passSalt. The admin UI only
     // needs the safe projection (+isDefault / +studentLimitStatus for the cards).
+    await hydratePhotos(env, teachers);
+    await hydratePhotos(env, archived);
     const withStatus = await Promise.all(teachers.map(async t => ({
       ...teacherAdminPayload(t), isDefault: !!t.isDefault, studentLimitStatus: await studentLimitStatus(env, t)
     })));
@@ -1256,8 +1391,10 @@ async function handleAdmin(request, env, ctx, pathname) {
     delete t.archivedAt; delete t.archived; t.enabled = false; t.updatedAt = new Date().toISOString();
     archived.splice(i, 1);
     teachers.push(t);
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
-    await kvPut(env, 'teachers:archived', JSON.stringify(archived));
+    // مفتاح الصورة (teacher:photo:<id>) لا يتحرك مع الأرشفة/الاستعادة — لا تحديث له.
+    await saveTeachers(env, teachers);
+    await saveArchived(env, archived);
+    await hydrateTeacher(env, t);
     return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
@@ -1270,11 +1407,11 @@ async function handleAdmin(request, env, ctx, pathname) {
     const archivedNow = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
     if (archivedNow.some(x => x.slug === t.slug)) return fail('هذا الرابط يخص معلمًا مؤرشفًا — استعده من الأرشيف أو اختر رابطًا مختلفًا.', 409);
     t.id = 't_' + randomHex(6);
-    t.teacherCode = 'TCH-' + String(teachers.length + 1).padStart(4, '0');
+    t.teacherCode = nextTeacherCode(teachers);
     t.createdAt = new Date().toISOString();
     t.updatedAt = t.createdAt;
     teachers.push(t);
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers, t.photo ? { [t.id]: t.photo } : {});
     return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   /* ---------- teacher dashboard (per-teacher results index) ---------- */
@@ -1310,31 +1447,48 @@ async function handleAdmin(request, env, ctx, pathname) {
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     if (method === 'PUT') {
       const body = await readJson(request, 3 * 1024 * 1024);
+      // الصورة محفوظة في مفتاح مستقل — تُحمَّل أولًا حتى لا يمحوها تعديل لا يذكرها.
+      await hydrateTeacher(env, teachers[idx]);
+      const prevPhoto = teachers[idx].photo || '';
       const t = await sanitizeTeacher(body, teachers[idx], env);
       if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
+      /* تغيير الرابط (slug) ممنوع بعد وجود بيانات مرتبطة به — لأن فهرس النتائج
+       * (results:teacher:<slug>) وسجل الطلاب (students:<slug>) وعدادات المحاولات
+       * كلها مفتاحها هو الرابط. تغييره كان: (١) يُخفي نتائج المعلم عنه وعن
+       * الإدارة نهائيًا، و(٢) يُصفّر عدد الطلاب المسجلين وعدد المحاولات فيسمح
+       * بتجاوز حد الطلاب/حد المحاولات بمجرد إعادة التسمية. مسموح فقط قبل أي بيانات. */
+      if (t.slug !== teachers[idx].slug) {
+        const prev = teachers[idx];
+        const prevResults = await kvGetJson(env, 'results:teacher:' + prev.slug).catch(() => null);
+        const prevStudents = await studentCount(env, prev);
+        if ((Array.isArray(prevResults) && prevResults.length > 0) || prevStudents > 0) {
+          return fail('لا يمكن تغيير رابط معلم لديه نتائج أو طلاب مسجلون — الرابط هو مفتاح بياناته على الخادم. أرشف الحساب وأنشئ معلمًا جديدًا برابط جديد إن لزم.', 409);
+        }
+      }
       // setting/clearing the password through the edit form is a credential change → revoke sessions
       if ((teachers[idx].passHash || '') !== (t.passHash || '')) await clearV(env, 'sessv:t:' + teachers[idx].id);
       t.id = teachers[idx].id;
-      t.teacherCode = teachers[idx].teacherCode || ('TCH-' + String(idx + 1).padStart(4, '0'));
+      t.teacherCode = teachers[idx].teacherCode || nextTeacherCode(teachers);
       t.createdAt = teachers[idx].createdAt;
       t.updatedAt = new Date().toISOString();
       if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
       teachers[idx] = t;
-      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      await saveTeachers(env, teachers, (t.photo || '') === prevPhoto ? {} : { [t.id]: t.photo || '' });
       // disabling kills all live sessions immediately (re-enabling requires a fresh login)
       if (t.enabled === false) await clearV(env, 'sessv:t:' + t.id);
       return json({ ok: true, teacher: teacherAdminPayload(t) });
     }
     if (method === 'DELETE') {
       // Non-destructive: the profile moves to the archive (restorable); results (results:teacher:<slug>)
-      // and the student registry are never deleted. The slug is released for reuse.
+      // and the student registry are never deleted. The slug STAYS reserved: creating a new
+      // teacher on an archived slug is rejected (409) so nobody inherits that history.
       if (teachers[idx].isDefault) return fail('لا يمكن حذف المعلم الافتراضي — يمكنك تعطيله فقط.', 400);
       await clearV(env, 'sessv:t:' + teachers[idx].id); // archive = sign out everywhere
       const [removed] = teachers.splice(idx, 1);
       const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
       archived.unshift({ ...removed, enabled: false, archived: true, archivedAt: new Date().toISOString() });
-      await kvPut(env, 'teachers:archived', JSON.stringify(archived.slice(0, 200)));
-      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      await saveArchived(env, archived);
+      await saveTeachers(env, teachers);
       return json({ ok: true, archived: true });
     }
   }
@@ -1351,7 +1505,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     const salt = randomHex(16);
     const hash = await pbkdf2(newPassword, salt);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers);
     await clearV(env, 'sessv:t:' + teachers[idx].id); // admin reset = the teacher must sign in again everywhere
     return json({ ok: true });
   }
@@ -1714,12 +1868,18 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- results ---------- */
   if (pathname === '/api/admin/results' && method === 'GET') {
-    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    const recent = await resultsRecent(env, 100);
     return json({ results: recent });
   }
   if (pathname === '/api/admin/results.csv' && method === 'GET') {
-    const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
-    const esc = (v) => '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"';
+    const recent = await resultsRecent(env, 200);
+    /* حقن الصيغ (CSV injection): أي قيمة تبدأ بـ = + - @ أو تبويب تُعتبر صيغة عند
+     * فتح الملف في Excel/Sheets — تُسبَق بفاصلة عليا لتُقرأ كنص. */
+    const esc = (v) => {
+      let x = String(v == null ? '' : v).replace(/[\u0000-\u0008\u000B-\u001F\u007F]/g, ' ');
+      if (/^[=+\-@\t\r]/.test(x)) x = "'" + x;
+      return '"' + x.replace(/"/g, '""') + '"';
+    };
     const rows = [['التاريخ', 'اسم الطالب', 'رقم الهاتف', 'الامتحان', 'المادة', 'الدرجة', 'النسبة %', 'المعلم'].map(esc).join(',')];
     recent.forEach(r => rows.push([
       new Date(r.date).toLocaleString('ar-EG'), r.name, r.phone, r.examLabel, r.subject,
@@ -1734,7 +1894,9 @@ async function handleAdmin(request, env, ctx, pathname) {
 }
 
 async function sanitizeTeacher(body, existing, env) {
-  const name = String(body.name || '').trim();
+  // اسم/نبذة/تخصص المعلم تظهر في صفحته العامة — تُهرَّب عند العرض، وتُنظَّف هنا
+  // من محارف التحكم حتى لا تُستخدم لتسميم CSV أو السجلات.
+  const name = stripControl(body.name, 80);
   if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
@@ -1798,8 +1960,8 @@ async function sanitizeTeacher(body, existing, env) {
 
   return {
     slug, name, phone, email, username, passHash, passSalt, passIterations,
-    specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
-    bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
+    specialty: stripControl(body.specialty ?? existing?.specialty ?? '', 120),
+    bio: stripControl(body.bio ?? existing?.bio ?? '', 500),
     photo,
     // عرض الصورة: contain (افتراضي للشفاف) أو cover (قص متناسق) — فارغ = تلقائي حسب نوع الملف
     photoFit: body.photoFit === 'cover' || body.photoFit === 'contain' ? body.photoFit
@@ -1841,8 +2003,13 @@ async function teacherCookiePayload(request, env) {
 }
 async function handleTeacherLogin(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  sweepThrottles(teacherLoginFails);
   const fails = teacherLoginFails.get(ip) || { n: 0, until: 0 };
   if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة.', 429);
+  // نفس قواعد الحماية من CSRF: لا تسجيل دخول مُجبر من موقع آخر (login CSRF)،
+  // ولا مصدر خارجي (ترويسة مخصّصة + تطابق Origin/Host).
+  if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+  if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
   const body = await readJson(request);
   const email = String(body.email || '').trim().toLowerCase();
   const password = String(body.password || '');
@@ -1884,7 +2051,10 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
   const method = request.method;
   const teacher = await requireTeacher(request, env);
   if (!teacher) return fail('غير مصرح.', 401);
-  if (method !== 'GET' && request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+  if (method !== 'GET') {
+    if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
+    if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
+  }
   if (pathname === '/api/t/password' && method === 'POST') {
     const body = await readJson(request);
     const current = String(body.current || ''); const next = String(body.next || '');
@@ -1898,7 +2068,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers);
     // password change revokes every session, then re-issues the CURRENT device only
     const v = randomHex(8);
     await setVList(env, 'sessv:t:' + teacher.id, [v]);
@@ -1912,6 +2082,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
   if (pathname === '/api/t/profile' && method === 'GET') {
     // The teacher's own safe profile (used to pre-fill the edit form — prevents the
     // "save blanks out fields you never saw" bug). Never exposes hashes/limits of others.
+    await hydrateTeacher(env, teacher);
     return json({ teacher: {
       id: teacher.id, slug: teacher.slug, studentUrl: '/' + teacher.slug,
       phone: teacher.phone || '', email: teacher.email || '', username: teacher.username || '',
@@ -1924,8 +2095,11 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     const teachers = await getTeachers(env);
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
-    const existing = teachers[idx]; const updated = { ...existing };
-    updated.name = String(body.name || '').trim() || existing.name;
+    // الصورة في مفتاح مستقل — تُحمَّل أولًا حتى لا يمحوها حفظ لا يذكرها.
+    const existing = await hydrateTeacher(env, teachers[idx]);
+    const prevPhoto = existing.photo || '';
+    const updated = { ...existing };
+    updated.name = stripControl(body.name, 80) || existing.name;
     if (updated.name.length > 80) throw bad('اسم المعلم طويل.');
     updated.phone = String(body.phone ?? existing.phone ?? '').trim();
     if (updated.phone) { const np = normalizePhone(updated.phone); updated.phone = isValidEgMobile(np) ? np : updated.phone.replace(/[\s\-.()]/g, ''); }
@@ -1939,7 +2113,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
       }
     }
     updated.socialLinks = social;
-    updated.bio = String(body.bio ?? existing.bio ?? '').trim().slice(0, 500);
+    updated.bio = stripControl(body.bio ?? existing.bio ?? '', 500);
     if (body.photo !== undefined) {
       let photo = String(body.photo || '');
       if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
@@ -1950,11 +2124,11 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     else if (body.photoFit === '') updated.photoFit = '';
     updated.updatedAt = new Date().toISOString();
     teachers[idx] = updated;
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers, (updated.photo || '') === prevPhoto ? {} : { [updated.id]: updated.photo || '' });
     return json({ ok: true, teacher: teacherPublic(updated) });
   }
   if (pathname === '/api/t/dashboard' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const slStatus = await studentLimitStatus(env, teacher);
     const students = Math.max(slStatus.current, new Set(tlist.map(r => (r.phone || '') + '|' + r.name)).size);
     const avg = tlist.length ? Math.round(tlist.reduce((n, r) => n + r.percentage, 0) / tlist.length * 100) / 100 : 0;
@@ -1969,7 +2143,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
       recent: tlist.slice(0, 10) });
   }
   if (pathname === '/api/t/students' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const slStatus = await studentLimitStatus(env, teacher);
     const studentMap = new Map();
     tlist.forEach(r => { const key = (r.phone || '') + '|' + normalizeName(r.name); if (!studentMap.has(key)) studentMap.set(key, { name: r.name, phone: r.phone || '', examCount: 0, totalScore: 0, totalPossible: 0, lastActivity: r.date, firstSeen: r.date }); const s = studentMap.get(key); s.examCount++; s.totalScore += r.score; s.totalPossible += r.total; if (new Date(r.date) > new Date(s.lastActivity)) s.lastActivity = r.date; if (new Date(r.date) < new Date(s.firstSeen)) s.firstSeen = r.date; });
@@ -1980,7 +2154,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     return json({ total: students.length, registered: slStatus.current, students: students.map(s => ({ name: s.name, phone: s.phone, examCount: s.examCount, avgPercentage: s.totalPossible > 0 ? Math.round(s.totalScore / s.totalPossible * 10000) / 100 : 0, lastActivity: s.lastActivity, firstSeen: s.firstSeen })) });
   }
   if (pathname === '/api/t/results' && method === 'GET') {
-    const tlist = await kvGetJson(env, 'results:teacher:' + teacher.slug).catch(() => null) || [];
+    const tlist = await resultsForTeacher(env, teacher.slug, 200);
     const url = new URL(request.url); const search = (url.searchParams.get('q') || '').trim().toLowerCase(); const subject = (url.searchParams.get('subject') || '').trim(); const examId = (url.searchParams.get('examId') || '').trim();
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1); const perPage = 50;
     let results = tlist;
@@ -1991,6 +2165,16 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     return json({ total, page, perPage, results: slice.map(r => ({ id: r.id, date: r.date, name: r.name, phone: r.phone, examId: r.examId, examLabel: r.examLabel, subject: r.subject, score: r.score, total: r.total, percentage: r.percentage })) });
   }
   return fail('المسار غير موجود.', 404);
+}
+
+/* كود معلم فريد فعلًا: 'TCH-' + (count+1) كان يُكرَّر بعد أي حذف/أرشفة. */
+function nextTeacherCode(teachers) {
+  const used = new Set((teachers || []).map(x => x.teacherCode).filter(Boolean));
+  for (let n = (teachers || []).length + 1; n < 10000; n++) {
+    const code = 'TCH-' + String(n).padStart(4, '0');
+    if (!used.has(code)) return code;
+  }
+  return 'TCH-' + randomHex(3).toUpperCase();
 }
 
 function teacherAdminPayload(t) {
@@ -2080,6 +2264,39 @@ export class AttemptLimiter {
       });
       return Response.json(result);
     }
+    /* ---- results index: serialised, transactional append ---- */
+    if (url.pathname === '/results/append' && request.method === 'POST') {
+      let b = null;
+      try { b = await request.json(); } catch {}
+      const e = b && b.entry;
+      if (!e || !e.id) return Response.json({ error: 'entry required' }, 400);
+      const scope = String(b.scope || '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 90);
+      const lean = { id: String(e.id).slice(0, 64), date: String(e.date || '').slice(0, 40), name: String(e.name || '').slice(0, 120), phone: String(e.phone || '').slice(0, 40), examId: String(e.examId || '').slice(0, 60), examLabel: String(e.examLabel || '').slice(0, 200), subject: String(e.subject || '').slice(0, 60), total: Number(e.total) || 0, score: Number(e.score) || 0, percentage: Number(e.percentage) || 0, teacherSlug: String(e.teacherSlug || '').slice(0, 80) };
+      const out = await this.state.storage.transaction(async (txn) => {
+        const all = (await txn.get('recent')) || [];
+        if (all.some((r) => r.id === lean.id)) {
+          return { recent: all.slice(0, 200), mine: scope ? ((await txn.get(scope)) || []).slice(0, 200) : null, duplicate: true };
+        }
+        const next = [lean, ...all].slice(0, RESULT_INDEX_CAP);
+        await txn.put('recent', next);
+        let mine = null;
+        if (scope) {
+          const prev = (await txn.get(scope)) || [];
+          if (!prev.some((r) => r.id === lean.id)) {
+            mine = [lean, ...prev].slice(0, RESULT_INDEX_CAP);
+            await txn.put(scope, mine);
+          } else mine = prev;
+        }
+        return { recent: next.slice(0, 200), mine: mine ? mine.slice(0, 200) : null, duplicate: false };
+      });
+      return Response.json(out);
+    }
+    if (url.pathname === '/results/list' && request.method === 'GET') {
+      const scope = String(url.searchParams.get('scope') || '').replace(/[^A-Za-z0-9_.:-]/g, '').slice(0, 90);
+      const limit = Math.max(1, Math.min(200, parseInt(url.searchParams.get('limit') || '200', 10) || 200));
+      const list = scope ? ((await this.state.storage.get(scope)) || []) : ((await this.state.storage.get('recent')) || []);
+      return Response.json({ items: Array.isArray(list) ? list.slice(0, limit) : [] });
+    }
     if (url.pathname === '/consume' && request.method === 'POST') {
       let limit = 0;
       try { limit = Math.max(1, Math.min(50, parseInt((await request.json()).limit, 10) || 0)); } catch {}
@@ -2102,6 +2319,68 @@ export class AttemptLimiter {
 async function limiterStub(env, key) {
   if (!env.ATTEMPT_LIMITER) return null;
   return env.ATTEMPT_LIMITER.get(env.ATTEMPT_LIMITER.idFromName('v1:' + key));
+}
+
+/* ---------- results index: KV cannot do read-modify-write atomically ----------
+ * Two submissions finishing together both read `results:recent`, both prepend and
+ * both write back — the slower write drops the other result from the index (the
+ * result body at `result:<id>` survives, but it vanishes from every dashboard).
+ * The Durable Object serialises the append in a storage transaction, so the list
+ * is never lost; KV is kept as a write-through mirror (and as history for results
+ * recorded before this existed), and readers merge the two and de-duplicate by id.
+ */
+const RESULT_INDEX_CAP = 400;
+async function resultIndexAppend(env, entry, teacherSlug) {
+  const stub = await limiterStub(env, '__results__');
+  if (!stub) return null;
+  const r = await stub.fetch('https://limiter/results/append', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ entry, scope: 't:' + String(teacherSlug || 'unknown').replace(/[^A-Za-z0-9_.-]/g, '').slice(0, 80) })
+  }).catch(() => null);
+  if (!r || !r.ok) return null;
+  return await r.json().catch(() => null);
+}
+async function resultIndexList(env, scope, limit) {
+  const stub = await limiterStub(env, '__results__');
+  if (!stub) return null;
+  const r = await stub.fetch('https://limiter/results/list?scope=' + encodeURIComponent(scope || '') + '&limit=' + limit, { method: 'GET' }).catch(() => null);
+  if (!r || !r.ok) return null;
+  const d = await r.json().catch(() => null);
+  return Array.isArray(d && d.items) ? d.items : null;
+}
+function mergeResultLists(a, b, limit) {
+  const seen = new Set(); const out = [];
+  for (const r of (a || []).concat(b || [])) {
+    if (!r || !r.id || seen.has(r.id)) continue;   // de-dup: KV mirror + DO overlap
+    seen.add(r.id); out.push(r);
+  }
+  out.sort((x, y) => String(y.date || '').localeCompare(String(x.date || '')));
+  return out.slice(0, limit);
+}
+async function resultsRecent(env, limit) {
+  const [fromDo, fromKv] = await Promise.all([
+    resultIndexList(env, '', 200),
+    kvGetJson(env, 'results:recent').catch(() => null)
+  ]);
+  return mergeResultLists(fromDo, fromKv, limit);
+}
+async function resultsForTeacher(env, slug, limit) {
+  const [fromDo, fromKv] = await Promise.all([
+    slug ? resultIndexList(env, 't:' + slug, 200) : null,
+    kvGetJson(env, 'results:teacher:' + slug).catch(() => null)
+  ]);
+  return mergeResultLists(fromDo, fromKv, limit);
+}
+async function kvAppendResult(env, key, entry, cap, withSlug) {
+  const raw = await env.PLATFORM_KV.get(key).catch(() => null);
+  let list = [];
+  try { list = raw ? JSON.parse(raw) : []; } catch {}
+  if (!Array.isArray(list)) list = [];
+  list.unshift(withSlug ? entry : { id: entry.id, date: entry.date, name: entry.name, phone: entry.phone, examId: entry.examId, examLabel: entry.examLabel, subject: entry.subject, total: entry.total, score: entry.score, percentage: entry.percentage });
+  if (list.length > cap) list = list.slice(0, cap);
+  await env.PLATFORM_KV.put(key, JSON.stringify(list)).catch(() => {});
+  return list;
 }
 async function limitKey(slug, examId, identity) {
   const digest = await crypto.subtle.digest('SHA-256', enc.encode(slug + '|' + examId + '|' + identity));
@@ -2128,7 +2407,13 @@ export default {
 
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         try {
-          return securityHeaders(await handleApi(request, env, ctx, pathname));
+          const res = await handleApi(request, env, ctx, pathname);
+          // HEAD must behave exactly like GET (status + headers) with no body —
+          // previously every HEAD on /api/* fell through to a 404.
+          const out = (request.method === 'HEAD')
+            ? new Response(null, { status: res.status, headers: res.headers })
+            : res;
+          return securityHeaders(out);
         } catch (e) {
           // Only ApiError messages reach the client; anything else is an internal fault → generic text, no details.
           if (e instanceof ApiError) return securityHeaders(fail(e.message, e.status));
@@ -2138,6 +2423,15 @@ export default {
 
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         return securityHeaders(fail('الطريقة غير مسموح بها.', 405));
+      }
+
+      /* الملفات نفسها تُخدَم من مساراتها القياسية فقط (/ و /admin و /teacher):
+       * /index.html و /admin.html و /teacher.html تُحوَّل تحويلًا دائمًا حتى لا
+       * يُفهرس المحتوى نفسه تحت أكثر من رابط (كان خادم الأصول يحوّل /index.html
+       * → / تلقائيًا، ومع run_worker_first صار التحويل مسؤولية الـWorker). */
+      const canonicalHtml = { '/index.html': '/', '/admin.html': '/admin', '/teacher.html': '/teacher' };
+      if (canonicalHtml[pathname]) {
+        return securityHeaders(new Response(null, { status: 308, headers: { Location: canonicalHtml[pathname], 'Cache-Control': 'no-store' } }));
       }
 
       // teacher SPA: /teacher (login + dashboard) — shell must always revalidate (assets are ?v= versioned)

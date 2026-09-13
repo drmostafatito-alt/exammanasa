@@ -225,7 +225,8 @@
     else if (logo) logoEl.innerHTML = '<img src="' + esc(logo) + '" alt="">';
     else logoEl.textContent = monogramOf(t ? t.name : platformName);
     var footBrand = document.getElementById('footBrand');
-    if (footBrand) footBrand.innerHTML = platformName + (t ? ' — <b>' + esc(t.name) + '</b>' : '');
+    /* platformName نص قابل للتحكم من لوحة الإدارة — يجب تهريبه مثل أي مدخل مستخدم. */
+    if (footBrand) footBrand.innerHTML = esc(platformName) + (t ? ' — <b>' + esc(t.name) + '</b>' : '');
     var footSub = document.getElementById('footSub');
     if (footSub) footSub.textContent = shortDesc;
     var footCopy = document.getElementById('footCopy');

@@ -47,7 +47,7 @@ const ok = (name, cond, extra) => {
 
 /* ---------- tiny fetch helpers ---------- */
 async function jfetch(path, opts) {
-  const r = await fetch(BASE + path, opts);
+  const r = await fetch(BASE + path, { redirect: 'manual', ...(opts || {}) });
   const text = await r.text();
   let data = null; try { data = JSON.parse(text); } catch {}
   return { status: r.status, data, text, headers: r.headers };
@@ -155,6 +155,34 @@ try {
     ok('GET /styles.css → 200 CSS', css.status === 200 && css.text.includes('--primary'));
     const robots = await jfetch('/robots.txt');
     ok('robots.txt يمنع /admin و /api', robots.status === 200 && robots.text.includes('Disallow: /admin'));
+  }
+
+  /* ============ 1ب. ترويسات الأمان على كل استجابة (لا استثناءات) ============ */
+  console.log('\n[1ب] ترويسات الأمان على الصفحات والأصول الثابتة');
+  {
+    /* انحدار: خادم الأصول كان يخدم أي ملف موجود في ./public قبل الـWorker، فتُسلَّم
+     * كل صفحات HTML وملفات JS/CSS بلا أي ترويسة أمان. run_worker_first يضمن مرور
+     * كل طلب على securityHeaders(). */
+    const paths = ['/', '/admin', '/teacher', '/mostafa', '/app.js', '/styles.css', '/favicon.svg', '/robots.txt', '/art/wave.svg', '/nope-404'];
+    for (const p of paths) {
+      const r = await jfetch(p);
+      ok('ترويسات أمان كاملة على ' + p,
+        r.headers.get('x-content-type-options') === 'nosniff' &&
+        r.headers.get('x-frame-options') === 'DENY' &&
+        r.headers.get('referrer-policy') === 'strict-origin-when-cross-origin' &&
+        !!r.headers.get('content-security-policy') &&
+        /frame-ancestors 'none'/.test(r.headers.get('content-security-policy') || ''),
+        'got ' + JSON.stringify(Object.fromEntries(r.headers.entries())).slice(0, 200));
+    }
+    const idx = await jfetch('/index.html');
+    ok('/index.html → 308 دائم إلى /', idx.status === 308 && (idx.headers.get('location') || '') === '/', 'got ' + idx.status);
+    const adm = await jfetch('/admin.html');
+    ok('/admin.html → 308 دائم إلى /admin', adm.status === 308 && (adm.headers.get('location') || '') === '/admin', 'got ' + adm.status);
+    ok('واجهات المعلم/المسؤول بلا تخزين مؤقت (no-cache)',
+      (await jfetch('/admin')).headers.get('cache-control') === 'no-cache' &&
+      (await jfetch('/teacher')).headers.get('cache-control') === 'no-cache');
+    const head = await jfetch('/api/catalog', { method: 'HEAD' });
+    ok('HEAD على /api/* يكافئ GET (لا 404)', head.status === 200, 'got ' + head.status);
   }
 
   /* ============ 2. catalog ============ */
@@ -339,6 +367,9 @@ try {
   console.log('\n[8] حساب المسؤول');
   let cookie;
   {
+    const st0 = await jfetch('/api/admin/status');
+    ok('GET /api/admin/status قبل الإعداد → setup:true', st0.status === 200 && st0.data.setup === true, JSON.stringify(st0.data));
+    ok('GET /api/admin/status بلا كوكي → authed:false ولا يكشف البريد', st0.data.authed === false && !('email' in st0.data), JSON.stringify(st0.data));
     const noAdmin = await post('/api/admin/login', { email: 'x@y.z', password: 'whatever1' });
     ok('لا دخول قبل إنشاء الحساب (رسالة إعداد)', noAdmin.status === 404);
     const weak = await post('/api/admin/setup', { email: 'bad', password: 'short' });
@@ -347,6 +378,8 @@ try {
     ok('الإعداد الأولي ناجح', setup.status === 200);
     const dup = await post('/api/admin/setup', { email: 'a@b.c', password: 'longenough1' });
     ok('لا يمكن إنشاء حساب مسؤول ثانٍ', dup.status === 409);
+    const st1 = await jfetch('/api/admin/status');
+    ok('GET /api/admin/status بعد الإعداد → setup:false (ولا يكشف أي سر)', st1.status === 200 && st1.data.setup === false && !JSON.stringify(st1.data).includes('pass'), JSON.stringify(st1.data));
     const wrong = await post('/api/admin/login', { email: 'admin@test.local', password: 'wrong-password' });
     ok('رفض كلمة مرور خاطئة', wrong.status === 401);
     const login = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' });
@@ -356,6 +389,8 @@ try {
     cookie = sc.split(';')[0];
     const sessionOk = await jfetch('/api/admin/session', { headers: { Cookie: cookie } });
     ok('الجلسة تعمل', sessionOk.status === 200 && sessionOk.data.email === 'admin@test.local');
+    const stAuth = await jfetch('/api/admin/status', { headers: { Cookie: cookie } });
+    ok('GET /api/admin/status مع جلسة سارية → authed:true + البريد (طلب واحد يكفي لبدء اللوحة)', stAuth.data.authed === true && stAuth.data.email === 'admin@test.local', JSON.stringify(stAuth.data));
     const unauth = await jfetch('/api/admin/overview');
     ok('رفض الوصول بدون جلسة', unauth.status === 401);
     const noCsrf = await fetch(BASE + '/api/admin/teachers', {
@@ -875,6 +910,197 @@ try {
     await jfetch('/api/admin/teachers/' + mk19.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 19ب. سلامة الرابط (slug): لا تغيير بعد وجود بيانات ============ */
+  console.log('\n[19ب] الرابط (slug) ثابت — لا يُفقد بيانات ولا يُصفّر الحدود');
+  {
+    // انحدار: تغيير slug معلم لديه نتائج كان (١) يُخفي نتائجه للأبد (فهرس
+    // results:teacher:<slug>) و(٢) يُصفّر سجل الطلاب وعدادات المحاولات فيسمح
+    // بتجاوز حد الطلاب بمجرد إعادة التسمية.
+    const mk = await post('/api/admin/teachers', { name: 'معلم رابط', slug: 'slugx', email: 'slugx@test.com', password: 'password123', requirePhone: true }, { Cookie: cookie });
+    const id = mk.data.teacher.id;
+    // معلم بلا بيانات: يُسمح بتصحيح الرابط
+    const ren0 = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم رابط', slug: 'slugy' })
+    });
+    ok('تغيير الرابط مسموح قبل وجود أي بيانات', ren0.status === 200 && ren0.data.teacher.slug === 'slugy', 'got ' + ren0.status);
+    // أنتج نتيجة + سجّل طالبًا تحت الرابط الجديد
+    const ss = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب الرابط', phone: '01090000021', slug: 'slugy' });
+    ok('بدء تحت الرابط الجديد يعمل', ss.status === 200);
+    await post('/api/exam/submit', { token: ss.data.token, answers: correctPositions('U1-T1', decodeToken(ss.data.token).seed) });
+    await new Promise(r => setTimeout(r, 900));
+    const ren1 = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم رابط', slug: 'slugz' })
+    });
+    ok('تغيير الرابط مرفوض (409) بعد وجود نتائج/طلاب — لا ضياع بيانات', ren1.status === 409, 'got ' + ren1.status + ' ' + ren1.text.slice(0, 120));
+    const st = await jfetch('/api/admin/teachers/' + id + '/stats', { headers: { Cookie: cookie } });
+    ok('نتائج المعلم وطلابه ما زالوا مرتبطين به بعد الرفض',
+      st.status === 200 && st.data.totals.results >= 1 && st.data.studentLimit.current >= 1, JSON.stringify(st.data && st.data.totals));
+    // كود المعلم فريد فعلًا (كان يُكرَّر بعد الحذف)
+    const codes = (await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } })).data.teachers.map(t => t.teacherCode);
+    ok('أكواد المعلمين فريدة (لا تكرار بعد أرشفة)', new Set(codes).size === codes.length, codes.join(','));
+    await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 19ج. CSRF حقيقي + تعقيم المخرجات ============ */
+  console.log('\n[19ج] CSRF (ترويسة + Origin) وتعقيم CSV/النصوص');
+  {
+    // CSRF على الإعداد الأولي: صفحة خارجية لا تستطيع إنشاء مالك المنصة
+    const setupCsrf = await fetch(BASE + '/api/admin/setup', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'x@y.test', password: 'AnotherPass#1' })
+    });
+    ok('POST /api/admin/setup بلا ترويسة مخصّصة → 403', setupCsrf.status === 403, 'got ' + setupCsrf.status);
+    const loginCsrf = await fetch(BASE + '/api/t/login', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: 'a@b.test', password: 'whatever123' })
+    });
+    ok('POST /api/t/login بلا ترويسة مخصّصة → 403 (لا login-CSRF)', loginCsrf.status === 403, 'got ' + loginCsrf.status);
+    // Origin بين المواقع مرفوض حتى مع الترويسة الصحيحة
+    const originBad = await fetch(BASE + '/api/admin/teachers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'Origin': 'https://evil.example', Cookie: cookie },
+      body: JSON.stringify({ name: 'evil', slug: 'evil1' })
+    });
+    ok('POST بمصدر خارجي (Origin مختلف عن Host) → 403', originBad.status === 403, 'got ' + originBad.status);
+    const originOk = await fetch(BASE + '/api/admin/teachers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', 'Origin': new URL(BASE).origin, Cookie: cookie },
+      body: JSON.stringify({ name: 'من نفس المصدر', slug: 'sameorigin1' })
+    });
+    const originOkBody = await originOk.json().catch(() => ({}));
+    ok('POST من نفس المصدر مقبول (Origin = Host)', originOk.status === 200, 'got ' + originOk.status);
+    if (originOkBody.teacher && originOkBody.teacher.id) {
+      await jfetch('/api/admin/teachers/' + originOkBody.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+    }
+
+    // تعقيم CSV: صيغة تبدأ بـ = لا تُنفَّذ عند فتح الملف
+    const sF = await post('/api/exam/start', { examId: 'U1-T1', name: '=cmd|\' /c calc\'!A1', phone: '01090000031', slug: 'mostafa' });
+    ok('اسم طالب بصيغة CSV مقبول كنص', sF.status === 200, 'got ' + sF.status);
+    if (sF.status === 200) {
+      await post('/api/exam/submit', { token: sF.data.token, answers: correctPositions('U1-T1', decodeToken(sF.data.token).seed) });
+      await new Promise(r => setTimeout(r, 900));
+      const csv = await jfetch('/api/admin/results.csv', { headers: { Cookie: cookie } });
+      ok('CSV يجرّد صيغة Excel (قيمة تبدأ بـ = تُسبَق بـ \')', csv.text.includes('"\'=cmd|'), (csv.text.match(/.{0,40}cmd.{0,20}/) || [''])[0]);
+      ok('CSV لا يحتوي أي خلية تبدأ بـ "=', !/,"=/.test(csv.text), (csv.text.match(/,"=[^"]*/) || [''])[0]);
+    }
+    // محارف التحكم تُزال من الاسم (لا تسميم سجلات/CSV)
+    const sC = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب\u0000\u0007خبيث', phone: '01090000032', slug: 'mostafa' });
+    ok('محارف التحكم تُزال من اسم الطالب', sC.status === 200 && decodeToken(sC.data.token).name === 'طالب خبيث', 'got ' + JSON.stringify(decodeToken(sC.data.token).name));
+    // نص السؤال لم يُمسّ (الأسئلة لا تمرّ عبر stripControl)
+    const bankQ = BANKS.questions[BANKS.examDefs['U1-T1'][0]];
+    const sQ = await post('/api/exam/start', { examId: 'U1-T1', name: 'طالب', phone: '01090000033', slug: 'mostafa' });
+    ok('نص السؤال يصل حرفيًا كما في البنك (لا تعقيم)', sQ.status === 200 && sQ.data.questions[0].text === bankQ.text);
+  }
+
+  /* ============ 19د. صور المعلمين خارج مستند القائمة (حد KV ٢٥ ميجابايت) ============ */
+  console.log('\n[19د] صورة المعلم تُخزَّن في مفتاح مستقل ولا تضيع');
+  {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const mk = await post('/api/admin/teachers', { name: 'معلم صورة', slug: 'photot', email: 'photo@test.com', username: 'photot', password: 'password123', photo: PHOTO }, { Cookie: cookie });
+    ok('إنشاء معلم بصورة', mk.status === 200 && mk.data.teacher.photo === PHOTO, 'got ' + mk.status);
+    const id = mk.data.teacher.id;
+    const list = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    ok('قائمة المعلمين تُرجع الصورة (محمّلة من مفتاحها)', list.data.teachers.some(t => t.id === id && t.photo === PHOTO));
+    // تعديل لا يذكر الصورة يجب ألا يمحوها
+    const ren = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم صورة ٢', slug: 'photot' })
+    });
+    ok('تعديل بلا حقل صورة يحفظ الصورة الحالية (لا محو)', ren.status === 200 && ren.data.teacher.photo === PHOTO, 'got ' + (ren.data.teacher || {}).photo);
+    const pubT = await jfetch('/api/teacher/photot');
+    ok('الصفحة العامة تعرض الصورة', pubT.status === 200 && pubT.data.teacher.photo === PHOTO);
+    // المعلم نفسه: حفظ الملف الشخصي بلا صورة يجب ألا يمحوها
+    const lg = await post('/api/t/login', { email: 'photo@test.com', password: 'password123' });
+    const tCookie = 'teacher_session=' + ((lg.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/) || [, ''])[1];
+    const prof0 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('ملف المعلم يحمل صورته', prof0.status === 200 && prof0.data.teacher.photo === PHOTO);
+    await jfetch('/api/t/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: tCookie },
+      body: JSON.stringify({ bio: 'نبذة بلا صورة' })
+    });
+    const prof1 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('حفظ الملف بلا حقل صورة يحفظ الصورة', prof1.data.teacher.photo === PHOTO && prof1.data.teacher.bio === 'نبذة بلا صورة', JSON.stringify({ p: (prof1.data.teacher.photo || '').slice(0, 30), b: prof1.data.teacher.bio }));
+    // إزالة صريحة
+    await jfetch('/api/t/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: tCookie },
+      body: JSON.stringify({ photo: '' })
+    });
+    const prof2 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('إزالة صريحة (photo:"") تمسح الصورة', prof2.data.teacher.photo === '');
+    await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
+  /* ============ 19ه. استيراد/تصدير: رحلة كاملة (round-trip) ============ */
+  console.log('\n[19ه] تصدير ←→ استيراد (نفس الصيغة القياسية)');
+  {
+    const AH = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie };
+    const src = 'T1-PH-01';
+    const exp = await jfetch('/api/admin/exams/' + src + '/export', { headers: AH });
+    ok('تصدير امتحان من البنك بصيغة v1', exp.status === 200 && exp.data.version === 1 && exp.data.exam && exp.data.questions.length === BANKS.examDefs[src].length,
+      'got ' + exp.status);
+    ok('التصدير يحوي المفاتيح (إدارة فقط) ولا يحوي بيانات خادم داخلية',
+      exp.data.questions.every(q => /^[ABCD]$/.test(q.correctAnswer)) && !('passHash' in exp.data));
+    const canonical = JSON.stringify(exp.data);
+    const prev = await jfetch('/api/admin/exams', { headers: AH });
+    // معاينة: كل الأسئلة «موجودة مسبقًا» → لا إنشاء مكرر
+    const pv = await jfetch('/api/admin/import/preview', { method: 'POST', headers: AH, body: JSON.stringify({ text: canonical }) });
+    ok('معاينة الرحلة الكاملة: لا أسئلة جديدة (كلها موجودة في البنك)',
+      pv.status === 200 && pv.data.report.ok === true && pv.data.report.stats.newCount === 0 && pv.data.report.stats.existsInBank === BANKS.examDefs[src].length,
+      JSON.stringify(pv.data.report && pv.data.report.stats));
+    ok('المعاينة لا تحفظ شيئًا', (await jfetch('/api/admin/exams', { headers: AH })).data.counts.all === prev.data.counts.all);
+    const cm = await jfetch('/api/admin/import/commit', { method: 'POST', headers: AH, body: JSON.stringify({ text: canonical, confirm: true }) });
+    ok('الاستيراد المؤكَّد ينشئ امتحانًا مخصّصًا دون تكرار أي سؤال',
+      cm.status === 200 && cm.data.createdQuestions === 0 && cm.data.total === BANKS.examDefs[src].length, JSON.stringify(cm.data));
+    // الامتحان المستورد يطابق الأصل ترتيبًا ونصًا ومفتاحًا
+    const got = await jfetch('/api/admin/exams/' + cm.data.examId, { headers: AH });
+    const same = got.status === 200 &&
+      got.data.questionIds.join('|') === BANKS.examDefs[src].join('|') &&
+      got.data.questions.every((q, i) => q.text === BANKS.questions[BANKS.examDefs[src][i]].text && q.answer === BANKS.questions[BANKS.examDefs[src][i]].answer && q.options.join('|') === BANKS.questions[BANKS.examDefs[src][i]].options.join('|'));
+    ok('الامتحان المستورد مطابق للأصل (الترتيب/النص/الخيارات/المفتاح)', same);
+    ok('بنك الأسئلة لم يُعدَّل بالاستيراد (لا duplicate مقصود)', (await jfetch('/api/admin/questions', { headers: AH })).data.counts.all === Object.keys(BANKS.questions).length);
+    // رفض حمولة ضخمة/تالفة
+    const huge = await jfetch('/api/admin/import/preview', { method: 'POST', headers: AH, body: JSON.stringify({ text: 'x'.repeat(7 * 1024 * 1024) }) });
+    ok('حمولة استيراد أكبر من ٦ ميجابايت → 413', huge.status === 413, 'got ' + huge.status);
+    await jfetch('/api/admin/exams/' + cm.data.examId, { method: 'DELETE', headers: AH });
+  }
+
+  /* ============ 19و. فهرس النتائج: تسليمات متزامنة لا تُفقد ============ */
+  console.log('\n[19و] فهرس النتائج ذريًا (تسليمات متزامنة)');
+  {
+    const AH = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie };
+    const mkT = await post('/api/admin/teachers', { name: 'معلم التزامن', slug: 'conc1', email: 'conc1@test.com', username: 'conc1', password: 'securePass123' }, AH);
+    const slug = mkT.data.teacher.slug;
+    // 6 طلاب يبدؤون معًا ثم يسلّمون معًا (Promise.all = نفس اللحظة على الخادم)
+    const N = 6;
+    const starts = await Promise.all(Array.from({ length: N }, (_, i) =>
+      post('/api/exam/start', { examId: 'U1-T1', name: 'متزامن ' + i, phone: '0107770000' + i, slug })));
+    ok('بدء ' + N + ' جلسات متزامنة', starts.every(s => s.status === 200), starts.map(s => s.status).join(','));
+    const subs = await Promise.all(starts.map(s => {
+      const seed = decodeToken(s.data.token).seed;
+      return post('/api/exam/submit', { token: s.data.token, answers: correctPositions('U1-T1', seed) });
+    }));
+    ok('كل التسليمات المتزامنة نجحت', subs.every(s => s.status === 200 && s.data.score === BANKS.examDefs['U1-T1'].length), subs.map(s => s.status + '/' + (s.data && s.data.score)).join(' '));
+    const ids = subs.map(s => s.data.id);
+    ok('معرّفات نتائج متمايزة (لا تصادم)', new Set(ids).size === N, ids.join(','));
+    const adminRes = await jfetch('/api/admin/results', { headers: AH });
+    const seen = (adminRes.data.results || []).map(r => r.id);
+    const missing = ids.filter(id => !seen.includes(id));
+    ok('فهرس الإدارة يحوي كل النتائج المتزامنة (لا lost update)', missing.length === 0, 'مفقود: ' + missing.join(','));
+    ok('لا تكرار في الفهرس بعد الدمج', new Set(seen).size === seen.length);
+    // نفس الشيء من جانب المعلم
+    const lg = await post('/api/t/login', { email: 'conc1@test.com', password: 'securePass123' });
+    const tc = 'teacher_session=' + lg.headers.get('set-cookie').match(/teacher_session=([^;]+)/)[1];
+    const tres = await jfetch('/api/t/results', { headers: { Cookie: tc } });
+    const tseen = tres.data.results.map(r => r.id);
+    ok('فهرس المعلم يحوي كل نتائج طلابه المتزامنة', ids.every(id => tseen.includes(id)), 'مفقود: ' + ids.filter(id => !tseen.includes(id)).join(','));
+    const dash = await jfetch('/api/t/dashboard', { headers: { Cookie: tc } });
+    ok('لوحة المعلم تحسب ' + N + ' طلاب متمايزين', dash.data.totals.students === N && dash.data.totals.results === N, JSON.stringify(dash.data.totals));
+    // العزل: نتائج معلم آخر لا تظهر هنا
+    const other = await jfetch('/api/admin/results', { headers: AH });
+    ok('نتائج هذا المعلم موسومة به ولا تُنسب لغيره', (other.data.results || []).filter(r => r.teacherSlug === slug).length === N);
+    await jfetch('/api/admin/teachers/' + mkT.data.teacher.id, { method: 'DELETE', headers: AH });
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {
@@ -1098,6 +1324,11 @@ try {
       if (r.status === 429) { sawLockA = true; break; }
     }
     ok('دخول المسؤول: قفل مؤقت بعد تكرار الفشل (429)', sawLockA);
+    // انحدار: اكتشاف «أول تشغيل» كان يعتمد على /api/admin/login — ومع القفل كان
+    // يخفي شاشة الإعداد عن المالك على نشر جديد. نقطة الحالة المخصّصة لا تُقفل.
+    const stLocked = await jfetch('/api/admin/status');
+    ok('قفل المحاولات لا يخفي نقطة حالة الإعداد (شاشة الإعداد تبقى متاحة)',
+      stLocked.status === 200 && typeof stLocked.data.setup === 'boolean', 'got ' + stLocked.status);
   }
 
   console.log('\n══════════════════════════════');
