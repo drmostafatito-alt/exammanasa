@@ -18,15 +18,13 @@
  * وتنظيف الطبقة الفوقية حتى يعود عدّاد المحتوى لطبيعته (bank diff = 0).
  * مع مراقب console/pageerror وتسريب المفاتيح للطلاب. */
 import { chromium as pw } from 'playwright-core';
-import chromiumMin from '@sparticuz/chromium-min';
+import { launchQaBrowser } from './qa-browser.mjs';
 import { writeFileSync, mkdirSync } from 'node:fs';
 
 const BASE = process.env.QABASE || 'http://127.0.0.1:8787';
 const ADMIN = { email: process.env.ADM_EMAIL || 'admin@exam.test', pass: process.env.ADM_PASS || 'AdminPass#2026' };
 const SHOTS = process.env.QASHOTS || '/home/user/exammanasa/tools/shots';
 mkdirSync(SHOTS, { recursive: true });
-const exe = await chromiumMin.executablePath('/tmp/chrm');
-process.env.LD_LIBRARY_PATH = (process.env.LD_LIBRARY_PATH ? process.env.LD_LIBRARY_PATH + ':' : '') + '/tmp/crlibs/lib';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x) => { if (c) { pass++; console.log('  ✓ ' + n); } else { fail++; console.log('  ✗ ' + n + (x ? ' — ' + x : '')); } };
@@ -34,7 +32,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 const consoleIssues = [];
 const ALLOW = [/fonts\.(googleapis|gstatic)\.com/, /net::/, /ERR_[A-Z_]+/, /Failed to load resource: the server responded with a status of 4(01|00|03|04|29)/];
 
-const browser = await pw.launch({ executablePath: exe, args: ['--no-sandbox', '--disable-dev-shm-usage', '--disable-gpu', '--lang=ar'], headless: true });
+const browser = await launchQaBrowser(pw);
 const ctx = await browser.newContext({ viewport: { width: 1440, height: 900 }, locale: 'ar-EG' });
 const p = await ctx.newPage();
 p.on('console', m => { if (m.type() === 'error') { const t = m.text() || ''; if (!ALLOW.some(re => re.test(t))) consoleIssues.push(t.slice(0, 160)); } });

@@ -293,6 +293,10 @@
 
   /* صفحة غير موجودة/معطّلة: رابط صريح لا يعمل — رسالة واضحة بدل الصفحة المحايدة */
   function renderTeacherUnavailable() {
+    S.view = 'unavailable';
+    var bn = $('bottomnav');
+    if (bn) bn.classList.add('hidden');
+    document.body.classList.remove('has-bottomnav');
     app.innerHTML = '<div class="card" style="max-width:520px;margin:60px auto;text-align:center;padding:44px">' +
       '<h3>هذا الرابط غير متاح حاليًا</h3>' +
       '<p class="desc" style="margin-top:10px">لم يعد رابط هذا المعلم يعمل — ربما تم تعطيله أو حذفه. تواصل مع المعلم للحصول على الرابط الجديد.</p>' +
@@ -311,6 +315,7 @@
     document.body.classList.toggle('exam-mode', S.view === 'quiz');
   }
   function routeInner() {
+    if (S.slug && !S.teacher) { renderTeacherUnavailable(); return; }
     var hash = location.hash.replace(/^#\/?/, '');
     var parts = hash.split('/').filter(Boolean);
     if (!parts.length) { S.view = 'home'; renderHome(); return; }
@@ -435,7 +440,7 @@
         subjectId: 'psychology', icon: PSY_SVG, cls: 'psychology',
         grade: 'الصف الثاني الثانوي', subject: 'بكالوريا — علم النفس',
         subName: p.name,
-        stats: [p.units.length + ' وحدات', topics + ' موضوعات', countExams('psychology') + ' امتحانًا إلكترونيًا'],
+        stats: [p.units.length + ' وحدات', countWord(topics, 'موضوع', 'موضوعات'), countExams('psychology') + ' امتحانًا إلكترونيًا'],
         desc: 'امتحانات علم النفس مرتبة حسب الوحدات والموضوعات وفق المنهج الرسمي — مع تصحيح فوري ومراجعة الإجابات.'
       };
     }
@@ -446,7 +451,7 @@
       subjectId: 'philosophy', icon: PHILO_SVG, cls: 'philosophy',
       grade: 'الصف الأول الثانوي', subject: 'الفلسفة والمنطق',
       subName: ph.name,
-      stats: ['ترمان دراسيان', phTopics + ' موضوعًا', phTrainings + ' تدريبًا (امتحانًا إلكترونيًا)'],
+      stats: ['ترمان دراسيان', countWord(phTopics, 'موضوع', 'موضوعات'), phTrainings + ' تدريبًا (امتحانًا إلكترونيًا)'],
       desc: 'امتحانات الفلسفة والمنطق مرتبة حسب الترم ثم الموضوع ثم التدريب — كل تدريب امتحان مستقل بعدد أسئلته الخاصة مع تصحيح فوري ومراجعة الإجابات.'
     };
   }
@@ -756,7 +761,12 @@
     return found;
   }
   function topicTrainings(tp) { var out = []; tp.lessons.forEach(function (l) { out = out.concat(l.trainings); }); return out; }
-  function countWord(n, one, few) { return n + ' ' + (n === 1 ? one : few); }
+  function countWord(n, one, few) {
+    if (n === 1) return n + ' ' + one;
+    if (n === 2) return n + ' ' + one + 'ان';
+    if (n < 1 || (n >= 3 && n <= 10)) return n + ' ' + few;
+    return n + ' ' + one + 'ًا';
+  }
   /* بطاقة موضوع (الموضوع الأول/الثاني) — تفتح صفحة دروس الموضوع */
   function topicCard(tp) {
     var trs = topicTrainings(tp);
@@ -773,7 +783,7 @@
     return '<a class="topic-card lesson-card" href="' + lessonHash(tp, l) + '" role="button" aria-label="الدرس ' + l.no + ' — ' + esc(l.title) + '">' +
       '<div class="lno"><span>الدرس</span><b>' + l.no + '</b></div>' +
       '<div class="linfo"><div class="lt">الدرس ' + l.no + ' — ' + esc(l.title) + '</div>' +
-      '<div class="ls"><span>' + countWord(n, 'تدريب', 'تدريبات') + ' · ' + totalQ + ' سؤالًا</span></div></div>' +
+      '<div class="ls"><span>' + countWord(n, 'تدريب', 'تدريبات') + ' · ' + countWord(totalQ, 'سؤال', 'أسئلة') + '</span></div></div>' +
       '<span class="lgo lgo-text" aria-hidden="true">عرض التدريبات ‹</span></a>';
   }
   /* قسم الامتحانات الشاملة — منفصل عن التدريبات */
@@ -872,7 +882,7 @@
       sub.units.forEach(function (u) {
         html += '<div class="unit-card">' +
           '<div class="unit-head"><div class="uno">' + u.no + '</div><h4>' + esc(u.title) + '</h4>' +
-          '<span class="chip count">' + u.lessons.length + ' موضوعات</span></div>' +
+          '<span class="chip count">' + countWord(u.lessons.length, 'موضوع', 'موضوعات') + '</span></div>' +
           '<div class="exam-list">';
         u.lessons.forEach(function (l) { html += lessonRow(l); });
         html += compRow(u.comprehensiveExamId, 'شامل الوحدة');
@@ -893,7 +903,7 @@
       (term.sections || []).forEach(function (sec) {
         html2 += '<div class="unit-card">' +
           '<div class="unit-head"><div class="uno">✦</div><h4>' + esc(sec.title) + '</h4>' +
-          '<span class="chip count">' + sec.topics.length + ' موضوعات</span></div>' +
+          '<span class="chip count">' + countWord(sec.topics.length, 'موضوع', 'موضوعات') + '</span></div>' +
           '<div class="topic-grid">';
         sec.topics.forEach(function (tp) { html2 += topicCard(tp); });
         html2 += '</div></div>';
@@ -1120,7 +1130,7 @@
       '<div class="rv-list">';
     if (missing.length) {
       html += '<div class="rv-note warn">' + WARN_SVG +
-        '<span>لم تُجب على ' + missing.length + ' ' + (missing.length === 1 ? 'سؤال' : 'أسئلة') + ' (رقم ' +
+        '<span>لم تُجب على ' + countWord(missing.length, 'سؤال', 'أسئلة') + ' (رقم ' +
         missing.map(function (i) { return i + 1; }).join('، ') +
         ') — لا يمكن تسليم الامتحان قبل الإجابة عليها. اضغط على أي سؤال للانتقال إليه.</span></div>';
     } else {
@@ -1139,7 +1149,7 @@
       '<div class="quiz-actions">' +
       '<button class="btn ghost" onclick="backToQuiz()">عودة إلى الأسئلة</button>' +
       (missing.length
-        ? '<button class="btn" id="submitBtn" disabled>تسليم الامتحان — ناقص ' + missing.length + ' ' + (missing.length === 1 ? 'سؤال' : 'أسئلة') + '</button>'
+        ? '<button class="btn" id="submitBtn" disabled>تسليم الامتحان — ناقص ' + countWord(missing.length, 'سؤال', 'أسئلة') + '</button>'
         : '<button class="btn" id="submitBtn" onclick="submitExam()">تسليم الامتحان</button>') +
       '</div>';
     app.innerHTML = html;
