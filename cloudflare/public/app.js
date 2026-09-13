@@ -136,6 +136,8 @@
   /* أيقونات خطية بسيطة (بلا ألوان صاخبة) للواجهة الرئيسية */
   var ICO = function (p, w) { return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="' + (w || 2) + '" stroke-linecap="round" stroke-linejoin="round">' + p + '</svg>'; };
   var ARROW_L_SVG = ICO('<path d="M12 19l-7-7 7-7"/><path d="M5 12h14"/>', 2.4);
+  /* أيقونة «الرئيسية» لاختصار الـ Hero Float: منزل واضح بباب (خط متناسق — ثانوي بصريًا أمام البورتريه) */
+  var HOME_SVG = ICO('<path d="M3.4 10.7 12 3.6l8.6 7.1"/><path d="M5.6 9.8V19a1.4 1.4 0 0 0 1.4 1.4h10a1.4 1.4 0 0 0 1.4-1.4V9.8"/><path d="M9.9 20.4v-4.6a2.1 2.1 0 0 1 4.2 0v4.6"/>', 2.1);
   /* فلسفة: عمود كلاسيكي (لاندمارك) — خط متناسق */
   var PHILO_SVG = ICO('<path d="M3 21h18"/><path d="M5 21v-9"/><path d="M9.5 21v-9"/><path d="M14.5 21v-9"/><path d="M19 21v-9"/><path d="M3 9h18"/><path d="M12 3l9 6H3z"/>');
   /* علم النفس: دماغ بخط متناسق */
@@ -221,9 +223,12 @@
     $('brandName').textContent = t ? t.name : platformName;
     $('brandSub').textContent = t ? (t.specialty || shortDesc) : shortDesc;
     var logoEl = $('brandLogo');
-    if (t && t.photo) logoEl.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
-    else if (logo) logoEl.innerHTML = '<img src="' + esc(logo) + '" alt="">';
+    var hasPhoto = false;
+    if (t && t.photo) { logoEl.innerHTML = '<img src="' + esc(t.photo) + '" alt="">'; hasPhoto = true; }
+    else if (logo) { logoEl.innerHTML = '<img src="' + esc(logo) + '" alt="">'; hasPhoto = true; }
     else logoEl.textContent = monogramOf(t ? t.name : platformName);
+    /* أفاتار المعلم: حلقة زرقاء/ذهبية ناعمة حول الصورة (وليست مصغّرًا مربعًا) */
+    logoEl.classList.toggle('has-photo', hasPhoto);
     var footBrand = document.getElementById('footBrand');
     /* platformName نص قابل للتحكم من لوحة الإدارة — يجب تهريبه مثل أي مدخل مستخدم. */
     if (footBrand) footBrand.innerHTML = esc(platformName) + (t ? ' — <b>' + esc(t.name) + '</b>' : '');
@@ -254,9 +259,11 @@
     }
     var footLogo = $('footLogo');
     if (footLogo) {
-      if (t && t.photo) footLogo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">';
-      else if (logo) footLogo.innerHTML = '<img src="' + esc(logo) + '" alt="">';
+      var footHasPhoto = false;
+      if (t && t.photo) { footLogo.innerHTML = '<img src="' + esc(t.photo) + '" alt="">'; footHasPhoto = true; }
+      else if (logo) { footLogo.innerHTML = '<img src="' + esc(logo) + '" alt="">'; footHasPhoto = true; }
       else footLogo.textContent = monogramOf(t ? t.name : platformName);
+      footLogo.classList.toggle('has-photo', footHasPhoto);
     }
   }
 
@@ -283,10 +290,13 @@
     var inner = (t && t.photo)
       ? '<img src="' + esc(t.photo) + '" alt="صورة ' + esc(t.name) + '">'
       : '<div class="monogram">' + esc(monogramOf(t ? t.name : 'م ت')) + '</div>';
+    /* الطبقات: قرص أكاديمي زخرفي + قوس متقطّع + توهج — كلها z-index:0 خلف المعلم،
+     * ثم البورتريه في طبقة أعلى (z-index:2) بلا overflow ولا border-radius، فيمتدّ
+     * الرأس والكتفان خارج الدائرة بدل أن يُحبسا داخلها. */
     return '<div class="portrait' + (extraCls ? ' ' + extraCls : '') + '" data-fit="' + photoFitOf(t) + '">' +
       '<span class="pt-blob" aria-hidden="true"></span>' +
-      '<span class="pt-glow" aria-hidden="true"></span>' +
       '<span class="pt-arc" aria-hidden="true"></span>' +
+      '<span class="pt-glow" aria-hidden="true"></span>' +
       '<div class="pt-img">' + inner + '</div>' +
       '</div>';
   }
@@ -374,6 +384,21 @@
     else go('#/');
   }
   function scrollToSubjects() { var el = $('subjects'); if (el) smoothScroll(el); bottomNav('subjects'); setMainNavActive('subjects'); }
+
+  /* اختصار «الرئيسية» العائم في الـ Hero: يعود دائمًا لجذر صفحة المعلم الحالي.
+   * على مسار المعلم → /<slug> (جذر الطالب لنفس المعلم)؛ على الجذر العام → /.
+   * لا يمرّ إطلاقًا بـ /admin أو /teacher ولا بأي رابط خارجي. */
+  function teacherRootPath() { return S.slug ? ('/' + S.slug + '/') : '/'; }
+  function goHome() {
+    var want = teacherRootPath();
+    var here = location.pathname.replace(/\/+$/, '') || '/';
+    var wantNoSlash = want.replace(/\/+$/, '') || '/';
+    if (here !== wantNoSlash) { location.href = want + '#/'; return; } // أمان: مسار مختلف = تنقل صريح للجذر الصحيح
+    if (location.hash && location.hash !== '#/') { go('#/'); }
+    else { route(); }
+    bottomNav('home'); setMainNavActive('top');
+    try { window.scrollTo({ top: 0, behavior: REDUCED_MOTION ? 'auto' : 'smooth' }); } catch (e) { window.scrollTo(0, 0); }
+  }
 
   /* تمييز عنصر التنقل العلوي النشط (حبة زرقاء فاتحة) */
   function setMainNavActive(key) {
@@ -484,11 +509,14 @@
 
     var html =
       '<section class="hero reveal in">' +
-      '<div class="hero-media">' +
+      '<div class="hero-media" data-fit="' + photoFitOf(t) + '">' +
       '<span class="hero-fig fig-soc" data-sp="-0.04" aria-hidden="true"></span>' +
       portraitHtml('') +
-      '<div class="photo-badge">' + CAP_SVG + '</div>' +
-      '<div class="float-chip">' + CHECK_SVG + ' ' + esc(floatChip) + '</div>' +
+      /* شارات عائمة بجانب البورتريه (لا فوقه): اختصار الرئيسية + شارة التصحيح الفوري */
+      '<div class="hero-deco">' +
+      '<button type="button" class="home-orb" onclick="goHome()" aria-label="العودة إلى الصفحة الرئيسية" title="الصفحة الرئيسية">' + HOME_SVG + '</button>' +
+      '<span class="float-chip">' + CHECK_SVG + ' ' + esc(floatChip) + '</span>' +
+      '</div>' +
       '</div>' +
       '<div class="hero-body">' +
       '<span class="hero-year">' + CAP_SVG + ' ' + esc(year || 'العام الدراسي 2026 / 2027') + '</span>' +
@@ -1312,6 +1340,7 @@
   window.renderBrand = renderBrand;
   window.renderHome = renderHome;
   window.navTo = navTo;
+  window.goHome = goHome;
   window.bottomNav = bottomNav;
   window.bnHome = bnHome;
   window.bnSubjects = bnSubjects;
