@@ -404,7 +404,50 @@ async function kvPut(env, key, value, ttlSeconds) {
 async function getTeachers(env) {
   const stored = await kvGetJson(env, 'teachers').catch(() => null);
   if (Array.isArray(stored) && stored.length) return stored;
-  return DEFAULT_TEACHERS;
+  return DEFAULT_TEACHERS.map(t => Object.assign({}, t));
+}
+
+/* صور المعلمين تُخزَّن في مفتاح منفصل لكل معلم (teacher:photo:<id>) بدل أن توضع
+ * داخل مستند `teachers` نفسه. سبب القرار: حد القيمة الواحدة في KV هو ٢٥ ميجابايت،
+ * وصورة واحدة بصيغة data-URL قد تصل إلى ٢.٥ ميجابايت — أي أن ~١٠ معلمين بصور كان
+ * يكفي لإيقاف كتابة قائمة المعلمين كلها (فشل إضافة/تعديل أي معلم). بهذا الفصل يبقى
+ * مستند القائمة خفيفًا مهما كثر المعلمون، ومفتاح الصورة يُكتب فقط عند تغيّرها. */
+async function kvDelete(env, key) { try { if (env.PLATFORM_KV) await env.PLATFORM_KV.delete(key); } catch (e) { } }
+async function getTeacherPhoto(env, id) {
+  if (!id) return '';
+  return (await kvGet(env, 'teacher:photo:' + id).catch(() => null)) || '';
+}
+/* تحميل الصور فقط حيث يحتاجها العرض فعليًا (لا تُقرأ في المسار الساخن للامتحان). */
+async function hydratePhotos(env, list) {
+  if (!Array.isArray(list) || !list.length) return list;
+  await Promise.all(list.map(async t => { if (!t.photo) t.photo = await getTeacherPhoto(env, t.id); }));
+  return list;
+}
+async function hydrateTeacher(env, t) {
+  if (!t) return t;
+  if (!t.photo) t.photo = await getTeacherPhoto(env, t.id);
+  return t;
+}
+function leanTeacher(t) { const c = Object.assign({}, t); delete c.photo; return c; }
+function leanTeachers(list) { return (list || []).map(leanTeacher); }
+/* يكتب القائمة (بلا صور) + مفاتيح الصور المُعدَّلة فقط (photoUpdates: { id: dataUrl }).
+ * تمرير {} يعني «لا تغيير على الصور» — لا قراءة ولا كتابة إضافية (حصة KV المجانية). */
+async function saveTeachers(env, teachers, photoUpdates) {
+  const payload = JSON.stringify(leanTeachers(teachers));
+  // حد القيمة الواحدة في KV هو ٢٥ ميجابايت — نرفض مبكرًا برسالة واضحة بدل
+  // فشل كتابة غامض (500) يترك المسؤول بلا تفسير.
+  if (payload.length > 20 * 1024 * 1024) {
+    throw bad('حجم بيانات المعلمين تجاوز الحد المسموح (٢٠ ميجابايت). احذف بعض الحسابات المؤرشفة أو ارفع مساحة التخزين.', 413);
+  }
+  await kvPut(env, 'teachers', payload);
+  for (const id of Object.keys(photoUpdates || {})) {
+    const photo = photoUpdates[id] || '';
+    if (photo) await kvPut(env, 'teacher:photo:' + id, photo);
+    else await kvDelete(env, 'teacher:photo:' + id);
+  }
+}
+async function saveArchived(env, archived) {
+  await kvPut(env, 'teachers:archived', JSON.stringify(leanTeachers(archived).slice(0, 200)));
 }
 async function getSessionSecret(env) {
   if (env.SESSION_SECRET) return env.SESSION_SECRET;
@@ -761,8 +804,8 @@ function ownerTeacher(teachers) {
 }
 
 async function publicCatalog(env) {
-  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
-  const owner = ownerTeacher(teachers);
+  const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS.map(t => Object.assign({}, t)));
+  const owner = await hydrateTeacher(env, ownerTeacher(teachers));
   const { catalog, pubExams } = await contentView(env);
   return {
     version: BANKS.version, generatedAt: BANKS.generatedAt,
@@ -800,6 +843,7 @@ async function handleApi(request, env, ctx, pathname) {
     const teachers = await getTeachers(env);
     const t = teachers.find(x => x.slug === teacherMatch[1] && x.enabled !== false);
     if (!t) return fail('لا يوجد معلم بهذا الرابط.', 404);
+    await hydrateTeacher(env, t);
     return json({ teacher: teacherPublic(t) }, 200, { 'Cache-Control': 'public, max-age=60, s-maxage=300' });
   }
 
@@ -1294,6 +1338,8 @@ async function handleAdmin(request, env, ctx, pathname) {
     const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
     // NEVER return raw KV records: they carry passHash/passSalt. The admin UI only
     // needs the safe projection (+isDefault / +studentLimitStatus for the cards).
+    await hydratePhotos(env, teachers);
+    await hydratePhotos(env, archived);
     const withStatus = await Promise.all(teachers.map(async t => ({
       ...teacherAdminPayload(t), isDefault: !!t.isDefault, studentLimitStatus: await studentLimitStatus(env, t)
     })));
@@ -1312,8 +1358,10 @@ async function handleAdmin(request, env, ctx, pathname) {
     delete t.archivedAt; delete t.archived; t.enabled = false; t.updatedAt = new Date().toISOString();
     archived.splice(i, 1);
     teachers.push(t);
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
-    await kvPut(env, 'teachers:archived', JSON.stringify(archived));
+    // مفتاح الصورة (teacher:photo:<id>) لا يتحرك مع الأرشفة/الاستعادة — لا تحديث له.
+    await saveTeachers(env, teachers);
+    await saveArchived(env, archived);
+    await hydrateTeacher(env, t);
     return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   if (pathname === '/api/admin/teachers' && method === 'POST') {
@@ -1330,7 +1378,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     t.createdAt = new Date().toISOString();
     t.updatedAt = t.createdAt;
     teachers.push(t);
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers, t.photo ? { [t.id]: t.photo } : {});
     return json({ ok: true, teacher: teacherAdminPayload(t) });
   }
   /* ---------- teacher dashboard (per-teacher results index) ---------- */
@@ -1366,6 +1414,9 @@ async function handleAdmin(request, env, ctx, pathname) {
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     if (method === 'PUT') {
       const body = await readJson(request, 3 * 1024 * 1024);
+      // الصورة محفوظة في مفتاح مستقل — تُحمَّل أولًا حتى لا يمحوها تعديل لا يذكرها.
+      await hydrateTeacher(env, teachers[idx]);
+      const prevPhoto = teachers[idx].photo || '';
       const t = await sanitizeTeacher(body, teachers[idx], env);
       if (teachers.some((x, i) => i !== idx && x.slug === t.slug)) return fail('الرابط (slug) مستخدم بالفعل.', 409);
       /* تغيير الرابط (slug) ممنوع بعد وجود بيانات مرتبطة به — لأن فهرس النتائج
@@ -1389,7 +1440,7 @@ async function handleAdmin(request, env, ctx, pathname) {
       t.updatedAt = new Date().toISOString();
       if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
       teachers[idx] = t;
-      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      await saveTeachers(env, teachers, (t.photo || '') === prevPhoto ? {} : { [t.id]: t.photo || '' });
       // disabling kills all live sessions immediately (re-enabling requires a fresh login)
       if (t.enabled === false) await clearV(env, 'sessv:t:' + t.id);
       return json({ ok: true, teacher: teacherAdminPayload(t) });
@@ -1403,8 +1454,8 @@ async function handleAdmin(request, env, ctx, pathname) {
       const [removed] = teachers.splice(idx, 1);
       const archived = await kvGetJson(env, 'teachers:archived').catch(() => null) || [];
       archived.unshift({ ...removed, enabled: false, archived: true, archivedAt: new Date().toISOString() });
-      await kvPut(env, 'teachers:archived', JSON.stringify(archived.slice(0, 200)));
-      await kvPut(env, 'teachers', JSON.stringify(teachers));
+      await saveArchived(env, archived);
+      await saveTeachers(env, teachers);
       return json({ ok: true, archived: true });
     }
   }
@@ -1421,7 +1472,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     const salt = randomHex(16);
     const hash = await pbkdf2(newPassword, salt);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers);
     await clearV(env, 'sessv:t:' + teachers[idx].id); // admin reset = the teacher must sign in again everywhere
     return json({ ok: true });
   }
@@ -1983,7 +2034,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
     teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers);
     // password change revokes every session, then re-issues the CURRENT device only
     const v = randomHex(8);
     await setVList(env, 'sessv:t:' + teacher.id, [v]);
@@ -1997,6 +2048,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
   if (pathname === '/api/t/profile' && method === 'GET') {
     // The teacher's own safe profile (used to pre-fill the edit form — prevents the
     // "save blanks out fields you never saw" bug). Never exposes hashes/limits of others.
+    await hydrateTeacher(env, teacher);
     return json({ teacher: {
       id: teacher.id, slug: teacher.slug, studentUrl: '/' + teacher.slug,
       phone: teacher.phone || '', email: teacher.email || '', username: teacher.username || '',
@@ -2009,7 +2061,10 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     const teachers = await getTeachers(env);
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
-    const existing = teachers[idx]; const updated = { ...existing };
+    // الصورة في مفتاح مستقل — تُحمَّل أولًا حتى لا يمحوها حفظ لا يذكرها.
+    const existing = await hydrateTeacher(env, teachers[idx]);
+    const prevPhoto = existing.photo || '';
+    const updated = { ...existing };
     updated.name = stripControl(body.name, 80) || existing.name;
     if (updated.name.length > 80) throw bad('اسم المعلم طويل.');
     updated.phone = String(body.phone ?? existing.phone ?? '').trim();
@@ -2035,7 +2090,7 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     else if (body.photoFit === '') updated.photoFit = '';
     updated.updatedAt = new Date().toISOString();
     teachers[idx] = updated;
-    await kvPut(env, 'teachers', JSON.stringify(teachers));
+    await saveTeachers(env, teachers, (updated.photo || '') === prevPhoto ? {} : { [updated.id]: updated.photo || '' });
     return json({ ok: true, teacher: teacherPublic(updated) });
   }
   if (pathname === '/api/t/dashboard' && method === 'GET') {

@@ -985,6 +985,44 @@ try {
     ok('نص السؤال يصل حرفيًا كما في البنك (لا تعقيم)', sQ.status === 200 && sQ.data.questions[0].text === bankQ.text);
   }
 
+  /* ============ 19د. صور المعلمين خارج مستند القائمة (حد KV ٢٥ ميجابايت) ============ */
+  console.log('\n[19د] صورة المعلم تُخزَّن في مفتاح مستقل ولا تضيع');
+  {
+    const PHOTO = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+    const mk = await post('/api/admin/teachers', { name: 'معلم صورة', slug: 'photot', email: 'photo@test.com', username: 'photot', password: 'password123', photo: PHOTO }, { Cookie: cookie });
+    ok('إنشاء معلم بصورة', mk.status === 200 && mk.data.teacher.photo === PHOTO, 'got ' + mk.status);
+    const id = mk.data.teacher.id;
+    const list = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    ok('قائمة المعلمين تُرجع الصورة (محمّلة من مفتاحها)', list.data.teachers.some(t => t.id === id && t.photo === PHOTO));
+    // تعديل لا يذكر الصورة يجب ألا يمحوها
+    const ren = await jfetch('/api/admin/teachers/' + id, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ name: 'معلم صورة ٢', slug: 'photot' })
+    });
+    ok('تعديل بلا حقل صورة يحفظ الصورة الحالية (لا محو)', ren.status === 200 && ren.data.teacher.photo === PHOTO, 'got ' + (ren.data.teacher || {}).photo);
+    const pubT = await jfetch('/api/teacher/photot');
+    ok('الصفحة العامة تعرض الصورة', pubT.status === 200 && pubT.data.teacher.photo === PHOTO);
+    // المعلم نفسه: حفظ الملف الشخصي بلا صورة يجب ألا يمحوها
+    const lg = await post('/api/t/login', { email: 'photo@test.com', password: 'password123' });
+    const tCookie = 'teacher_session=' + ((lg.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/) || [, ''])[1];
+    const prof0 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('ملف المعلم يحمل صورته', prof0.status === 200 && prof0.data.teacher.photo === PHOTO);
+    await jfetch('/api/t/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: tCookie },
+      body: JSON.stringify({ bio: 'نبذة بلا صورة' })
+    });
+    const prof1 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('حفظ الملف بلا حقل صورة يحفظ الصورة', prof1.data.teacher.photo === PHOTO && prof1.data.teacher.bio === 'نبذة بلا صورة', JSON.stringify({ p: (prof1.data.teacher.photo || '').slice(0, 30), b: prof1.data.teacher.bio }));
+    // إزالة صريحة
+    await jfetch('/api/t/profile', {
+      method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: tCookie },
+      body: JSON.stringify({ photo: '' })
+    });
+    const prof2 = await jfetch('/api/t/profile', { headers: { Cookie: tCookie } });
+    ok('إزالة صريحة (photo:"") تمسح الصورة', prof2.data.teacher.photo === '');
+    await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {
