@@ -161,7 +161,7 @@
         '</div>' +
         '<div class="card"><h3 class="t-card-title">أكثر الامتحانات محاولةً</h3>' +
         (d.perExam.length ? d.perExam.slice(0, 8).map(function (e) {
-          return '<div class="t-exam-item"><span class="t-e-title">' + esc(e.title) + '</span><span class="t-e-badge">' + e.attempts + ' محاولة</span></div>';
+          return '<div class="t-exam-item"><span class="t-e-title">' + esc(e.title) + '</span><span class="t-e-badge">' + attemptsWord(e.attempts) + '</span></div>';
         }).join('') : '<div class="empty">لا توجد بيانات بعد</div>') +
         '</div>' +
         '</div>';
@@ -171,6 +171,13 @@
         if (av && p.teacher.photo) av.innerHTML = '<img src="' + esc(p.teacher.photo) + '" alt="">';
       }).catch(function () {});
     }).catch(function (e) { main.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  /* صياغة عدد المحاولات (المثنى بالتاء: محاولتان — لا يصلح لاحق «ان» العام هنا) */
+  function attemptsWord(n) {
+    if (n === 1) return '1 محاولة';
+    if (n === 2) return '2 محاولتان';
+    if (n >= 3 && n <= 10) return n + ' محاولات';
+    return n + ' محاولةً';
   }
   function stat(icon, label, value) {
     return '<div class="t-stat-card"><div class="t-stat-icon">' + icon + '</div><div class="t-stat-body"><div class="t-stat-val">' + esc(String(value)) + '</div><div class="t-stat-label">' + esc(label) + '</div></div></div>';

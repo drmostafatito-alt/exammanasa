@@ -476,6 +476,25 @@ try {
       method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
     });
     ok('لا يمكن حذف المعلم الافتراضي', defDel.status === 400);
+    /* انحدار الجولة البصرية: أي حفظ على المعلم الافتراضي كان يمحو isDefault بصمت
+     * (sanitizeTeacher لا تُرجعها وإعادة الإسناد تستبدل السجل) — فيفقد الشارة وحماية الحذف. */
+    const defEdit = await jfetch('/api/admin/teachers/t_default_mostafa', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ specialty: 'تخصص انحدار مؤقت' })
+    });
+    ok('تعديل المعلم الافتراضي ينجح', defEdit.status === 200 && defEdit.data.teacher.specialty === 'تخصص انحدار مؤقت');
+    ok('استجابة التعديل تحمل isDefault', defEdit.status === 200 && defEdit.data.teacher.isDefault === true);
+    const defList = await jfetch('/api/admin/teachers', { headers: { Cookie: cookie } });
+    const defRowKeep = defList.data.teachers.find(t => t.id === 't_default_mostafa');
+    ok('صفة «الافتراضي» تبقى بعد الحفظ (لا تُمحى بصمت)', !!defRowKeep && defRowKeep.isDefault === true);
+    const defDel2 = await jfetch('/api/admin/teachers/t_default_mostafa', {
+      method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie }
+    });
+    ok('حماية حذف الافتراضي تبقى بعد التعديل', defDel2.status === 400);
+    await jfetch('/api/admin/teachers/t_default_mostafa', {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie },
+      body: JSON.stringify({ specialty: 'مدرس الفلسفة والمنطق وعلم النفس — المرحلة الثانوية' })
+    });
   }
 
   /* ============ 10. results & CSV ============ */

@@ -1481,7 +1481,10 @@ async function handleAdmin(request, env, ctx, pathname) {
       t.teacherCode = teachers[idx].teacherCode || nextTeacherCode(teachers);
       t.createdAt = teachers[idx].createdAt;
       t.updatedAt = new Date().toISOString();
-      if (teachers[idx].isDefault && t.slug !== teachers[idx].slug) delete t.isDefault;
+      /* بقاء صفة «الافتراضي» عبر التعديلات: sanitizeTeacher لا تُرجع isDefault أصلًا،
+       * فإعادة الإسناد المباشرة كانت تمحوها بصمت من أول حفظ — فيفقد المعلم
+       * الافتراضي شارة «افتراضي» وحماية الحذف. تُحفظ ما دام الرابط ثابتًا. */
+      if (teachers[idx].isDefault && t.slug === teachers[idx].slug) t.isDefault = true;
       teachers[idx] = t;
       await saveTeachers(env, teachers, (t.photo || '') === prevPhoto ? {} : { [t.id]: t.photo || '' });
       // disabling kills all live sessions immediately (re-enabling requires a fresh login)
@@ -2214,6 +2217,7 @@ function teacherAdminPayload(t) {
     offlineMode: t.offlineMode === true,
     studentLimitUnlimited: sl.unlimited, studentLimit: sl.limit,
     hasPassword: !!t.passHash,
+    isDefault: !!t.isDefault,
     createdAt: t.createdAt || '', updatedAt: t.updatedAt || ''
   };
 }
