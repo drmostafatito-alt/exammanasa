@@ -4,10 +4,14 @@
 (function () {
   'use strict';
   var $ = function (id) { return document.getElementById(id); };
-  var LETTERS = ['أ', 'ب', 'ج', 'د'];
+  /* مفاتيح الإجابة القانونية في المنصة كلها لاتينية A/B/C/D (البنك، التصدير، الاستيراد،
+   * والتصحيح على الخادم). الحروف العربية للعرض فقط بجانبها حتى لا يضطر المسؤول للترجمة
+   * ذهنيًا — وأي خلط بينهما كان يجعل حفظ السؤال مرفوضًا من الخادم. */
+  var LETTERS = ['A', 'B', 'C', 'D'];
+  var LETTER_AR = { A: 'أ', B: 'ب', C: 'ج', D: 'د' };
   var A = {
     tab: 'dashboard', data: {}, bankPage: 1,
-    bankFilters: { subject: '', term: '', lesson: '', q: '' },
+    bankFilters: { subject: '', term: '', lesson: '', q: '', only: '' },
     session: null, settings: null, settingsDirty: false,
     teachers: [], pendingPhoto: null
   };
@@ -26,6 +30,20 @@
   var I_PUZZLE = ICO('<path d="M14 3v3a2 2 0 0 0 2 2h3v5h-2a2 2 0 0 0 0 4h2v4h-6v-2a2 2 0 0 0-4 0v2H4v-6H3a2 2 0 0 1 0-4h1V6h5V5a2 2 0 0 1 5-2z"/>');
   var I_PALETTE = ICO('<path d="M12 3a9 9 0 1 0 0 18c1.5 0 2-.9 2-2 0-.6-.3-1-.6-1.4-.3-.4-.4-.7-.4-1.1 0-1 .9-1.5 2-1.5h2a4 4 0 0 0 4-4c0-4.5-4-8-9-8z"/><circle cx="7.5" cy="11.5" r=".6"/><circle cx="11" cy="7.5" r=".6"/><circle cx="15.5" cy="9" r=".6"/>');
   var I_LOCK = ICO('<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>');
+  /* أيقونات إدارة المحتوى (CMS) — خط متناسق 24px */
+  var I_EDIT = ICO('<path d="M4 20h4L19.5 8.5a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M13.5 6.5l3 3"/>');
+  var I_COPY = ICO('<rect x="9" y="9" width="12" height="12" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>');
+  var I_TRASH = ICO('<path d="M3 6h18"/><path d="M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6"/><path d="M14 11v6"/>');
+  var I_IMPORT = ICO('<path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M4 21h16"/>');
+  var I_EXPORT = ICO('<path d="M12 21V9"/><path d="M7 14l5-5 5 5"/><path d="M4 3h16"/>');
+  var I_EYE = ICO('<path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/>');
+  var I_EYEOFF = ICO('<path d="M3 3l18 18"/><path d="M10.6 5.1A10.8 10.8 0 0 1 12 5c6.4 0 10 7 10 7a17.6 17.6 0 0 1-3 3.9"/><path d="M6.6 6.6C3.8 8.5 2 12 2 12s3.6 7 10 7a10 10 0 0 0 4.3-1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/>');
+  var I_BACK = ICO('<path d="M9 6l6 6-6 6"/>');
+  var I_UP = ICO('<path d="M12 19V5"/><path d="M6 11l6-6 6 6"/>');
+  var I_DOWN = ICO('<path d="M12 5v14"/><path d="M6 13l6 6 6-6"/>');
+  var I_REVERT = ICO('<path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/>');
+  var I_PLUS = ICO('<path d="M12 5v14"/><path d="M5 12h14"/>');
+  var WARN_SVG_A = ICO('<path d="M12 8v5"/><circle cx="12" cy="16.6" r=".5" fill="currentColor"/><path d="M10.3 3.6 1.9 18a2 2 0 0 0 1.7 3h16.8a2 2 0 0 0 1.7-3L13.7 3.6a2 2 0 0 0-3.4 0z"/>');
 
   function esc(s) {
     return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -97,10 +115,10 @@
   /* ================= الهيكل (Sidebar + محتوى) ================= */
   var NAV = [
     { title: 'عام', items: [['dashboard', I_HOME, 'نظرة عامة'], ['teachers', I_USERS, 'المعلمون'], ['results', I_CHART, 'النتائج']] },
-    { title: 'المحتوى', items: [['psychology', I_BRAIN, 'علم النفس'], ['philosophy', I_BOOK, 'الفلسفة والمنطق'], ['bank', I_BANK, 'بنك الأسئلة'], ['exams', I_CLIP, 'الامتحانات']] },
+    { title: 'إدارة المحتوى', items: [['exams', I_CLIP, 'الامتحانات'], ['bank', I_BANK, 'بنك الأسئلة'], ['import', I_IMPORT, 'استيراد/تصدير'], ['psychology', I_BRAIN, 'علم النفس'], ['philosophy', I_BOOK, 'الفلسفة والمنطق']] },
     { title: 'النظام', items: [['settings', I_GEAR, 'الإعدادات']] }
   ];
-  var TITLES = { dashboard: 'نظرة عامة', teachers: 'المعلمون', psychology: 'علم النفس', philosophy: 'الفلسفة والمنطق', bank: 'بنك الأسئلة', exams: 'الامتحانات', results: 'النتائج', settings: 'إعدادات المنصة' };
+  var TITLES = { dashboard: 'نظرة عامة', teachers: 'المعلمون', psychology: 'خريطة علم النفس', philosophy: 'خريطة الفلسفة', bank: 'بنك الأسئلة', exams: 'الامتحانات', import: 'استيراد/تصدير', results: 'النتائج', settings: 'إعدادات المنصة' };
   function renderShell() {
     var app = $('app');
     app.innerHTML =
@@ -124,6 +142,8 @@
   }
   function setTab(t) {
     if (A.settingsDirty && t !== 'settings' && !confirm('لديك تغييرات غير محفوظة في الإعدادات. متابعة دون حفظ؟')) return;
+    if (A.ee && A.ee.dirty && t !== 'exams' && !confirm('لديك تغييرات غير محفوظة في محرر الامتحان. متابعة دون حفظ؟')) return;
+    if (t !== 'exams') A.ee = null;
     A.tab = t;
     var title = $('aTitle'); if (title) title.textContent = TITLES[t] || '';
     document.querySelectorAll('.a-nav-item').forEach(function (el) {
@@ -143,6 +163,7 @@
     else if (A.tab === 'psychology' || A.tab === 'philosophy') renderSubjectTree(body, A.tab);
     else if (A.tab === 'bank') renderBank(body);
     else if (A.tab === 'exams') renderExams(body);
+    else if (A.tab === 'import') renderImport(body);
     else if (A.tab === 'results') renderResults(body);
     else if (A.tab === 'settings') renderSettings(body);
   }
@@ -152,10 +173,28 @@
     api('/api/admin/overview').then(function (d) {
       var a = d.audit, st = d.structure;
       body.innerHTML =
+        '<div class="cms-quick">' +
+        '<button class="qq" onclick="setTab(\'exams\')">' + I_CLIP + '<b>الامتحانات</b><span>فتح/تعديل/ترتيب/تعطيل</span></button>' +
+        '<button class="qq" onclick="setTab(\'bank\')">' + I_BANK + '<b>بنك الأسئلة</b><span>تعديل/إنشاء/تكرار/حذف</span></button>' +
+        '<button class="qq" onclick="setTab(\'import\')">' + I_IMPORT + '<b>استيراد امتحان</b><span>JSON → معاينة → تأكيد</span></button>' +
+        '<button class="qq" onclick="setTab(\'teachers\')">' + I_USERS + '<b>المعلمون</b><span>حسابات وروابط الطلاب</span></button>' +
+        '</div>' +
         '<div class="stat-grid">' +
         stat(d.exams, 'امتحانًا') + stat(d.questions, 'سؤالًا فريدًا') +
         stat(d.teachersCount, 'معلمًا') + stat(d.recentResultsCount, 'نتيجة أخيرة') +
         '</div>' +
+        ((d.customExams || d.customQuestions || d.editedQuestions || d.editedExams || d.disabledExams || d.deletedQuestions || d.deletedExams)
+          ? '<div class="section-title"><h3>طبقة التعديلات (فوق البنك الأصلي)</h3></div>' +
+          '<div class="cms-counts" style="margin:0 0 4px">' +
+          '<span class="cchip gold">' + (d.customExams || 0) + ' امتحان مخصّص</span>' +
+          '<span class="cchip gold">' + (d.customQuestions || 0) + ' سؤال مضاف</span>' +
+          '<span class="cchip blue">' + (d.editedExams || 0) + ' امتحان معدّل</span>' +
+          '<span class="cchip blue">' + (d.editedQuestions || 0) + ' سؤال معدّل</span>' +
+          '<span class="cchip red">' + (d.disabledExams || 0) + ' معطّل</span>' +
+          '<span class="cchip red">' + ((d.deletedQuestions || 0) + (d.deletedExams || 0)) + ' في السلة</span>' +
+          (d.contentUpdatedAt ? '<span class="cchip muted">آخر تحديث ' + new Date(d.contentUpdatedAt).toLocaleString('ar-EG') + '</span>' : '') +
+          '</div>'
+          : '') +
         '<div class="section-title"><h3>توزيع المحتوى</h3></div>' +
         '<div class="stat-grid">' +
         stat(st.psychology.examCount, 'امتحانات علم النفس (' + st.psychology.uniqueQuestions + ' سؤالًا)') +
@@ -322,7 +361,13 @@
         '<div class="field"><label>اسم المعلم *</label><input id="tName" value="' + esc(t.name) + '" maxlength="80" placeholder="مثال: أ. محمد أحمد"></div>' +
         '<div class="field"><label>التخصص</label><input id="tSpecialty" value="' + esc(t.specialty || '') + '" maxlength="120" placeholder="مثال: مدرس الفلسفة والمنطق — المرحلة الثانوية"></div>' +
         '<div class="field"><label>نبذة المدرس (تظهر في صفحتك العامة)</label><textarea id="tBio" rows="3" maxlength="500" placeholder="اكتب نبذة حقيقية عنك وعن خبرتك…">' + esc(t.bio || '') + '</textarea></div>' +
-        '<div class="field"><label>صورة المدرس</label><div class="photo-upload"><div class="prev" id="tPhotoPrev">' + (t.photo ? '<img src="' + esc(t.photo) + '" alt="">' : 'صورة') + '</div><div class="actions"><input type="file" id="tPhoto" accept="image/*" style="font-size:.78rem"><button class="btn small ghost" id="tPhotoClear" type="button">إزالة الصورة</button></div></div></div>') +
+        '<div class="field"><label>صورة المدرس</label>' +
+        '<div class="photo-upload"><div class="prev" id="tPhotoPrev" data-fit="' + esc(t.photoFit || '') + '">' + (t.photo ? '<img src="' + esc(t.photo) + '" alt="">' : '<span class="mono">' + esc((t.name || 'م ت').slice(0, 2)) + '</span>') + '</div>' +
+        '<div class="actions"><input type="file" id="tPhoto" accept="image/png,image/jpeg,image/webp" style="font-size:.78rem">' +
+        '<button class="btn small ghost" id="tPhotoClear" type="button">إزالة الصورة</button>' +
+        '<select id="tPhotoFit" style="font-size:.78rem"><option value=""' + (!t.photoFit ? ' selected' : '') + '>تلقائي (شفاف ⇒ احتواء كامل)</option><option value="contain"' + (t.photoFit === 'contain' ? ' selected' : '') + '>احتواء كامل بلا قص</option><option value="cover"' + (t.photoFit === 'cover' ? ' selected' : '') + '>قص متناسق (صور فوتوغرافية)</option></select>' +
+        '</div></div>' +
+        '<div class="hint" style="font-size:.7rem;color:var(--muted-2);margin-top:6px">PNG الشفاف يبقى شفافًا فوق الخلفية الزخرفية — المعاينة هنا تطابق الظهور العام للطالب.</div></div>') +
 
       section(2, 'بيانات الدخول',
         '<div class="field"><label>البريد الإلكتروني (لدخول المعلم)</label><input id="tEmail" type="email" dir="ltr" value="' + esc(t.email || '') + '" placeholder="بريد المعلم"></div>' +
@@ -359,8 +404,19 @@
       '</div>';
     document.body.appendChild(overlay);
     $('tSlug').addEventListener('input', function () { $('tUrlPreview').value = location.host + '/' + this.value; });
-    $('tPhoto').addEventListener('change', function () { resizePhoto(this.files[0], function (d) { A.pendingPhoto = d; $('tPhotoPrev').innerHTML = '<img src="' + d + '" alt="">'; }); });
-    $('tPhotoClear').addEventListener('click', function () { A.pendingPhoto = ''; $('tPhotoPrev').innerHTML = 'صورة'; });
+    $('tPhoto').addEventListener('change', function () {
+      resizePhoto(this.files[0], function (d, keepAlpha) {
+        A.pendingPhoto = d;
+        var prev = $('tPhotoPrev');
+        prev.innerHTML = '<img src="' + d + '" alt="">';
+        // شفافية ⇒ احتواء كامل افتراضيًا (يمكن تغييره يدويًا)
+        if (keepAlpha && !$('tPhotoFit').value) $('tPhotoFit').value = 'contain';
+        prev.setAttribute('data-fit', $('tPhotoFit').value || (keepAlpha ? 'contain' : 'cover'));
+      });
+    });
+    $('tPhotoClear').addEventListener('click', function () { A.pendingPhoto = ''; $('tPhotoPrev').innerHTML = '<span class="mono">م‌ت</span>'; });
+    var pfSel = $('tPhotoFit');
+    if (pfSel) pfSel.addEventListener('change', function () { $('tPhotoPrev').setAttribute('data-fit', this.value); });
     $('tUnlimited').addEventListener('change', function () { $('tMaxAtt').disabled = this.checked; });
     $('tStuUnl').addEventListener('change', function () { $('tStuLimit').disabled = this.checked; });
     var es = document.createElement('style');
@@ -377,22 +433,35 @@
     return '<div class="toggle-row"><div class="tl"><b>' + label + '</b><span>' + hint + '</span></div>' +
       '<label class="switch"><input type="checkbox" id="' + id + '"' + (checked ? ' checked' : '') + '><i></i></label></div>';
   }
+  /* ضغط صورة المعلم مع الحفاظ على الشفافية: PNG/WebP تُحفظ PNG بقناة ألفا
+   * (لا تُحوَّل لجسم أسود/أبيض)، وJPG تُضغط JPEG. الخلفية مسؤولية التصميم لا الملف. */
   function resizePhoto(file, cb) {
     if (!file) return;
-    if (file.size > 6 * 1024 * 1024) { toast('الصورة كبيرة جدًا (الحد 6 ميجابايت قبل الضغط)', true); return; }
+    if (file.size > 8 * 1024 * 1024) { toast('الصورة كبيرة جدًا (الحد 8 ميجابايت قبل الضغط)', true); return; }
+    if (!/image\/(png|jpe?g|webp)/i.test(file.type || '')) { toast('نوع الصورة غير مدعوم (PNG/JPG/WebP).', true); return; }
+    var keepAlpha = /image\/(png|webp)/i.test(file.type || '');
     var reader = new FileReader();
     reader.onload = function () {
       var img = new Image();
       img.onload = function () {
-        var max = 512;
+        var max = 640;
         var scale = Math.min(1, max / Math.max(img.width, img.height));
         var c = document.createElement('canvas');
-        c.width = Math.round(img.width * scale); c.height = Math.round(img.height * scale);
+        c.width = Math.max(1, Math.round(img.width * scale)); c.height = Math.max(1, Math.round(img.height * scale));
         c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-        cb(c.toDataURL('image/jpeg', 0.85));
+        var out = keepAlpha ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.88);
+        if (out.length > 2.4 * 1024 * 1024) {
+          var c2 = document.createElement('canvas');
+          c2.width = Math.max(1, Math.round(c.width * 0.7)); c2.height = Math.max(1, Math.round(c.height * 0.7));
+          c2.getContext('2d').drawImage(c, 0, 0, c2.width, c2.height);
+          out = keepAlpha ? c2.toDataURL('image/png') : c2.toDataURL('image/jpeg', 0.85);
+        }
+        cb(out, keepAlpha);
       };
+      img.onerror = function () { toast('الملف ليس صورة صالحة.', true); };
       img.src = reader.result;
     };
+    reader.onerror = function () { toast('تعذّرت قراءة الملف.', true); };
     reader.readAsDataURL(file);
   }
   function saveTeacher(id) {
@@ -415,6 +484,7 @@
       studentLimit: Math.max(0, parseInt($('tStuLimit').value, 10) || 0)
     };
     if (A.pendingPhoto !== null) payload.photo = A.pendingPhoto || '';
+    payload.photoFit = $('tPhotoFit') ? $('tPhotoFit').value : '';
     if (!payload.name) { $('tErr').textContent = 'اسم المعلم مطلوب.'; return; }
     $('tSave').disabled = true;
     api(id ? '/api/admin/teachers/' + id : '/api/admin/teachers', {
@@ -504,13 +574,21 @@
       '<span class="badge green">' + count + ' س</span></div>';
   }
 
-  /* ================= بنك الأسئلة ================= */
+  /* ================= CMS: بنك الأسئلة (إدارة كاملة) =================
+   * عرض/بحث/تصفية + تعديل/إنشاء/تكرار/حذف/استعادة — المفاتيح ظاهرة هنا فقط
+   * (جلسة مسؤول + CSRF)، ولا تصل لأي واجهة طلابية أبدًا. */
   function renderBank(body) {
     var f = A.bankFilters;
     body.innerHTML =
-      '<div class="filters">' +
+      '<div class="cms-bar">' +
+      '<div class="cms-bar-t"><h2>بنك الأسئلة</h2><p>كل أسئلة المنصة مع مفاتيحها — التعديل هنا يُخزَّن كطبقة فوقية فوق البنك الأصلي ولا يمسّه.</p></div>' +
+      '<div class="cms-bar-a"><button class="btn small" onclick="openQuestionEditor(null)">+ سؤال جديد</button>' +
+      '<button class="btn small ghost" onclick="openDeletedQuestions()">سلة المحذوفات</button></div>' +
+      '</div>' +
+      '<div class="filters cms-filters">' +
       '<select id="fSubject" onchange="bankFilter()"><option value="">كل المواد</option><option value="psychology"' + (f.subject === 'psychology' ? ' selected' : '') + '>علم النفس</option><option value="philosophy"' + (f.subject === 'philosophy' ? ' selected' : '') + '>الفلسفة والمنطق</option></select>' +
       '<select id="fTerm" onchange="bankFilter()"><option value="">كل الترمات</option><option value="1"' + (f.term === '1' ? ' selected' : '') + '>الترم الأول</option><option value="2"' + (f.term === '2' ? ' selected' : '') + '>الترم الثاني</option></select>' +
+      '<select id="fOnly" onchange="bankFilter()"><option value="">كل الأسئلة</option><option value="custom"' + (f.only === 'custom' ? ' selected' : '') + '>مضافة/مستوردة</option><option value="edited"' + (f.only === 'edited' ? ' selected' : '') + '>معدّلة</option><option value="base"' + (f.only === 'base' ? ' selected' : '') + '>أصلية بلا تعديل</option></select>' +
       '<input id="fLesson" placeholder="بحث بالدرس/الفصل…" value="' + esc(f.lesson) + '" onchange="bankFilter()">' +
       '<input id="fQ" placeholder="بحث في نص السؤال…" value="' + esc(f.q) + '" onchange="bankFilter()">' +
       '<button class="btn small" onclick="bankFilter()">بحث</button></div>' +
@@ -518,32 +596,46 @@
     loadBank();
   }
   function bankFilter() {
-    A.bankFilters = { subject: $('fSubject').value, term: $('fTerm').value, lesson: $('fLesson').value.trim(), q: $('fQ').value.trim() };
+    A.bankFilters = { subject: $('fSubject').value, term: $('fTerm').value, lesson: $('fLesson').value.trim(), q: $('fQ').value.trim(), only: $('fOnly').value };
     A.bankPage = 1;
     loadBank();
   }
   function loadBank() {
     var f = A.bankFilters;
-    var qs = '?subject=' + encodeURIComponent(f.subject) + '&term=' + encodeURIComponent(f.term) + '&lesson=' + encodeURIComponent(f.lesson) + '&q=' + encodeURIComponent(f.q) + '&page=' + A.bankPage;
+    var qs = '?subject=' + encodeURIComponent(f.subject) + '&term=' + encodeURIComponent(f.term) + '&lesson=' + encodeURIComponent(f.lesson) + '&q=' + encodeURIComponent(f.q) + '&only=' + encodeURIComponent(f.only || '') + '&page=' + A.bankPage;
     api('/api/admin/questions' + qs).then(function (d) {
       var el = $('bankList');
       if (!el) return;
-      if (!d.questions.length) { el.innerHTML = '<div class="empty">لا نتائج.</div>'; return; }
+      if (!d.questions.length) { el.innerHTML = '<div class="empty">لا نتائج مطابقة.</div>'; return; }
       el.innerHTML =
-        '<div class="desc" style="font-size:.78rem;margin-bottom:10px">' + d.total + ' سؤالًا — صفحة ' + d.page + ' من ' + Math.ceil(d.total / d.perPage) + '</div>' +
+        '<div class="cms-counts">' +
+        '<span class="cchip">' + d.counts.all + ' سؤالًا</span>' +
+        '<span class="cchip gold">' + d.counts.custom + ' مضاف/مستورد</span>' +
+        '<span class="cchip blue">' + d.counts.edited + ' معدّل</span>' +
+        '<span class="cchip red">' + d.counts.deleted + ' في السلة</span>' +
+        '<span class="cchip muted">صفحة ' + d.page + ' من ' + Math.ceil(d.total / d.perPage) + '</span>' +
+        '</div>' +
         d.questions.map(function (q) {
-          return '<div class="rq"><div class="no">' + esc(q.id) + ' · ' + esc(q.meta.subject) +
-            (q.meta.term ? ' · ترم ' + q.meta.term : '') + (q.meta.difficulty ? ' · ' + esc(q.meta.difficulty) : '') +
-            (q.meta.authorCreated ? ' · مؤلَّف' : ' · موثق') + '</div>' +
+          return '<div class="rq cms-q">' +
+            '<div class="no"><span class="qid" dir="ltr">' + esc(q.id) + '</span> · ' + esc(q.meta.subject) +
+            (q.meta.term ? ' · ترم ' + q.meta.term : '') +
+            (q.custom ? ' <span class="badge gold">مضاف</span>' : (q.edited ? ' <span class="badge blue">معدّل</span>' : ' <span class="badge green">موثق</span>')) +
+            '<span class="cms-q-acts">' +
+            '<button class="ibtn" title="تعديل السؤال" onclick="openQuestionEditor(\'' + esc(q.id) + '\')">' + I_EDIT + '</button>' +
+            '<button class="ibtn" title="تكرار السؤال" onclick="duplicateQuestion(\'' + esc(q.id) + '\')">' + I_COPY + '</button>' +
+            '<button class="ibtn danger" title="حذف السؤال" onclick="deleteQuestion(\'' + esc(q.id) + '\')">' + I_TRASH + '</button>' +
+            '</span></div>' +
             '<div class="q">' + esc(q.text) + '</div>' +
+            '<div class="cms-opts">' +
             q.options.map(function (o, i) {
               var isAns = LETTERS[i] === q.answer;
-              return '<div class="ans ' + (isAns ? 'correct' : '') + '"' + (isAns ? '' : ' style="opacity:.75"') + '>' + LETTERS[i] + ') ' + esc(o) + (isAns ? ' ✓' : '') + '</div>';
+              return '<div class="ans' + (isAns ? ' correct' : '') + '"><span class="k">' + LETTERS[i] + '</span>' + esc(o) + (isAns ? ' <b class="ktag">الإجابة الصحيحة</b>' : '') + '</div>';
             }).join('') +
-            (q.meta.lesson || q.meta.chapter ? '<div class="no" style="margin-top:6px">' + esc(q.meta.lesson || q.meta.chapter) + '</div>' : '') +
+            '</div>' +
+            '<div class="no cms-qmeta">' + (q.meta.lesson || q.meta.chapter ? esc(q.meta.lesson || q.meta.chapter) + ' · ' : '') + 'يُستخدم في ' + q.usedBy + ' امتحان' + (q.meta.source ? ' · ' + esc(q.meta.source) : '') + '</div>' +
             '</div>';
         }).join('') +
-        '<div style="display:flex;gap:10px;justify-content:center;margin-top:16px">' +
+        '<div class="cms-pager">' +
         (A.bankPage > 1 ? '<button class="btn small ghost" onclick="bankPage(' + (A.bankPage - 1) + ')">السابق</button>' : '') +
         (A.bankPage < Math.ceil(d.total / d.perPage) ? '<button class="btn small ghost" onclick="bankPage(' + (A.bankPage + 1) + ')">التالي</button>' : '') +
         '</div>';
@@ -551,25 +643,517 @@
   }
   function bankPage(p) { A.bankPage = p; loadBank(); }
 
-  /* ================= الامتحانات ================= */
-  function renderExams(body) {
-    api('/api/admin/exams').then(function (d) {
-      var rows = Object.values(d.exams).sort(function (a, b) { return (a.subjectId + a.term + a.title).localeCompare(b.subjectId + b.term + b.title, 'ar'); });
-      body.innerHTML = '<div class="card"><div style="overflow-x:auto"><table class="tbl">' +
-        '<tr><th>المعرف</th><th>العنوان</th><th>الموضوع</th><th>المادة</th><th>الترم</th><th>النوع</th><th>الأسئلة</th><th>الحالة</th></tr>' +
-        rows.map(function (e) {
-          return '<tr><td dir="ltr" style="font-size:.72rem">' + esc(e.id) + '</td><td>' + esc(e.title) + '</td>' +
-            '<td>' + esc(e.topicKey ? ('الموضوع ' + e.topicNo + ' / الدرس ' + e.lessonNo + ' — ' + e.lessonTitle) : (e.lessonTitle || '—')) + '</td>' +
-            '<td>' + (e.subjectId === 'psychology' ? 'علم النفس' : (e.sectionTitle ? 'الفلسفة والمنطق — ' + e.sectionTitle : 'الفلسفة')) + '</td>' +
-            '<td>' + (e.term || '—') + '</td><td>' + typeLabel(e.type) + '</td><td>' + e.count + '</td>' +
-            '<td>' + (e.legacy ? '<span class="badge">قديم — غير معروض</span>' : '<span class="badge green">نشط</span>') + '</td></tr>';
-        }).join('') + '</table></div></div>';
-    }).catch(function (e) { body.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  /* ---- محرر السؤال (إنشاء/تعديل) — واجهة آمنة للمفتاح ---- */
+  function openQuestionEditor(qid, prefill) {
+    var done = function (q, edited) {
+      var m = (q && q.meta) || {};
+      var v = prefill || {};
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-bg';
+      overlay.innerHTML =
+        '<div class="modal cms-qmodal"><h3>' + (q ? 'تعديل السؤال' : 'سؤال جديد') + '</h3>' +
+        '<p class="desc" style="font-size:.76rem;color:var(--muted)">نص السؤال والخيارات ومفتاح الإجابة — الحقول المطلوبة معلّمة بـ *</p>' +
+        '<div class="field"><label>نص السؤال *</label><textarea id="qeText" rows="3" maxlength="3000">' + esc(q ? q.text : (v.text || '')) + '</textarea></div>' +
+        '<div class="cms-optgrid">' +
+        LETTERS.map(function (L, i) {
+          return '<div class="field cms-optfield"><label><span class="kchip' + (q && q.answer === L ? ' on' : '') + '" data-k="' + L + '">' + L + '</span> الخيار ' + L + ' (' + LETTER_AR[L] + ') *</label><input id="qeOpt' + L + '" maxlength="600" value="' + esc(q ? q.options[i] : ((v.options || [])[i] || '')) + '"></div>';
+        }).join('') +
+        '</div>' +
+        '<div class="field"><label>الإجابة الصحيحة * <span class="hint">A/B/C/D — تُحفظ بالحرف اللاتيني كما في البنك وملف الاستيراد</span></label><div class="cms-keypick" id="qeKey">' +
+        LETTERS.map(function (L) {
+          return '<button type="button" class="kbtn' + (q && q.answer === L ? ' on' : '') + '" data-k="' + L + '" title="الخيار ' + LETTER_AR[L] + '" onclick="qePickKey(\'' + L + '\')">' + L + '<i>' + LETTER_AR[L] + '</i></button>';
+        }).join('') + '</div><input type="hidden" id="qeAnswer" value="' + esc(q ? q.answer : (v.answer || '')) + '"></div>' +
+        '<div class="cms-meta-grid">' +
+        '<div class="field"><label>المادة</label><select id="qeSubject"><option value="philosophy"' + (m.subjectId === 'psychology' ? '' : ' selected') + '>الفلسفة والمنطق</option><option value="psychology"' + (m.subjectId === 'psychology' ? ' selected' : '') + '>علم النفس</option></select></div>' +
+        '<div class="field"><label>الترم</label><select id="qeTerm"><option value="">بدون</option><option value="1"' + (String(m.term) === '1' ? ' selected' : '') + '>الترم الأول</option><option value="2"' + (String(m.term) === '2' ? ' selected' : '') + '>الترم الثاني</option></select></div>' +
+        '<div class="field"><label>الوحدة / الموضوع</label><input id="qeUnit" maxlength="80" value="' + esc(m.unit || m.topic || '') + '"></div>' +
+        '<div class="field"><label>الدرس</label><input id="qeLesson" maxlength="200" value="' + esc(m.lesson || m.chapter || '') + '"></div>' +
+        '<div class="field full"><label>المصدر</label><input id="qeSource" maxlength="200" value="' + esc(m.source || '') + '" placeholder="مثال: كتاب الأسئلة الرسمي / إضافة المعلم"></div>' +
+        '</div>' +
+        '<div class="err" id="qeErr"></div>' +
+        '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إلغاء</button>' +
+        (q && edited ? '<button class="btn ghost" onclick="revertQuestion(\'' + esc(qid) + '\')">' + I_REVERT + ' استعادة الأصل</button>' : '') +
+        '<button class="btn" onclick="saveQuestionEditor(\'' + (qid || '') + '\')">' + (q ? 'حفظ التعديلات' : 'حفظ السؤال') + '</button></div></div>';
+      document.body.appendChild(overlay);
+      var t = $('qeText'); if (t) setTimeout(function () { t.focus(); }, 60);
+    };
+    if (!qid) { done(null); return; }
+    // edited تأتي أعلى استجابة الخادم (بجانب question) لا داخلها
+    api('/api/admin/questions/' + encodeURIComponent(qid)).then(function (d) { done(d.question, d.edited === true); }).catch(function (e) { toast(e.message, true); });
   }
-  function typeLabel(t) {
-    return { topic: 'موضوع', training: 'تدريب', 'unit-comprehensive': 'شامل وحدة', 'term-comprehensive': 'شامل ترم', 'subject-comprehensive': 'شامل مادة' }[t] || t;
+  function revertQuestion(qid) {
+    confirmModal('استعادة الأصل', '<p>سيُحذف تعديل الطبقة الفوقية ويعود السؤال حرفيًا كما في البنك الأصلي (نصًا وخيارات ومفتاحًا).</p>', 'استعادة الأصل', function () {
+      api('/api/admin/questions/' + encodeURIComponent(qid) + '/revert', { method: 'POST', body: '{}' })
+        .then(function () {
+          toast('تمت استعادة السؤال الأصل من البنك.');
+          var ed = document.querySelector('.cms-qmodal'); if (ed) { var bg = ed.closest('.modal-bg'); if (bg) bg.remove(); }
+          if (A.tab === 'bank') loadBank();
+          if (A.ee) refreshExamEditor();
+        })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  }
+  function qePickKey(L) {
+    $('qeAnswer').value = L;
+    document.querySelectorAll('#qeKey .kbtn').forEach(function (b) { b.classList.toggle('on', b.getAttribute('data-k') === L); });
+  }
+  function saveQuestionEditor(qid) {
+    var payload = {
+      text: $('qeText').value,
+      options: LETTERS.map(function (L) { return $('qeOpt' + L).value; }),
+      answer: $('qeAnswer').value,
+      meta: {
+        subjectId: $('qeSubject').value,
+        term: $('qeTerm').value === '' ? null : parseInt($('qeTerm').value, 10),
+        unit: $('qeUnit').value, lesson: $('qeLesson').value, source: $('qeSource').value
+      }
+    };
+    var err = $('qeErr'); err.textContent = '';
+    api('/api/admin/questions' + (qid ? '/' + encodeURIComponent(qid) : ''), { method: qid ? 'PUT' : 'POST', body: JSON.stringify(payload) })
+      .then(function (d) {
+        document.querySelector('.modal-bg').remove();
+        toast(qid ? 'تم حفظ تعديلات السؤال.' : 'تمت إضافة السؤال (' + d.id + ').');
+        if (A.tab === 'bank') loadBank();
+        if (A.ee && A.ee.ids.indexOf(qid) !== -1) refreshExamEditor();
+      })
+      .catch(function (e) { err.textContent = e.message; });
+  }
+  function duplicateQuestion(qid) {
+    api('/api/admin/questions/' + encodeURIComponent(qid) + '/duplicate', { method: 'POST', body: '{}' })
+      .then(function (d) { toast('تم إنشاء نسخة: ' + d.id); loadBank(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+  function deleteQuestion(qid) {
+    api('/api/admin/questions/' + encodeURIComponent(qid)).then(function (d) {
+      var used = (d.usedBy || []).map(function (u) { return u.title; });
+      confirmModal('حذف السؤال',
+        '<p>سيُزال السؤال من البنك ومن كل الامتحانات التي تستخدمه' + (used.length ? ' (' + esc(used.slice(0, 3).join('، ')) + (used.length > 3 ? '…' : '') + ')' : '') + '.</p><p class="desc" style="font-size:.76rem;color:var(--muted)">الحذف غير تدميري: يبقى السؤال في سلة المحذوفات ويمكن استعادته.</p>',
+        'حذف', function () {
+          api('/api/admin/questions/' + encodeURIComponent(qid), { method: 'DELETE' }).then(function (r) {
+            toast('تم الحذف — تأثّر ' + r.affectedExams + ' امتحان.');
+            if (A.tab === 'bank') loadBank();
+            if (A.ee) refreshExamEditor();
+          }).catch(function (e) { toast(e.message, true); });
+        });
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function openDeletedQuestions() {
+    api('/api/admin/questions/deleted').then(function (d) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-bg';
+      overlay.innerHTML = '<div class="modal"><h3>سلة المحذوفات — الأسئلة</h3>' +
+        (d.questions.length
+          ? '<div class="cms-deleted">' + d.questions.map(function (q) {
+            return '<div class="dr"><div><b dir="ltr" style="font-size:.72rem">' + esc(q.id) + '</b> <span style="font-size:.82rem">' + esc(String(q.text).slice(0, 90)) + '…</span></div>' +
+              '<button class="btn small ghost" onclick="restoreQuestion(\'' + esc(q.id) + '\')">استعادة</button></div>';
+          }).join('') + '</div>'
+          : '<div class="empty">السلة فارغة.</div>') +
+        '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إغلاق</button></div></div>';
+      document.body.appendChild(overlay);
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function restoreQuestion(qid) {
+    api('/api/admin/questions/' + encodeURIComponent(qid) + '/restore', { method: 'POST', body: '{}' })
+      .then(function () { toast('تمت الاستعادة.'); document.querySelector('.modal-bg').remove(); if (A.tab === 'bank') loadBank(); if (A.ee) refreshExamEditor(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+  function confirmModal(title, html, okLabel, onOk) {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.innerHTML = '<div class="modal" style="max-width:460px"><h3>' + esc(title) + '</h3>' + html +
+      '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إلغاء</button>' +
+      '<button class="btn danger" id="cmOk">' + esc(okLabel) + '</button></div></div>';
+    document.body.appendChild(overlay);
+    $('cmOk').addEventListener('click', function () { overlay.remove(); onOk(); });
   }
 
+  /* ================= CMS: الامتحانات ================= */
+  function renderExams(body) {
+    if (A.ee) { renderExamEditor(body); return; }
+    var f = A.examFilters || (A.examFilters = { q: '', subject: '', term: '', status: '' });
+    body.innerHTML =
+      '<div class="cms-bar">' +
+      '<div class="cms-bar-t"><h2>الامتحانات</h2><p>فتح/تعديل/ترتيب/تعطيل/استيراد/تصدير — كل امتحانات المنصة بما فيها المخصّصة والمستوردة.</p></div>' +
+      '<div class="cms-bar-a">' +
+      '<button class="btn small" onclick="openExamEditor(null)">+ امتحان جديد</button>' +
+      '<button class="btn small gold" onclick="setTab(\'import\')">' + I_IMPORT + ' استيراد امتحان</button>' +
+      '<button class="btn small ghost" onclick="openDeletedExams()">سلة المحذوفات</button>' +
+      '</div></div>' +
+      '<div class="filters cms-filters">' +
+      '<input id="exQ" placeholder="بحث بالعنوان أو المعرف…" value="' + esc(f.q) + '" oninput="examFilterDebounced()">' +
+      '<select id="exSubject" onchange="examFilter()"><option value="">كل المواد</option><option value="psychology"' + (f.subject === 'psychology' ? ' selected' : '') + '>علم النفس</option><option value="philosophy"' + (f.subject === 'philosophy' ? ' selected' : '') + '>الفلسفة والمنطق</option></select>' +
+      '<select id="exTerm" onchange="examFilter()"><option value="">كل الترمات</option><option value="1"' + (f.term === '1' ? ' selected' : '') + '>الترم الأول</option><option value="2"' + (f.term === '2' ? ' selected' : '') + '>الترم الثاني</option></select>' +
+      '<select id="exStatus" onchange="examFilter()"><option value="">كل الحالات</option><option value="enabled"' + (f.status === 'enabled' ? ' selected' : '') + '>نشط</option><option value="disabled"' + (f.status === 'disabled' ? ' selected' : '') + '>معطّل</option><option value="custom"' + (f.status === 'custom' ? ' selected' : '') + '>مخصّص/مستورد</option><option value="edited"' + (f.status === 'edited' ? ' selected' : '') + '>معدّل</option></select>' +
+      '</div>' +
+      '<div id="exList"><div class="empty"><div class="spin"></div></div></div>';
+    loadExams();
+  }
+  var exFT = null;
+  function examFilterDebounced() { clearTimeout(exFT); exFT = setTimeout(examFilter, 250); }
+  function examFilter() {
+    A.examFilters = { q: ($('exQ') || {}).value || '', subject: ($('exSubject') || {}).value || '', term: ($('exTerm') || {}).value || '', status: ($('exStatus') || {}).value || '' };
+    loadExams();
+  }
+  function loadExams() {
+    var f = A.examFilters || {};
+    var qs = '?q=' + encodeURIComponent(f.q || '') + '&subject=' + encodeURIComponent(f.subject || '') + '&term=' + encodeURIComponent(f.term || '') + '&status=' + encodeURIComponent(f.status || '');
+    api('/api/admin/exams' + qs).then(function (d) {
+      var el = $('exList');
+      if (!el) return;
+      if (!d.exams.length) { el.innerHTML = '<div class="empty">لا امتحانات مطابقة.</div>'; return; }
+      el.innerHTML =
+        '<div class="cms-counts"><span class="cchip">' + d.counts.all + ' امتحانًا</span><span class="cchip gold">' + d.counts.custom + ' مخصّص/مستورد</span><span class="cchip blue">' + d.counts.edited + ' معدّل</span><span class="cchip red">' + d.counts.disabled + ' معطّل</span></div>' +
+        '<div class="cms-exlist">' +
+        d.exams.map(function (e) {
+          return '<div class="cms-exrow">' +
+            '<div class="ex-i"><div class="ex-t">' + esc(e.title) + ' ' +
+            (e.custom ? '<span class="badge gold">مخصّص</span>' : '') +
+            (e.modified && !e.custom ? '<span class="badge blue">معدّل</span>' : '') +
+            (e.enabled === false ? '<span class="badge red">معطّل</span>' : '') +
+            (e.legacy ? '<span class="badge">قديم</span>' : '') + '</div>' +
+            '<div class="ex-s"><span dir="ltr" class="qid">' + esc(e.id) + '</span> · ' + (e.subjectId === 'psychology' ? 'علم النفس' : 'الفلسفة والمنطق') +
+            (e.term ? ' · ترم ' + e.term : '') + ' · ' + typeLabel(e.type) + ' · ' + e.count + ' سؤالًا' + (e.grade ? ' · ' + esc(e.grade) : '') + '</div></div>' +
+            '<div class="ex-a">' +
+            '<button class="btn small" onclick="openExamEditor(\'' + esc(e.id) + '\')">فتح المحرر</button>' +
+            '<button class="ibtn" title="تصدير JSON" onclick="exportExam(\'' + esc(e.id) + '\')">' + I_EXPORT + '</button>' +
+            '<button class="ibtn" title="' + (e.enabled === false ? 'تفعيل' : 'تعطيل') + '" onclick="toggleExam(\'' + esc(e.id) + '\',' + (e.enabled === false) + ')">' + (e.enabled === false ? I_EYE : I_EYEOFF) + '</button>' +
+            '</div></div>';
+        }).join('') + '</div>';
+    }).catch(function (e) { var el = $('exList'); if (el) el.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  function typeLabel(t) {
+    return { topic: 'موضوع', training: 'تدريب', 'unit-comprehensive': 'شامل وحدة', 'term-comprehensive': 'شامل ترم', 'subject-comprehensive': 'شامل مادة', custom: 'مخصّص' }[t] || t;
+  }
+  function toggleExam(id, enable) {
+    api('/api/admin/exams/' + encodeURIComponent(id), { method: 'PUT', body: JSON.stringify({ enabled: enable }) })
+      .then(function () { toast(enable ? 'تم تفعيل الامتحان.' : 'تم تعطيل الامتحان — لن يظهر للطلاب.'); loadExams(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+  function exportExam(id) {
+    api('/api/admin/exams/' + encodeURIComponent(id) + '/export').then(function (d) {
+      var blob = new Blob([JSON.stringify(d, null, 2)], { type: 'application/json' });
+      var a = document.createElement('a');
+      a.href = URL.createObjectURL(blob);
+      a.download = 'exam-' + id + '.json';
+      document.body.appendChild(a); a.click(); a.remove();
+      toast('تم تنزيل ملف الامتحان بالصيغة القياسية.');
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function openDeletedExams() {
+    api('/api/admin/exams/deleted').then(function (d) {
+      var overlay = document.createElement('div');
+      overlay.className = 'modal-bg';
+      overlay.innerHTML = '<div class="modal"><h3>سلة المحذوفات — الامتحانات</h3>' +
+        (d.exams.length
+          ? '<div class="cms-deleted">' + d.exams.map(function (e) {
+            return '<div class="dr"><div><b dir="ltr" style="font-size:.72rem">' + esc(e.id) + '</b> <span style="font-size:.82rem">' + esc(e.title) + '</span></div>' +
+              '<button class="btn small ghost" onclick="restoreExam(\'' + esc(e.id) + '\')">استعادة</button></div>';
+          }).join('') + '</div>'
+          : '<div class="empty">السلة فارغة.</div>') +
+        '<div class="acts"><button class="btn ghost" onclick="this.closest(\'.modal-bg\').remove()">إغلاق</button></div></div>';
+      document.body.appendChild(overlay);
+    }).catch(function (e) { toast(e.message, true); });
+  }
+  function restoreExam(id) {
+    api('/api/admin/exams/' + encodeURIComponent(id) + '/restore', { method: 'POST', body: '{}' })
+      .then(function () { toast('تمت الاستعادة.'); document.querySelector('.modal-bg').remove(); loadExams(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+
+  /* ================= CMS: محرر الامتحان ================= */
+  function openExamEditor(id) {
+    if (!id) {
+      A.ee = { id: null, title: '', subjectId: 'philosophy', term: null, grade: '', enabled: true, ids: [], qs: [], dirty: false, isNew: true };
+      renderTab();
+      return;
+    }
+    A.ee = { id: id, loading: true };
+    renderTab();
+    api('/api/admin/exams/' + encodeURIComponent(id)).then(function (d) {
+      A.ee = {
+        id: id, isNew: false, dirty: false,
+        title: d.exam.title, subjectId: d.exam.subjectId, term: d.exam.term == null ? null : d.exam.term,
+        grade: d.exam.grade || '', enabled: d.exam.enabled !== false, custom: d.exam.custom === true, modified: d.exam.modified === true,
+        ids: d.questionIds.slice(), qs: d.questions.slice()
+      };
+      renderTab();
+    }).catch(function (e) { A.ee = null; toast(e.message, true); renderTab(); });
+  }
+  function closeExamEditor() {
+    if (A.ee && A.ee.dirty && !confirm('لديك تغييرات غير محفوظة في المحرر — خروج دون حفظ؟')) return;
+    A.ee = null;
+    renderTab();
+  }
+  function refreshExamEditor() {
+    if (!A.ee || !A.ee.id) return;
+    var keep = A.ee;
+    api('/api/admin/exams/' + encodeURIComponent(keep.id)).then(function (d) {
+      A.ee.ids = d.questionIds.slice(); A.ee.qs = d.questions.slice();
+      if (A.tab === 'exams') renderTab();
+    }).catch(function () { });
+  }
+  function renderExamEditor(body) {
+    var ee = A.ee;
+    if (!ee) { renderExams(body); return; }
+    if (ee.loading) { body.innerHTML = '<div class="empty"><div class="spin"></div></div>'; return; }
+    body.innerHTML =
+      '<div class="cms-bar">' +
+      '<div class="cms-bar-t"><button class="ibtn big" onclick="closeExamEditor()" title="رجوع">' + I_BACK + '</button>' +
+      '<div><h2>' + (ee.isNew ? 'امتحان جديد' : 'تعديل الامتحان') + '</h2><p>' + (ee.isNew ? 'أنشئ امتحانًا مخصّصًا واختر أسئلته من البنك.' : '<span dir="ltr" class="qid">' + esc(ee.id) + '</span>' + (ee.custom ? ' · مخصّص' : (ee.modified ? ' · معدّل عن الأصل' : ' · من البنك الأصلي'))) + '</p></div></div>' +
+      '<div class="cms-bar-a">' +
+      (!ee.isNew ? '<button class="btn small ghost" onclick="exportExam(\'' + esc(ee.id) + '\')">' + I_EXPORT + ' تصدير</button>' : '') +
+      (!ee.isNew && !ee.custom ? '<button class="btn small ghost" onclick="revertExam()">' + I_REVERT + ' استعادة الأصل</button>' : '') +
+      (!ee.isNew ? '<button class="btn small ghost" onclick="toggleExamEE()">' + (ee.enabled ? I_EYEOFF + ' تعطيل' : I_EYE + ' تفعيل') + '</button>' : '') +
+      (!ee.isNew ? '<button class="btn small danger" onclick="deleteExam(\'' + esc(ee.id) + '\')">' + I_TRASH + ' حذف</button>' : '') +
+      '<button class="btn" onclick="saveExamEE()">حفظ التعديلات</button>' +
+      '</div></div>' +
+      '<div class="cms-editor">' +
+      '<div class="cms-ed-meta card">' +
+      '<div class="field"><label>اسم الامتحان *</label><input id="eeTitle" maxlength="200" value="' + esc(ee.title) + '" oninput="eeDirty()"></div>' +
+      '<div class="cms-meta-grid">' +
+      '<div class="field"><label>المادة</label><select id="eeSubject" onchange="eeDirty()"><option value="philosophy"' + (ee.subjectId === 'psychology' ? '' : ' selected') + '>الفلسفة والمنطق</option><option value="psychology"' + (ee.subjectId === 'psychology' ? ' selected' : '') + '>علم النفس</option></select></div>' +
+      '<div class="field"><label>الترم</label><select id="eeTerm" onchange="eeDirty()"><option value=""' + (ee.term == null ? ' selected' : '') + '>بدون</option><option value="1"' + (ee.term === 1 ? ' selected' : '') + '>الترم الأول</option><option value="2"' + (ee.term === 2 ? ' selected' : '') + '>الترم الثاني</option></select></div>' +
+      '<div class="field"><label>الصف</label><input id="eeGrade" maxlength="80" value="' + esc(ee.grade) + '" placeholder="الصف الأول الثانوي" oninput="eeDirty()"></div>' +
+      '</div>' +
+      '<div class="cms-ed-count"><span class="cchip blue">' + ee.ids.length + ' سؤالًا في الامتحان</span>' + (ee.dirty ? '<span class="cchip gold">تغييرات غير محفوظة</span>' : '') + '</div>' +
+      '</div>' +
+      '<div class="cms-ed-list">' +
+      '<div class="cms-ed-head"><h3>الأسئلة</h3><div><button class="btn small" onclick="openQuestionPicker()">+ إضافة سؤال</button></div></div>' +
+      (ee.ids.length ? '<div id="eeRows">' + eeRowsHtml() + '</div>' : '<div class="empty">لا أسئلة بعد — اضغط «+ إضافة سؤال» للاختيار من البنك أو إنشاء سؤال جديد.</div>') +
+      '</div></div>';
+  }
+  function eeRowsHtml() {
+    var ee = A.ee;
+    return ee.qs.map(function (q, i) {
+      return '<div class="ee-row">' +
+        '<span class="ee-n">' + (i + 1) + '</span>' +
+        '<div class="ee-b"><div class="ee-t">' + esc(q.text) + '</div>' +
+        '<div class="ee-m"><span dir="ltr" class="qid">' + esc(q.id) + '</span> · مفتاح <b class="ktag">' + esc(q.answer) + '</b> · ' + esc((q.meta && q.meta.subject) || '') + (q.meta && q.meta.lesson ? ' · ' + esc(String(q.meta.lesson).slice(0, 40)) : '') + '</div></div>' +
+        '<div class="ee-a">' +
+        '<button class="ibtn" title="تعديل السؤال" onclick="openQuestionEditor(\'' + esc(q.id) + '\')">' + I_EDIT + '</button>' +
+        '<button class="ibtn" title="لأعلى" onclick="eeMove(' + i + ',-1)"' + (i === 0 ? ' disabled' : '') + '>' + I_UP + '</button>' +
+        '<button class="ibtn" title="لأسفل" onclick="eeMove(' + i + ',1)"' + (i === ee.qs.length - 1 ? ' disabled' : '') + '>' + I_DOWN + '</button>' +
+        '<button class="ibtn danger" title="إزالة من الامتحان" onclick="eeRemove(' + i + ')">' + I_TRASH + '</button>' +
+        '</div></div>';
+    }).join('');
+  }
+  function eeDirty() { if (A.ee) A.ee.dirty = true; }
+  function eeMove(i, dir) {
+    var ee = A.ee; var j = i + dir;
+    if (j < 0 || j >= ee.ids.length) return;
+    var t = ee.ids[i]; ee.ids[i] = ee.ids[j]; ee.ids[j] = t;
+    var q = ee.qs[i]; ee.qs[i] = ee.qs[j]; ee.qs[j] = q;
+    ee.dirty = true; $('eeRows').innerHTML = eeRowsHtml();
+    var c = document.querySelector('.cms-ed-count'); if (c) c.innerHTML = '<span class="cchip blue">' + ee.ids.length + ' سؤالًا في الامتحان</span><span class="cchip gold">تغييرات غير محفوظة</span>';
+  }
+  function eeRemove(i) {
+    var ee = A.ee;
+    ee.ids.splice(i, 1); ee.qs.splice(i, 1); ee.dirty = true;
+    if (!ee.ids.length) { renderTab(); return; }
+    $('eeRows').innerHTML = eeRowsHtml();
+  }
+  function toggleExamEE() {
+    var ee = A.ee;
+    api('/api/admin/exams/' + encodeURIComponent(ee.id), { method: 'PUT', body: JSON.stringify({ enabled: !ee.enabled }) })
+      .then(function () { ee.enabled = !ee.enabled; toast(ee.enabled ? 'تم التفعيل.' : 'تم التعطيل.'); renderTab(); })
+      .catch(function (e) { toast(e.message, true); });
+  }
+  function deleteExam(id) {
+    confirmModal('حذف الامتحان', '<p>سيُنقل الامتحان إلى سلة المحذوفات — الأسئلة والنتائج لا تُحذف، ويمكن استعادة الامتحان لاحقًا من السلة.</p>', 'حذف الامتحان', function () {
+      api('/api/admin/exams/' + encodeURIComponent(id), { method: 'DELETE' })
+        .then(function () {
+          toast('تم نقل الامتحان إلى سلة المحذوفات.');
+          A.ee = null;
+          if (A.tab !== 'exams') setTab('exams'); else renderTab();
+          loadExams();
+        })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  }
+  function revertExam() {
+    confirmModal('استعادة الأصل', '<p>سيُحذف كل تعديل محفوظ على هذا الامتحان (العنوان/الترتيب/التعطيل) ويعود حرفيًا لتعريف البنك الأصلي.</p>', 'استعادة الأصل', function () {
+      api('/api/admin/exams/' + encodeURIComponent(A.ee.id) + '/revert', { method: 'POST', body: '{}' })
+        .then(function () { toast('تمت استعادة الأصل.'); openExamEditor(A.ee.id); })
+        .catch(function (e) { toast(e.message, true); });
+    });
+  }
+  function saveExamEE() {
+    var ee = A.ee;
+    var payload = {
+      title: $('eeTitle').value.trim(),
+      subjectId: $('eeSubject').value,
+      term: $('eeTerm').value === '' ? null : parseInt($('eeTerm').value, 10),
+      grade: $('eeGrade').value.trim(),
+      questionIds: ee.ids
+    };
+    if (!payload.title) { toast('اسم الامتحان مطلوب.', true); return; }
+    if (!ee.ids.length) { toast('أضف سؤالًا واحدًا على الأقل.', true); return; }
+    if (ee.isNew) {
+      api('/api/admin/exams', { method: 'POST', body: JSON.stringify(payload) }).then(function (d) {
+        toast('تم إنشاء الامتحان (' + d.id + ').');
+        openExamEditor(d.id);
+      }).catch(function (e) { toast(e.message, true); });
+      return;
+    }
+    api('/api/admin/exams/' + encodeURIComponent(ee.id), { method: 'PUT', body: JSON.stringify(payload) }).then(function (d) {
+      ee.dirty = false;
+      toast('تم حفظ الامتحان (' + d.count + ' سؤالًا).');
+      openExamEditor(ee.id);
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  /* ---- منتقي الأسئلة من البنك (إضافة دون تكرار) ---- */
+  function openQuestionPicker() {
+    var overlay = document.createElement('div');
+    overlay.className = 'modal-bg';
+    overlay.innerHTML = '<div class="modal cms-picker"><h3>إضافة أسئلة من البنك</h3>' +
+      '<p class="desc" style="font-size:.76rem;color:var(--muted)">الأسئلة تُربط من البنك المركزي نفسه — لا تُنسخ. اختر سؤالًا أو أكثر ثم أضفه.</p>' +
+      '<div class="filters cms-filters"><input id="pkQ" placeholder="بحث في نص السؤال…" oninput="pkDebounced()">' +
+      '<select id="pkSubject" onchange="pkLoad(1)"><option value="">كل المواد</option><option value="psychology">علم النفس</option><option value="philosophy">الفلسفة والمنطق</option></select>' +
+      '<select id="pkTerm" onchange="pkLoad(1)"><option value="">كل الترمات</option><option value="1">الأول</option><option value="2">الثاني</option></select></div>' +
+      '<div id="pkList" class="cms-pklist"><div class="empty"><div class="spin"></div></div></div>' +
+      '<div class="cms-pkfoot"><span id="pkSel" class="cchip blue">0 محدد</span>' +
+      '<div class="acts"><button class="btn ghost" onclick="openQuestionEditor(null)">+ سؤال جديد</button>' +
+      '<button class="btn" onclick="pkAdd()">إضافة إلى الامتحان</button></div></div></div>';
+    document.body.appendChild(overlay);
+    A.pkSel = {};
+    pkLoad(1);
+  }
+  var pkT = null;
+  function pkDebounced() { clearTimeout(pkT); pkT = setTimeout(function () { pkLoad(1); }, 250); }
+  function pkLoad(page) {
+    A.pkPage = page || 1;
+    var qs = '?q=' + encodeURIComponent(($('pkQ') || {}).value || '') + '&subject=' + encodeURIComponent(($('pkSubject') || {}).value || '') + '&term=' + encodeURIComponent(($('pkTerm') || {}).value || '') + '&page=' + A.pkPage + '&perPage=20';
+    api('/api/admin/questions' + qs).then(function (d) {
+      var el = $('pkList');
+      if (!el) return;
+      if (!d.questions.length) { el.innerHTML = '<div class="empty">لا نتائج.</div>'; return; }
+      var ee = A.ee || { ids: [] };
+      el.innerHTML = d.questions.map(function (q) {
+        var inExam = ee.ids.indexOf(q.id) !== -1;
+        return '<label class="pk-row' + (inExam ? ' inexam' : '') + '"><input type="checkbox" value="' + esc(q.id) + '" onchange="pkToggle(this)"' + (inExam ? ' disabled' : '') + '>' +
+          '<span class="pk-b"><span class="pk-t">' + esc(q.text) + '</span>' +
+          '<span class="pk-m"><span dir="ltr" class="qid">' + esc(q.id) + '</span> · مفتاح <b class="ktag">' + esc(q.answer) + '</b>' + (inExam ? ' · <b>مضاف بالفعل</b>' : '') + '</span></span></label>';
+      }).join('') +
+        '<div class="cms-pager">' + (A.pkPage > 1 ? '<button class="btn small ghost" onclick="pkLoad(' + (A.pkPage - 1) + ')">السابق</button>' : '') +
+        (A.pkPage < Math.ceil(d.total / d.perPage) ? '<button class="btn small ghost" onclick="pkLoad(' + (A.pkPage + 1) + ')">التالي</button>' : '') + '</div>';
+    }).catch(function (e) { var el = $('pkList'); if (el) el.innerHTML = '<div class="empty">' + esc(e.message) + '</div>'; });
+  }
+  function pkToggle(cb) {
+    A.pkSel = A.pkSel || {};
+    if (cb.checked) A.pkSel[cb.value] = true; else delete A.pkSel[cb.value];
+    var n = Object.keys(A.pkSel).length;
+    var s = $('pkSel'); if (s) s.textContent = n + ' محدد';
+  }
+  function pkAdd() {
+    var ids = Object.keys(A.pkSel || {});
+    if (!ids.length) { toast('اختر سؤالًا واحدًا على الأقل.', true); return; }
+    // fetch full objects for the chosen ids (single batched call per id is fine: selection is small)
+    Promise.all(ids.map(function (id) { return api('/api/admin/questions/' + encodeURIComponent(id)); })).then(function (res) {
+      var ee = A.ee;
+      res.forEach(function (r) {
+        if (!r.question || ee.ids.indexOf(r.question.id) !== -1) return;
+        ee.ids.push(r.question.id);
+        ee.qs.push({ id: r.question.id, text: r.question.text, options: r.question.options, answer: r.question.answer, meta: r.question.meta });
+      });
+      ee.dirty = true;
+      document.querySelector('.modal-bg').remove();
+      toast('تمت إضافة ' + ids.length + ' سؤالًا إلى الامتحان (لم يُحفظ بعد).');
+      renderTab();
+    }).catch(function (e) { toast(e.message, true); });
+  }
+
+  /* ================= CMS: استيراد امتحان من ملف ================= */
+  function renderImport(body) {
+    body.innerHTML =
+      '<div class="cms-bar"><div class="cms-bar-t"><h2>استيراد امتحان</h2>' +
+      '<p>ارفع ملفًا بالصيغة القياسية (JSON) — تُعرض معاينة وتحقق كامل قبل أي حفظ، ولا يُستورد شيء دون تأكيدك.</p></div>' +
+      '<div class="cms-bar-a"><button class="btn small ghost" onclick="downloadTemplate()">' + I_EXPORT + ' تنزيل نموذج JSON</button></div></div>' +
+      '<div class="card cms-import">' +
+      '<div class="cms-drop" id="impDrop">' + I_IMPORT +
+      '<div class="t">اسحب ملف الامتحان هنا أو اضغط للاختيار</div>' +
+      '<div class="s">JSON بصيغة المنصة القياسية — موثّقة في docs/exam-import-format.md</div>' +
+      '<input type="file" id="impFile" accept=".json,application/json" style="display:none"></div>' +
+      '<div id="impName" class="cchip muted" style="margin-top:10px;display:none"></div>' +
+      '<div class="acts" style="margin-top:14px"><button class="btn" id="impPrevBtn" onclick="importPreview()" disabled>معاينة وتحقق</button></div>' +
+      '</div>' +
+      '<div id="impReport"></div>';
+    var inp = $('impFile'), drop = $('impDrop');
+    drop.addEventListener('click', function () { inp.click(); });
+    inp.addEventListener('change', function () { if (inp.files[0]) readImportFile(inp.files[0]); });
+    drop.addEventListener('dragover', function (e) { e.preventDefault(); drop.classList.add('over'); });
+    drop.addEventListener('dragleave', function () { drop.classList.remove('over'); });
+    drop.addEventListener('drop', function (e) { e.preventDefault(); drop.classList.remove('over'); if (e.dataTransfer.files[0]) readImportFile(e.dataTransfer.files[0]); });
+  }
+  function readImportFile(file) {
+    if (file.size > 5 * 1024 * 1024) { toast('الملف كبير جدًا (الحد 5 ميجابايت).', true); return; }
+    var r = new FileReader();
+    r.onload = function () {
+      A.importText = String(r.result || '');
+      A.importName = file.name;
+      var n = $('impName'); n.style.display = ''; n.textContent = file.name + ' · ' + (file.size / 1024).toFixed(1) + 'KB';
+      $('impPrevBtn').disabled = false;
+      $('impReport').innerHTML = '';
+    };
+    r.onerror = function () { toast('تعذّرت قراءة الملف.', true); };
+    r.readAsText(file, 'utf-8');
+  }
+  function downloadTemplate() {
+    var tpl = {
+      version: 1,
+      exam: { title: 'امتحان فلسفة — الوحدة الأولى', subject: 'الفلسفة والمنطق', term: 'الترم الأول', grade: 'الصف الأول الثانوي' },
+      questions: [
+        { text: 'نص السؤال هنا', options: { A: 'الخيار الأول', B: 'الخيار الثاني', C: 'الخيار الثالث', D: 'الخيار الرابع' }, correctAnswer: 'B' }
+      ]
+    };
+    var blob = new Blob([JSON.stringify(tpl, null, 2)], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = 'exam-template.json';
+    document.body.appendChild(a); a.click(); a.remove();
+  }
+  function importPreview() {
+    if (!A.importText) { toast('اختر ملفًا أولًا.', true); return; }
+    var rep = $('impReport');
+    rep.innerHTML = '<div class="empty"><div class="spin"></div></div>';
+    api('/api/admin/import/preview', { method: 'POST', body: JSON.stringify({ text: A.importText }) }).then(function (d) {
+      var r = d.report;
+      A.importReport = r;
+      rep.innerHTML =
+        '<div class="card cms-rep' + (r.ok ? ' ok' : ' bad') + '">' +
+        '<h3>' + (r.ok ? 'تم العثور على ' + r.stats.total + ' سؤالًا — جاهز للمعاينة' : 'الملف غير صالح للاستيراد') + '</h3>' +
+        '<div class="cms-counts">' +
+        '<span class="cchip">الإجمالي ' + r.stats.total + '</span>' +
+        '<span class="cchip green">جديد ' + r.stats.newCount + '</span>' +
+        '<span class="cchip blue">موجود بالفعل ' + r.stats.existsInBank + '</span>' +
+        '<span class="cchip gold">مكرر داخليًا ' + r.stats.duplicateInFile + '</span>' +
+        '<span class="cchip red">غير صالح ' + r.stats.invalid + '</span>' +
+        '</div>' +
+        '<div class="kv" style="margin-top:10px"><div class="k">الامتحان</div><div>' + esc(r.exam.title || '—') + ' · ' + (r.exam.subjectId === 'psychology' ? 'علم النفس' : (r.exam.subjectId === 'philosophy' ? 'الفلسفة والمنطق' : '—')) + (r.exam.term ? ' · ترم ' + r.exam.term : '') + (r.exam.grade ? ' · ' + esc(r.exam.grade) : '') + '</div></div>' +
+        (r.errors.length ? '<div class="rv-note warn" style="margin-top:12px"><div><b>أخطاء تمنع الاستيراد:</b><ul style="margin:6px 0 0 18px;font-size:.8rem">' + r.errors.slice(0, 12).map(function (e) { return '<li><code dir="ltr">' + esc(e.where) + '</code>: ' + esc(e.message) + '</li>'; }).join('') + (r.errors.length > 12 ? '<li>… و' + (r.errors.length - 12) + ' خطأ آخر</li>' : '') + '</ul></div></div>' : '') +
+        (r.warnings.length ? '<div class="rv-note ok" style="margin-top:10px"><div><b>ملاحظات:</b><ul style="margin:6px 0 0 18px;font-size:.8rem">' + r.warnings.slice(0, 8).map(function (w) { return '<li>' + esc(w) + '</li>'; }).join('') + '</ul></div></div>' : '') +
+        '<div class="cms-rep-list">' + r.rows.map(function (row) {
+          return '<div class="rep-row ' + row.status + '"><span class="st">' + ({ 'new': 'جديد', exists: 'موجود', 'duplicate-file': 'مكرر', invalid: 'غير صالح' }[row.status] || row.status) + '</span>' +
+            '<div><div class="rt">' + esc(row.text || '(نص فارغ)') + '</div>' +
+            '<div class="rm">الإجابة: <b class="ktag">' + esc(row.correctAnswer || '—') + '</b>' + (row.existingId ? ' · <span dir="ltr" class="qid">' + esc(row.existingId) + '</span>' : '') + (row.problems.length ? ' · ' + esc(row.problems.join('، ')) : '') + '</div></div></div>';
+        }).join('') + '</div>' +
+        '<div class="acts" style="margin-top:14px">' +
+        '<button class="btn ghost" onclick="document.getElementById(\'impReport\').innerHTML=\'\'">إلغاء</button>' +
+        '<button class="btn gold" onclick="importCommit()"' + (r.ok ? '' : ' disabled') + '>استيراد (' + (r.stats.newCount + r.stats.existsInBank) + ' سؤالًا)</button>' +
+        '</div></div>';
+    }).catch(function (e) { rep.innerHTML = '<div class="rv-note warn">' + WARN_SVG_A + '<div>' + esc(e.message) + '</div></div>'; });
+  }
+  function importCommit() {
+    if (!A.importText) return;
+    confirmModal('تأكيد الاستيراد', '<p>سيُنشأ امتحان جديد بالأسئلة الصالحة: الأسئلة الموجودة في البنك تُربط كما هي، والجديدة تُضاف للبنك كمصادر موثّقة باسم الاستيراد.</p>', 'استيراد الآن', function () {
+      api('/api/admin/import/commit', { method: 'POST', body: JSON.stringify({ text: A.importText, confirm: true }) }).then(function (d) {
+        toast('تم الاستيراد: ' + d.total + ' سؤالًا (' + d.createdQuestions + ' جديد، ' + d.reusedQuestions + ' مرتبط).');
+        A.importText = ''; A.importName = '';
+        // المحرر يُرسم داخل تبويب الامتحانات — انقل المسؤول إليه ليفتح الامتحان المستورد مباشرة
+        if (A.tab !== 'exams') setTab('exams');
+        openExamEditor(d.examId);
+      }).catch(function (e) { toast(e.message, true); });
+    });
+  }
   /* ================= النتائج ================= */
   function renderResults(body) {
     api('/api/admin/results').then(function (d) {
@@ -851,6 +1435,36 @@
   window.saveSettings = saveSettings;
   window.settingsPreset = settingsPreset;
   window.changePassword = changePassword;
+  /* CMS */
+  window.openQuestionEditor = openQuestionEditor;
+  window.saveQuestionEditor = saveQuestionEditor;
+  window.qePickKey = qePickKey;
+  window.duplicateQuestion = duplicateQuestion;
+  window.deleteQuestion = deleteQuestion;
+  window.openDeletedQuestions = openDeletedQuestions;
+  window.restoreQuestion = restoreQuestion;
+  window.openExamEditor = openExamEditor;
+  window.closeExamEditor = closeExamEditor;
+  window.saveExamEE = saveExamEE;
+  window.eeMove = eeMove;
+  window.eeRemove = eeRemove;
+  window.toggleExamEE = toggleExamEE;
+  window.revertExam = revertExam;
+  window.deleteExam = deleteExam;
+  window.revertQuestion = revertQuestion;
+  window.openQuestionPicker = openQuestionPicker;
+  window.pkLoad = pkLoad;
+  window.pkToggle = pkToggle;
+  window.pkAdd = pkAdd;
+  window.toggleExam = toggleExam;
+  window.exportExam = exportExam;
+  window.openDeletedExams = openDeletedExams;
+  window.restoreExam = restoreExam;
+  window.examFilter = examFilter;
+  window.examFilterDebounced = examFilterDebounced;
+  window.importPreview = importPreview;
+  window.importCommit = importCommit;
+  window.downloadTemplate = downloadTemplate;
 
   /* boot */
   api('/api/admin/session').then(enter).catch(function () {

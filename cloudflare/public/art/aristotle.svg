@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 480" fill="none">
+  <!-- أرسطو: شعر قصير مصفوف + لحية مهذبة + لفيفة منطق — قناع (mask) أحادي اللون -->
+  <defs>
+    <radialGradient id="ariFade" gradientUnits="userSpaceOnUse" cx="200" cy="210" r="230">
+      <stop offset="0" stop-color="#fff"/>
+      <stop offset=".55" stop-color="#fff" stop-opacity=".8"/>
+      <stop offset=".86" stop-color="#fff" stop-opacity=".26"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <g stroke="url(#ariFade)" stroke-linecap="round" stroke-linejoin="round">
+    <!-- crown: short combed hair -->
+    <path d="M136 160 C132 104 160 72 200 72 C240 72 268 104 264 160" stroke-width="5"/>
+    <path d="M150 128 C160 104 178 92 200 90" stroke-width="2.4" opacity=".6"/>
+    <path d="M250 128 C240 104 222 92 200 90" stroke-width="2.4" opacity=".6"/>
+    <path d="M162 108 C176 96 188 92 200 92" stroke-width="2" opacity=".45"/>
+    <path d="M238 108 C224 96 212 92 200 92" stroke-width="2" opacity=".45"/>
+    <!-- face -->
+    <path d="M148 160 C148 196 158 220 176 234" stroke-width="4"/>
+    <path d="M252 160 C252 196 242 220 224 234" stroke-width="4"/>
+    <path d="M176 234 C186 244 214 244 224 234" stroke-width="4"/>
+    <!-- brow + eyes + nose -->
+    <path d="M166 168 C174 162 186 162 192 166" stroke-width="3"/>
+    <path d="M208 166 C214 162 226 162 234 168" stroke-width="3"/>
+    <path d="M172 180 C178 178 186 178 190 180" stroke-width="2.4"/>
+    <path d="M210 180 C214 178 222 178 228 180" stroke-width="2.4"/>
+    <path d="M200 182 C198 194 196 202 192 208 C196 212 204 212 208 208" stroke-width="2.6"/>
+    <!-- trimmed beard: short, shaped -->
+    <path d="M170 214 C168 236 176 254 200 258 C224 254 232 236 230 214" stroke-width="4"/>
+    <path d="M180 224 C182 240 190 248 200 250" stroke-width="2.2" opacity=".6"/>
+    <path d="M220 224 C218 240 210 248 200 250" stroke-width="2.2" opacity=".6"/>
+    <!-- shoulders / himation -->
+    <path d="M120 330 C132 282 162 262 200 262 C238 262 268 282 280 330" stroke-width="5"/>
+    <path d="M140 322 C152 292 172 278 200 276" stroke-width="2.6" opacity=".55"/>
+    <path d="M260 322 C248 292 228 278 200 276" stroke-width="2.6" opacity=".55"/>
+    <path d="M164 300 C180 312 220 312 236 300" stroke-width="2.4" opacity=".5"/>
+    <!-- scroll of logic in hand -->
+    <path d="M128 352 C128 344 136 340 142 344 L258 344 C264 340 272 344 272 352 C272 360 264 364 258 360 L142 360 C136 364 128 360 128 352 Z" stroke-width="3.4"/>
+    <path d="M150 352 L250 352" stroke-width="2" opacity=".55"/>
+    <!-- logic marks: syllogism circles -->
+    <circle cx="176" cy="392" r="16" stroke-width="2.6" opacity=".7"/>
+    <circle cx="204" cy="392" r="10" stroke-width="2.6" opacity=".7"/>
+    <path d="M228 384 L248 384 M238 374 L238 394" stroke-width="2.6" opacity=".7"/>
+  </g>
+</svg>

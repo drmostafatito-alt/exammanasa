@@ -110,8 +110,8 @@ console.log('\n[2] الواجهة الرئيسية (Hero) — تكوين الم�
   const W = dom.window;
   ok('اسم المعلم هو العنوان الرئيسي + شعار «اختبر نفسك وقيّم مستواك!»', !!doc.querySelector('.hero h1') && doc.querySelector('.hero h1').textContent.includes(catalog.owner.name) && !!doc.querySelector('.hero .hero-tagline') && doc.querySelector('.hero .hero-tagline').textContent.includes('اختبر نفسك'));
   ok('وصف مهني قصير للمنصة (بلا ادعاءات)', !!doc.querySelector('.hero .lead') && doc.querySelector('.hero .lead').textContent.includes('وفق المنهج الرسمي'));
-  ok('صورة المعلم كبيرة في الجهة اليمنى (عمود media أول الشبكة)', !!doc.querySelector('.hero .hero-media .photo') && /grid-template-areas:\s*"media body"/.test(css));
-  ok('أشكال زخرفية تعليمية حول الصورة (blob/ring/badge/شارة عائمة)', !!doc.querySelector('.hero .blob') && !!doc.querySelector('.hero .ring') && !!doc.querySelector('.hero .photo-badge') && !!doc.querySelector('.hero .float-chip'));
+  ok('صورة المعلم كبيرة في الجهة اليمنى (عمود media أول الشبكة)', !!doc.querySelector('.hero .hero-media .portrait .pt-img') && /grid-template-areas:\s*"media body"/.test(css));
+  ok('أشكال زخرفية تعليمية حول الصورة (blob/arc/badge/شارة عائمة)', !!doc.querySelector('.hero .pt-blob') && !!doc.querySelector('.hero .pt-arc') && !!doc.querySelector('.hero .photo-badge') && !!doc.querySelector('.hero .float-chip'));
   ok('لا صورة وهمية — حالة فارغة أنيقة (monogram) عند غياب صورة حقيقية', !catalog.owner.photo ? !!doc.querySelector('.hero .monogram') : true);
   ok('زر «ابدأ الامتحان الآن» يؤدي إلى بيانات الطالب (#/start)', !!doc.querySelector('.hero .hero-ctas .btn'));
   doc.querySelector('.hero .hero-ctas .btn').click();
@@ -136,7 +136,14 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
   ok('شريط مميزات بقدرات حقيقية فقط: امتحانات منظمة/نتيجتك فورًا/مراجعة الإجابات/اعمل من أي جهاز',
     doc.querySelectorAll('.feature').length === 4 && html.includes('امتحانات منظمة') && html.includes('نتيجتك فورًا') && html.includes('مراجعة الإجابات') && html.includes('اعمل من أي جهاز'));
   ok('قسم «نبذة عن المعلم» ببيانات فعلية (الاسم/التخصص/النبذة/العام)', !!doc.querySelector('.about-card') && html.includes(catalog.owner.name) && html.includes(catalog.owner.specialty) && html.includes(catalog.owner.bio) && html.includes(cat.philosophy.academicYear));
-  ok('صورة المعلم حاضرة بصريًا في قسم عن المعلم', !!doc.querySelector('.about-card .photo'));
+  ok('صورة المعلم حاضرة بصريًا في قسم عن المعلم', !!doc.querySelector('.about-card .portrait'));
+  {
+    const order = [...doc.getElementById('app').children].map(c => c.id || (c.className || '').split(' ')[0]);
+    const ix = a => order.findIndex(x => x === a);
+    ok('ترتيب الأقسام: Hero ← اختر صفك ← لماذا المنصة ← نبذة المعلم', ix('hero') === 0 && ix('subjects') > ix('hero') && ix('features') > ix('subjects') && ix('about') > ix('features'), order.join(' → '));
+  }
+  ok('تكوين الصورة تحريري: إطار عضوي (ليس دائرة) وخلفية مولّدة بلا أسود', !!doc.querySelector('.hero .portrait[data-fit]') && /\.portrait \.pt-img\s*{[^}]*border-radius:\s*46%/.test(css));
+  ok('هيدر الطالب بلا خط فاصل قاسٍ (انتقال ناعم)', /\.topbar\s*{[^}]*border-bottom:\s*none/.test(css));
   ok('لا إحصاءات مزيفة (عدد طلاب/شهادات/تقييمات)', !/\d+\s*(طالب|شاهد|تقييم|شهادة)/.test(html));
   ok('لا قيم undefined/null مسربة', !/\bundefined\b/.test(html) && !/>null</.test(html));
   const hasSocials = Object.values(catalog.owner.socialLinks || {}).some(v => /^https?:\/\//i.test(String(v || '').trim()));
@@ -532,6 +539,16 @@ console.log('\n[7ج] ملف المعلم — التواصل يظهر عند وج
 
 console.log('\n[8] لوحة التحكم');
 {
+  // جلسة مسؤول حقيقية (نفس بيانات اختبار [6ب]) حتى يُرسم «بنك الأسئلة» ببيانات فعلية
+  const ajar = {};
+  const apost = async (url, body) => {
+    const r = await fetch(new URL(url, BASE), { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, body: JSON.stringify(body) });
+    const sc = r.headers.get('set-cookie'); if (sc) ajar.cookie = sc.split(';')[0];
+    return r.status;
+  };
+  const ACRED = { email: 'admin@test.local', password: 'TestAdminPass-2026' };
+  let aSt = await apost('/api/admin/login', ACRED);
+  if (aSt === 404) { await apost('/api/admin/setup', ACRED); aSt = await apost('/api/admin/login', ACRED); }
   const dom2 = new JSDOM(adminHtml, { url: BASE + '/admin', runScripts: 'outside-only', pretendToBeVisual: true });
   dom2.window.fetch = (url, opts) => {
     const u = new URL(url, BASE + '/admin').href;
@@ -552,6 +569,10 @@ console.log('\n[8] لوحة التحكم');
       };
       return Promise.resolve(new Response(JSON.stringify(body), { status: 200, headers: { 'Content-Type': 'application/json' } }));
     }
+    // مرّر جلسة المسؤول للاختبارات الحقيقية (بنك الأسئلة/الامتحانات) داخل jsdom
+    if (ajar.cookie && u.includes('/api/admin/')) {
+      return fetch(u, Object.assign({}, opts, { headers: Object.assign({}, opts && opts.headers, { Cookie: ajar.cookie }) }));
+    }
     return fetch(u, opts);
   };
   dom2.window.eval(adminJs);
@@ -559,6 +580,31 @@ console.log('\n[8] لوحة التحكم');
   const tabs = dom2.window.document.body.textContent;
   ok('أقسام اللوحة: نظرة عامة/المعلمون/علم النفس/الفلسفة/بنك الأسئلة/الامتحانات/النتائج/الإعدادات',
     ['نظرة عامة', 'المعلمون', 'علم النفس', 'الفلسفة والمنطق', 'بنك الأسئلة', 'الامتحانات', 'النتائج', 'الإعدادات'].every(t => tabs.includes(t)));
+  // CMS — عقد مفتاح الإجابة: A/B/C/D لاتينية قانونية (البنك/التصدير/الاستيراد/التصحيح)
+  // مع تلميح عربي للعرض. خلط الحروف هنا كان يجعل حفظ أي تعديل مرفوضًا من الخادم.
+  dom2.window.openQuestionEditor(null);
+  await sleep(200);
+  const kd = dom2.window.document;
+  const kbtns = [...kd.querySelectorAll('#qeKey .kbtn')];
+  ok('محرر السؤال: 4 أزرار مفتاح A/B/C/D (لاتينية) + تلميح عربي أ/ب/ج/د',
+    kbtns.length === 4 && kbtns.map(b => b.getAttribute('data-k')).join('') === 'ABCD' &&
+    kbtns.map(b => (b.querySelector('i') || {}).textContent || '').join('') === 'أبجد',
+    kbtns.map(b => b.getAttribute('data-k') + '/' + ((b.querySelector('i') || {}).textContent || '')).join(' '));
+  dom2.window.qePickKey('C');
+  const ansEl = kd.getElementById('qeAnswer');
+  ok('اختيار المفتاح يكتب حرفًا يقبله الخادم (/^[ABCD]$/) في حقل مخفي لا نصي',
+    !!ansEl && ansEl.type === 'hidden' && /^[ABCD]$/.test(ansEl.value), ansEl && ansEl.type + '=' + ansEl.value);
+  ok('حقول الخيارات الأربعة مربوطة بالمفاتيح A–D (qeOptA…qeOptD)',
+    ['A', 'B', 'C', 'D'].every(L => !!kd.getElementById('qeOpt' + L)));
+  const mbg = kd.querySelector('.modal-bg'); if (mbg) mbg.remove();
+  // البنك: تعليم الإجابة الصحيحة في العرض يجب أن يطابق المفتاح المخزّن
+  dom2.window.setTab('bank');
+  await sleep(1800);
+  const bankRows = kd.querySelectorAll('#bankList .cms-q').length;
+  const bankMarks = kd.querySelectorAll('#bankList .ans.correct').length;
+  ok('بنك الأسئلة: كل صف يُعلّم إجابته الصحيحة (المفتاح اللاتيني يطابق العرض)',
+    bankRows > 0 && bankMarks >= bankRows, 'rows=' + bankRows + ' marks=' + bankMarks);
+
   ok('لوحة التحكم لا تكشف بريدًا حقيقيًا ولا كلمة مرور مضمنة',
     !/[\w.+-]+@[\w-]+\.[a-z]{2,}/i.test(adminJs + adminHtml) &&
     !/password\s*[:=]\s*['"][^'"]{6,}['"]/i.test(adminJs + adminHtml));
@@ -573,10 +619,18 @@ console.log('\n[9] الأداء وخفة الحزمة');
   // student/teacher/admin + premium subject-card identity; decorative artwork moved to
   // external /art/*.svg so only the small inline icon set counts). Still no frameworks.
   // The assertion still catches any framework/bloat regression.
-  const totalKB = Math.round((appJs.length + css.length + adminJs.length) / 1024);
-  // ميزانية 215KB: تغطي نظام التصميم «الرقمي الفاخر» (جولة 2: بطاقات الصفوف الفنية،
-  // الأشكال العضوية، CTA، تدرجات الظلال) — اللوحات الفنية نفسها SVG خارجية غير محسوبة.
-  ok('ملفات الواجهة خفيفة (' + totalKB + 'KB غير مضغوطة، بدون أطر)', totalKB < 215);
+  // جولة 5: فصل الميزانيتين — ما يحمله الطالب (app.js + styles.css) عمّا تحمله لوحة
+  // التحكم وحدها (admin.js). محرر الامتحانات/بنك الأسئلة/الاستيراد CMS حقيقي بكود
+  // فانِلّا خالص (لا أطر)، فهو يزيد حجم لوحة الإدارة دون أن يمسّ حزمة الطالب.
+  const studentKB = Math.round((appJs.length + css.length) / 1024);
+  const adminKB = Math.round(adminJs.length / 1024);
+  ok('حزمة الطالب خفيفة (' + studentKB + 'KB غير مضغوطة: app.js + styles.css)', studentKB < 200);
+  ok('لوحة التحكم خفيفة نسبيًا (' + adminKB + 'KB غير مضغوطة: admin.js + CMS)', adminKB < 125);
+  // الحارس الحقيقي ضد التضخّم: لا أطر ولا مكتبات واجهة في أي ملف
+  const bundled = appJs + '\n' + css + '\n' + adminJs;
+  ok('بدون أطر واجهة (لا React/Vue/jQuery/Bootstrap/Tailwind في الحزمة)',
+    !/\b(from\s+['"](?:react|vue|jquery|bootstrap|tailwindcss)|window\.(?:React|Vue|jQuery|\$)\s*=)/i.test(bundled) &&
+    !/<script[^>]+src="https?:\/\/[^"]*(?:react|vue|jquery|bootstrap|tailwind)/i.test(indexHtml + adminHtml));
   const cacheH = await fetch(BASE + '/app.js').then(r => r.headers.get('cache-control'));
   ok('ترويسة تخزين مؤقت للملفات الثابتة', (cacheH || '').includes('max-age'));
   ok('الخطوط من Google Fonts مع preconnect', /preconnect[^>]+fonts\.googleapis/.test(indexHtml));

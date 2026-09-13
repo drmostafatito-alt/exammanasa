@@ -370,6 +370,329 @@ async function getSessionSecret(env) {
   return s;
 }
 
+/* ============================ content overlay — Admin CMS ============================
+ * بنك الإنتاج الأساسي (banks.json المولَّد من ملفات .gs المدقَّقة) لا يُعاد توليده
+ * ولا يُعدَّل هنا أبدًا: كل تعديل يجريه المسؤول (تعديل سؤال/حذفه/تكراره/إضافته،
+ * تعديل امتحان/عنوانه/ترتيبه/تعطيله، استيراد امتحان من ملف، تصدير) يُخزَّن كطبقة
+ * فوقية صغيرة في KV تحت المفتاح `content:overrides` وتُدمج مع الأساس عند القراءة.
+ * النتائج: بنك الإنتاج يبقى diff = 0، كل تعديل موثَّق وقابل للتراجع («استعادة
+ * الأصل»)، والمفاتيح لا تغادر الخادم أبدًا (نفس قواعد الأمان القائمة). */
+const CONTENT_KEY = 'content:overrides';
+const CONTENT_CACHE_MS = 5000; // قراءة KV مرة كل ٥ ثوانٍ كحد أقصى لكل عزلة
+let _contentCache = null;      // { doc, view, catalog, pubExams, at }
+
+function blankContent() {
+  return { version: 1, updatedAt: null, questions: {}, deletedQuestions: [], exams: {}, deletedExams: [] };
+}
+function normalizeContentDoc(d) {
+  const o = blankContent();
+  if (!d || typeof d !== 'object') return o;
+  if (d.questions && typeof d.questions === 'object' && !Array.isArray(d.questions)) o.questions = d.questions;
+  if (Array.isArray(d.deletedQuestions)) o.deletedQuestions = d.deletedQuestions.filter(x => typeof x === 'string');
+  if (d.exams && typeof d.exams === 'object' && !Array.isArray(d.exams)) o.exams = d.exams;
+  if (Array.isArray(d.deletedExams)) o.deletedExams = d.deletedExams.filter(x => typeof x === 'string');
+  if (typeof d.updatedAt === 'string') o.updatedAt = d.updatedAt;
+  return o;
+}
+async function getContentDoc(env) {
+  const now = Date.now();
+  if (_contentCache && now - _contentCache.at < CONTENT_CACHE_MS) return _contentCache.doc;
+  const doc = normalizeContentDoc(await kvGetJson(env, CONTENT_KEY).catch(() => null));
+  _contentCache = { doc, at: now, view: null, catalog: null, pubExams: null };
+  return doc;
+}
+function invalidateContentCache() { _contentCache = null; }
+async function saveContentDoc(env, doc) {
+  doc.version = 1;
+  doc.updatedAt = new Date().toISOString();
+  await kvPut(env, CONTENT_KEY, JSON.stringify(doc));
+  _contentCache = { doc, at: Date.now(), view: null, catalog: null, pubExams: null };
+  return doc;
+}
+
+/* حقول وصف الامتحان القابلة للتعديل من الإدارة (لا شيء حساس) */
+const EXAM_META_KEYS = ['title', 'subjectId', 'term', 'type', 'unitTitle', 'chapterTitle', 'lessonTitle', 'lessonNo', 'topicKey', 'topicNo', 'topicTitle', 'training', 'variant', 'grade'];
+
+/* دمج الأساس + الطبقة الفوقية → منظر فعّال واحد لكل القراءات */
+function buildView(doc) {
+  const delQ = new Set(doc.deletedQuestions), delE = new Set(doc.deletedExams);
+  const questions = {};
+  for (const id of Object.keys(BANKS.questions)) {
+    if (delQ.has(id)) continue;
+    const base = BANKS.questions[id];
+    const p = doc.questions[id];
+    questions[id] = p
+      ? Object.assign({}, base, p, { id, meta: Object.assign({}, base.meta || {}, p.meta || {}) })
+      : base;
+  }
+  for (const id of Object.keys(doc.questions)) {
+    if (questions[id] || delQ.has(id)) continue;
+    const q = doc.questions[id];
+    if (q && q.custom === true) questions[id] = Object.assign({ id }, q);
+  }
+  const examDefs = {}, exams = {};
+  for (const id of Object.keys(BANKS.examDefs)) {
+    if (delE.has(id)) continue;
+    const p = doc.exams[id];
+    let ids = Array.isArray(p && p.questionIds) ? p.questionIds.filter(q => typeof q === 'string') : BANKS.examDefs[id];
+    ids = ids.filter(qid => questions[qid]);
+    examDefs[id] = ids;
+    const meta = Object.assign({}, BANKS.exams[id]);
+    if (p) for (const k of EXAM_META_KEYS) if (p[k] !== undefined) meta[k] = p[k];
+    meta.id = id;
+    meta.custom = false;
+    meta.enabled = (p && p.enabled === false) ? false : true;
+    meta.modified = !!(p && (Array.isArray(p.questionIds) || EXAM_META_KEYS.some(k => p[k] !== undefined)));
+    meta.count = ids.length;
+    exams[id] = meta;
+  }
+  for (const id of Object.keys(doc.exams)) {
+    if (exams[id] || delE.has(id)) continue;
+    const p = doc.exams[id];
+    if (!p || p.custom !== true) continue;
+    const ids = (Array.isArray(p.questionIds) ? p.questionIds : []).filter(qid => questions[qid]);
+    examDefs[id] = ids;
+    const meta = { id, custom: true };
+    for (const k of EXAM_META_KEYS) if (p[k] !== undefined) meta[k] = p[k];
+    if (!meta.title) meta.title = 'امتحان';
+    if (meta.subjectId !== 'psychology') meta.subjectId = 'philosophy';
+    if (!meta.type) meta.type = 'custom';
+    meta.enabled = p.enabled !== false;
+    meta.modified = true;
+    meta.createdAt = p.createdAt || '';
+    meta.updatedAt = p.updatedAt || '';
+    meta.count = ids.length;
+    exams[id] = meta;
+  }
+  return { questions, examDefs, exams };
+}
+
+/* فهرس الطلاب العام: يُستبعد المعطّل/المحذوف حتى لا يصل إليه طالب أبدًا،
+ * وتُضاف الامتحانات المخصّصة (المستوردة/المنشأة) كمجموعة مستقلة لكل مادة. */
+function buildCatalog(view) {
+  const cat = JSON.parse(JSON.stringify(BANKS.catalog));
+  const live = (id) => !!(view.exams[id] && view.exams[id].enabled !== false);
+  if (cat.psychology && Array.isArray(cat.psychology.units)) {
+    cat.psychology.units = cat.psychology.units.map(u => Object.assign({}, u, {
+      lessons: (u.lessons || []).filter(l => (l.examIds || []).some(live))
+    })).filter(u => u.lessons.length || live(u.comprehensiveExamId));
+    if (!live(cat.psychology.subjectComprehensiveExamId)) cat.psychology.subjectComprehensiveExamId = null;
+  }
+  if (cat.philosophy && Array.isArray(cat.philosophy.terms)) {
+    cat.philosophy.terms = cat.philosophy.terms.map(t => Object.assign({}, t, {
+      sections: (t.sections || []).map(s => Object.assign({}, s, {
+        topics: (s.topics || []).map(tp => Object.assign({}, tp, {
+          lessons: (tp.lessons || []).map(l => Object.assign({}, l, {
+            trainings: (l.trainings || []).filter(tr => live(tr.examId))
+          })).filter(l => l.trainings.length)
+        })).filter(tp => tp.lessons.length)
+      })).filter(s => s.topics.length),
+      comprehensiveExamIds: (t.comprehensiveExamIds || []).filter(live)
+    }));
+  }
+  for (const sid of ['psychology', 'philosophy']) {
+    const list = Object.keys(view.exams)
+      .filter(id => view.exams[id].custom === true && view.exams[id].subjectId === sid && view.exams[id].enabled !== false)
+      .map(id => ({ id, title: view.exams[id].title, count: view.exams[id].count, term: view.exams[id].term == null ? null : view.exams[id].term, grade: view.exams[id].grade || '' }));
+    if (cat[sid]) cat[sid].custom = list;
+  }
+  return cat;
+}
+function buildPublicExams(view) {
+  const out = {};
+  for (const id of Object.keys(view.exams)) {
+    const e = view.exams[id];
+    if (e.enabled === false) continue;
+    // وصف الامتحان فقط (بلا أي مفاتيح/قوائم أسئلة) — التصحيح على الخادم حصرًا.
+    const pub = Object.assign({}, e);
+    delete pub.modified;
+    delete pub.enabled;
+    out[id] = pub;
+  }
+  return out;
+}
+async function contentView(env) {
+  const now = Date.now();
+  if (_contentCache && now - _contentCache.at < CONTENT_CACHE_MS && _contentCache.view) {
+    return { doc: _contentCache.doc, view: _contentCache.view, catalog: _contentCache.catalog, pubExams: _contentCache.pubExams };
+  }
+  const doc = await getContentDoc(env);
+  const view = buildView(doc);
+  const catalog = buildCatalog(view);
+  const pubExams = buildPublicExams(view);
+  _contentCache = { doc, view, catalog, pubExams, at: now };
+  return { doc, view, catalog, pubExams };
+}
+
+/* ---- تحقق موحّد للسؤال (إنشاء/تعديل/استيراد) — الخادم هو الحكم ---- */
+function sanitizeQuestionInput(body, existing) {
+  const b = body && typeof body === 'object' ? body : {};
+  const text = String(b.text === undefined && existing ? existing.text : (b.text == null ? '' : b.text)).replace(/\s+$/g, '').trim();
+  if (!text) throw bad('نص السؤال مطلوب.');
+  if (text.length > 3000) throw bad('نص السؤال طويل جدًا (الحد 3000 حرف).');
+  /* Field-preserving: عند التعديل يكفي إرسال الحقول المراد تغييرها (الخيارات/المفتاح
+   * تُترك كما هي إن لم تُرسل) — أما الإنشاء فيطلب الحقول كاملة. */
+  let rawOpts = null;
+  if (Array.isArray(b.options)) rawOpts = b.options;
+  else if (b.options && typeof b.options === 'object') rawOpts = ['A', 'B', 'C', 'D'].map(k => b.options[k]);
+  else if (existing && Array.isArray(existing.options)) rawOpts = existing.options;
+  if (!rawOpts) throw bad('الخيارات الأربعة مطلوبة.');
+  const options = rawOpts.map(o => String(o == null ? '' : o).trim().slice(0, 600));
+  if (options.length !== 4) throw bad('يجب إدخال أربعة خيارات بالضبط (أ/ب/ج/د).');
+  if (options.some(o => !o)) throw bad('لا يُسمح بخيار فارغ.');
+  const hasAnswer = b.answer !== undefined || b.correctAnswer !== undefined;
+  const answer = String(hasAnswer ? (b.answer != null ? b.answer : b.correctAnswer) : (existing ? existing.answer : '')).trim().toUpperCase();
+  if (!answer) throw bad('الإجابة الصحيحة مطلوبة.');
+  if (!/^[ABCD]$/.test(answer)) throw bad('الإجابة الصحيحة يجب أن تكون أحد الحروف A أو B أو C أو D.');
+  const meta = Object.assign({}, (existing && existing.meta) || {});
+  const m = b.meta && typeof b.meta === 'object' ? b.meta : b;
+  const setMeta = (key, src, max) => { if (src !== undefined) meta[key] = String(src == null ? '' : src).trim().slice(0, max || 200); };
+  setMeta('subject', m.subject); setMeta('subjectId', m.subjectId); setMeta('unit', m.unit, 80);
+  setMeta('lesson', m.lesson); setMeta('topic', m.topic); setMeta('chapter', m.chapter);
+  setMeta('source', m.source); setMeta('difficulty', m.difficulty, 40);
+  if (m.term !== undefined) meta.term = (m.term === null || m.term === '') ? null : (parseInt(m.term, 10) === 2 ? 2 : 1);
+  if (meta.subjectId === 'psychology') meta.subject = meta.subject || 'علم النفس';
+  else if (meta.subjectId === 'philosophy') meta.subject = meta.subject || 'الفلسفة والمنطق';
+  return { text, options, answer, meta };
+}
+/* تطبيع نص السؤال لاكتشاف المكرر (يتجاهل التشكيل والفراغات وعلامات الترقيم) */
+function normalizeQuestionText(s) {
+  return String(s || '').replace(/[\u064B-\u0652\u0670\u0640]/g, '')
+    .replace(/[\s\u00A0]+/g, ' ')
+    .replace(/[.,،؛:!?؟()"«»'\-ـ]/g, '')
+    .trim();
+}
+function questionFingerprint(view, text) {
+  return normalizeQuestionText(text);
+}
+function buildTextIndex(view) {
+  const idx = new Map();
+  for (const id of Object.keys(view.questions)) {
+    const fp = questionFingerprint(view, view.questions[id].text);
+    if (fp && !idx.has(fp)) idx.set(fp, id);
+  }
+  return idx;
+}
+/* معرفات فريدة للطبقة الفوقية (بادئة مميّزة لا تصطدم بمعرفات البنك الأصلية) */
+function uniqueQuestionId(doc) {
+  for (let i = 0; i < 500; i++) {
+    const id = 'CQ-' + randomHex(4).toUpperCase();
+    if (!doc.questions[id] && !BANKS.questions[id]) return id;
+  }
+  return 'CQ-' + randomHex(8).toUpperCase();
+}
+function uniqueExamId(doc) {
+  for (let i = 0; i < 500; i++) {
+    const id = 'CX-' + randomHex(4).toUpperCase();
+    if (!doc.exams[id] && !BANKS.examDefs[id]) return id;
+  }
+  return 'CX-' + randomHex(8).toUpperCase();
+}
+/* تنسيق التصدير/الاستيراد القياسي (موثّق في docs/exam-import-format.md) */
+function examToCanonical(view, examId) {
+  const e = view.exams[examId];
+  const ids = view.examDefs[examId] || [];
+  return {
+    version: 1,
+    platform: 'exammanasa',
+    exportedAt: new Date().toISOString(),
+    exam: {
+      id: examId,
+      title: e.title,
+      subject: e.subjectId === 'psychology' ? 'علم النفس' : 'الفلسفة والمنطق',
+      subjectId: e.subjectId,
+      term: e.term == null ? null : e.term,
+      grade: e.grade || (e.subjectId === 'psychology' ? 'الصف الثاني الثانوي' : 'الصف الأول الثانوي'),
+      type: e.type || 'custom',
+      unitTitle: e.unitTitle || '', lessonTitle: e.lessonTitle || ''
+    },
+    questions: ids.map(qid => {
+      const q = view.questions[qid];
+      return {
+        id: qid,
+        text: q.text,
+        options: { A: q.options[0], B: q.options[1], C: q.options[2], D: q.options[3] },
+        correctAnswer: q.answer,
+        meta: q.meta || {}
+      };
+    })
+  };
+}
+/* تحليل ملف الاستيراد + التحقق الكامل (بلا أي حفظ) → تقرير معاينة */
+function parseImportPayload(rawText) {
+  let data;
+  try { data = JSON.parse(String(rawText)); } catch (e) {
+    throw bad('الملف ليس JSON صالحًا — تأكد من تنزيله بصيغة UTF-8 دون إضافات.');
+  }
+  if (!data || typeof data !== 'object' || Array.isArray(data)) throw bad('بنية الملف غير صحيحة: يُتوقع كائن JSON يحتوي exam و questions.');
+  const ex = data.exam && typeof data.exam === 'object' ? data.exam : {};
+  const title = String(ex.title == null ? '' : ex.title).trim();
+  const subjectRaw = String(ex.subject == null ? (ex.subjectId == null ? '' : ex.subjectId) : ex.subject).trim();
+  const subjectId = /^(psychology|psych)$/i.test(subjectRaw) || subjectRaw.includes('علم النفس') ? 'psychology'
+    : /^(philosophy|philo)$/i.test(subjectRaw) || subjectRaw.includes('فلسفة') ? 'philosophy' : '';
+  const termRaw = ex.term == null ? null : ex.term;
+  const term = termRaw === null || termRaw === '' ? null : (String(termRaw).includes('2') || String(termRaw).includes('الثاني') ? 2 : 1);
+  const grade = String(ex.grade == null ? '' : ex.grade).trim().slice(0, 80);
+  const rawQuestions = Array.isArray(data.questions) ? data.questions : [];
+  return { title, subjectId, term, grade, rawQuestions, version: data.version == null ? 1 : data.version };
+}
+function validateImport(parsed, view) {
+  const errors = [], warnings = [], rows = [];
+  const textIndex = buildTextIndex(view);
+  const seenInFile = new Map();
+  if (!parsed.title) errors.push({ where: 'exam.title', message: 'اسم الامتحان مطلوب (exam.title).' });
+  if (!parsed.subjectId) errors.push({ where: 'exam.subject', message: 'المادة مطلوبة: «الفلسفة والمنطق» أو «علم النفس» (exam.subject).' });
+  if (!parsed.rawQuestions.length) errors.push({ where: 'questions', message: 'لا توجد أسئلة في الملف (questions).' });
+  if (parsed.rawQuestions.length > 200) errors.push({ where: 'questions', message: 'عدد الأسئلة كبير جدًا (الحد 200 سؤال لكل امتحان).' });
+  parsed.rawQuestions.forEach((q, i) => {
+    const at = 'questions[' + i + ']';
+    const row = { index: i + 1, text: '', options: { A: '', B: '', C: '', D: '' }, correctAnswer: '', status: 'new', existingId: null, problems: [] };
+    if (!q || typeof q !== 'object') { row.problems.push('السجل ليس كائنًا.'); row.status = 'invalid'; rows.push(row); errors.push({ where: at, message: 'السجل ليس كائنًا صالحًا.' }); return; }
+    const text = String(q.text == null ? '' : q.text).trim();
+    row.text = text;
+    if (!text) { row.problems.push('نص السؤال فارغ.'); errors.push({ where: at + '.text', message: 'نص السؤال فارغ.' }); }
+    else if (text.length > 3000) { row.problems.push('نص السؤال أطول من 3000 حرف.'); errors.push({ where: at + '.text', message: 'نص السؤال أطول من 3000 حرف.' }); }
+    let opts = null;
+    if (Array.isArray(q.options)) opts = q.options;
+    else if (q.options && typeof q.options === 'object') opts = ['A', 'B', 'C', 'D'].map(k => q.options[k]);
+    if (!opts) { row.problems.push('الخيارات مفقودة.'); errors.push({ where: at + '.options', message: 'الخيارات مفقودة (options بكائن A-D أو مصفوفة من 4).' }); }
+    else {
+      opts = opts.map(o => String(o == null ? '' : o).trim());
+      if (opts.length !== 4) { row.problems.push('عدد الخيارات ' + opts.length + ' وليس 4.'); errors.push({ where: at + '.options', message: 'عدد الخيارات ' + opts.length + ' — المطلوب 4 بالضبط.' }); }
+      else {
+        opts.forEach((o, k) => { row.options['ABCD'[k]] = o; if (!o) { row.problems.push('الخيار ' + 'ABCD'[k] + ' فارغ.'); errors.push({ where: at + '.options.' + 'ABCD'[k], message: 'الخيار ' + 'ABCD'[k] + ' فارغ.' }); } });
+        if (new Set(opts).size !== opts.length) { row.problems.push('خيارات مكررة داخل السؤال.'); warnings.push('السؤال ' + (i + 1) + ': خيارات مكررة داخل السؤال نفسه.'); }
+      }
+    }
+    const ans = String(q.correctAnswer != null ? q.correctAnswer : (q.answer != null ? q.answer : '')).trim().toUpperCase();
+    row.correctAnswer = ans;
+    if (!/^[ABCD]$/.test(ans)) { row.problems.push('الإجابة الصحيحة غير صالحة: «' + ans + '».'); errors.push({ where: at + '.correctAnswer', message: 'الإجابة الصحيحة يجب أن تكون A/B/C/D — الوارد: «' + ans + '».' }); }
+    const fp = questionFingerprint(view, text);
+    if (fp) {
+      if (seenInFile.has(fp)) { row.status = 'duplicate-file'; row.existingId = seenInFile.get(fp); row.problems.push('مكرر داخل الملف نفسه (سؤال ' + row.existingId + ').'); warnings.push('السؤال ' + (i + 1) + ' مكرر داخل الملف نفسه — سيُضاف مرة واحدة.'); }
+      else {
+        seenInFile.set(fp, i + 1);
+        const bankId = textIndex.get(fp);
+        if (bankId) { row.status = 'exists'; row.existingId = bankId; warnings.push('السؤال ' + (i + 1) + ' موجود بالفعل في البنك (' + bankId + ') — سيُربط الموجود دون تكرار.'); }
+      }
+    }
+    if (row.problems.length && row.status !== 'duplicate-file') row.status = 'invalid';
+    rows.push(row);
+  });
+  const stats = {
+    total: rows.length,
+    invalid: rows.filter(r => r.status === 'invalid').length,
+    existsInBank: rows.filter(r => r.status === 'exists').length,
+    duplicateInFile: rows.filter(r => r.status === 'duplicate-file').length,
+    newCount: rows.filter(r => r.status === 'new').length
+  };
+  return {
+    ok: errors.length === 0 && stats.total > 0,
+    exam: { title: parsed.title, subjectId: parsed.subjectId, term: parsed.term, grade: parsed.grade },
+    stats, errors, warnings, rows
+  };
+}
+
 /* ============================ request parsing ============================ */
 async function readJson(request, maxBytes = 128 * 1024) {
   const buf = await request.arrayBuffer();
@@ -394,9 +717,10 @@ function ownerTeacher(teachers) {
 async function publicCatalog(env) {
   const teachers = await getTeachers(env).catch(() => DEFAULT_TEACHERS);
   const owner = ownerTeacher(teachers);
+  const { catalog, pubExams } = await contentView(env);
   return {
     version: BANKS.version, generatedAt: BANKS.generatedAt,
-    catalog: BANKS.catalog, exams: BANKS.exams,
+    catalog, exams: pubExams,
     owner: owner ? teacherPublic(owner) : null
   };
 }
@@ -404,6 +728,7 @@ async function publicCatalog(env) {
 function teacherPublic(t) {
   return {
     slug: t.slug, name: t.name, specialty: t.specialty || '', bio: t.bio || '', photo: t.photo || '',
+    photoFit: t.photoFit === 'cover' ? 'cover' : (t.photoFit === 'contain' ? 'contain' : ''),
     socialLinks: t.socialLinks || {},
     requirePhone: !!t.requirePhone
   };
@@ -460,9 +785,11 @@ async function handleApi(request, env, ctx, pathname) {
   if (pathname === '/api/exam/start' && method === 'POST') {
     const body = await readJson(request);
     const examId = String(body.examId || '');
-    const examMeta = BANKS.exams[examId];
+    const cv = await contentView(env);
+    const examMeta = cv.view.exams[examId];
     if (!examMeta) return fail('الامتحان غير موجود.', 404);
-    const ids = BANKS.examDefs[examId];
+    if (examMeta.enabled === false) return fail('الامتحان غير متاح حاليًا.', 404);
+    const ids = cv.view.examDefs[examId];
     if (!ids || !ids.length) return fail('الامتحان غير متاح حاليًا.', 404);
 
     const name = String(body.name || '').trim();
@@ -522,11 +849,12 @@ async function handleApi(request, env, ctx, pathname) {
     const iss = Math.floor(Date.now() / 1000);
     const token = await signToken({
       t: 'exam', examId, seed, nonce, name, phone: normPhone,
+      qcount: ids.length,
       slug, iss, exp: iss + ttl
     }, secret);
 
     const questions = ids.map((qid, i) => {
-      const q = BANKS.questions[qid];
+      const q = cv.view.questions[qid];
       const perm = shuffledOrder(seed, i);
       return { no: i + 1, id: qid, text: q.text, options: perm.map(origIdx => q.options[origIdx]) };
     });
@@ -555,8 +883,17 @@ async function handleApi(request, env, ctx, pathname) {
     if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
     const sess = await verifyToken(token, secret);
     if (!sess || sess.t !== 'exam') return fail('جلسة الامتحان غير صالحة أو منتهية. أعد فتح الامتحان.', 403);
-    if (!Array.isArray(answers) || answers.length !== BANKS.examDefs[sess.examId].length) {
+    const cv = await contentView(env);
+    const sessDefs = cv.view.examDefs[sess.examId];
+    const sessMeta = cv.view.exams[sess.examId];
+    if (!sessDefs || !sessMeta || sessMeta.enabled === false) return fail('الامتحان غير متاح حاليًا — أعد فتحه من قائمة الامتحانات.', 404);
+    if (!Array.isArray(answers) || answers.length !== sessDefs.length) {
       return fail('عدد الإجابات لا يطابق عدد الأسئلة.');
+    }
+    // A live content edit that changed the exam size after this session started would
+    // desync the seeded shuffle — refuse politely instead of mis-grading.
+    if (Number.isInteger(sess.qcount) && sess.qcount !== sessDefs.length) {
+      return fail('تم تحديث هذا الامتحان أثناء الجلسة — أعد فتح الامتحان ثم سلّم إجاباتك.', 409);
     }
     const unanswered = [];
     answers.forEach((a, i) => { if (!Number.isInteger(a) || a < 0 || a > 3) unanswered.push(i + 1); });
@@ -608,11 +945,11 @@ async function handleApi(request, env, ctx, pathname) {
     }
 
     // grade — SERVER ONLY
-    const ids = BANKS.examDefs[sess.examId];
-    const examMeta = BANKS.exams[sess.examId];
+    const ids = sessDefs;
+    const examMeta = sessMeta;
     let score = 0;
     const review = ids.map((qid, i) => {
-      const q = BANKS.questions[qid];
+      const q = cv.view.questions[qid];
       const perm = shuffledOrder(sess.seed, i);
       const correctOrig = 'ABCD'.indexOf(q.answer);
       const chosenOrig = perm[answers[i]];
@@ -871,9 +1208,20 @@ async function handleAdmin(request, env, ctx, pathname) {
   if (pathname === '/api/admin/overview' && method === 'GET') {
     const teachers = await getTeachers(env);
     const recent = await kvGetJson(env, 'results:recent').catch(() => null) || [];
+    const cv = await contentView(env);
+    const allExams = Object.values(cv.view.exams);
+    const doc = cv.doc;
     return json({
-      exams: Object.keys(BANKS.exams).length,
-      questions: Object.keys(BANKS.questions).length,
+      exams: allExams.length,
+      questions: Object.keys(cv.view.questions).length,
+      customExams: allExams.filter(e => e.custom === true).length,
+      customQuestions: Object.values(cv.view.questions).filter(q => q.custom === true).length,
+      disabledExams: allExams.filter(e => e.enabled === false).length,
+      deletedQuestions: doc.deletedQuestions.length,
+      deletedExams: doc.deletedExams.length,
+      editedQuestions: Object.keys(doc.questions).filter(id => BANKS.questions[id]).length,
+      editedExams: Object.keys(doc.exams).filter(id => BANKS.examDefs[id]).length,
+      contentUpdatedAt: doc.updatedAt,
       structure: BANKS.structure,
       audit: BANKS.audit,
       notes: BANKS.notes,
@@ -1008,29 +1356,360 @@ async function handleAdmin(request, env, ctx, pathname) {
     return json({ ok: true });
   }
 
-  /* ---------- question bank (admin sees keys) ---------- */
+  /* ---------- question bank (admin sees keys) — merged base + overlay ---------- */
   if (pathname === '/api/admin/questions' && method === 'GET') {
     const url = new URL(request.url);
+    const cv = await contentView(env);
     const subject = url.searchParams.get('subject') || '';
     const term = url.searchParams.get('term') || '';
     const search = (url.searchParams.get('q') || '').trim();
     const lesson = (url.searchParams.get('lesson') || '').trim();
+    const only = url.searchParams.get('only') || ''; // custom | edited | base
     const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10) || 1);
-    const perPage = 50;
-    const entries = Object.entries(BANKS.questions)
+    const perPage = Math.min(100, Math.max(10, parseInt(url.searchParams.get('perPage') || '50', 10) || 50));
+    const entries = Object.entries(cv.view.questions)
       .filter(([, q]) => !subject || q.meta.subjectId === subject)
       .filter(([, q]) => !term || String(q.meta.term || '') === term)
       .filter(([, q]) => !lesson || String(q.meta.lesson || q.meta.chapter || '').includes(lesson))
-      .filter(([, q]) => !search || q.text.includes(search));
+      .filter(([, q]) => !search || q.text.includes(search))
+      .filter(([id, q]) => !only || (only === 'custom' ? q.custom === true : only === 'edited' ? !!cv.doc.questions[id] : q.custom !== true && !cv.doc.questions[id]));
     const total = entries.length;
     const slice = entries.slice((page - 1) * perPage, page * perPage)
-      .map(([id, q]) => ({ id, text: q.text, options: q.options, answer: q.answer, meta: q.meta }));
-    return json({ total, page, perPage, questions: slice });
+      .map(([id, q]) => ({
+        id, text: q.text, options: q.options, answer: q.answer, meta: q.meta,
+        custom: q.custom === true, edited: !!cv.doc.questions[id], deleted: false,
+        usedBy: Object.keys(cv.view.examDefs).filter(eid => (cv.view.examDefs[eid] || []).indexOf(id) !== -1).length
+      }));
+    return json({
+      total, page, perPage, questions: slice,
+      counts: {
+        all: Object.keys(cv.view.questions).length,
+        custom: Object.values(cv.view.questions).filter(q => q.custom === true).length,
+        edited: Object.keys(cv.doc.questions).filter(id => BANKS.questions[id]).length,
+        deleted: cv.doc.deletedQuestions.length
+      }
+    });
+  }
+  /* deleted (tombstoned) questions — restorable */
+  if (pathname === '/api/admin/questions/deleted' && method === 'GET') {
+    const cv = await contentView(env);
+    return json({
+      questions: cv.doc.deletedQuestions.map(id => {
+        const base = BANKS.questions[id];
+        const p = cv.doc.questions[id];
+        const q = p || base;
+        return { id, text: q ? q.text : '(غير متاح)', custom: !!(p && p.custom === true), hasBase: !!base };
+      })
+    });
   }
 
-  /* ---------- exams ---------- */
+  /* ---------- single question (admin, privileged: includes the key) ---------- */
+  const qMatch = pathname.match(/^\/api\/admin\/questions\/([A-Za-z0-9_.:-]+)$/);
+  if (qMatch) {
+    const cv = await contentView(env);
+    const id = qMatch[1];
+    if (method === 'GET') {
+      const q = cv.view.questions[id];
+      const del = cv.doc.deletedQuestions.indexOf(id) !== -1;
+      if (!q && !del) return fail('السؤال غير موجود.', 404);
+      return json({
+        question: q ? { id, text: q.text, options: q.options, answer: q.answer, meta: q.meta, custom: q.custom === true } : null,
+        deleted: del, edited: !!cv.doc.questions[id],
+        usedBy: Object.keys(cv.view.examDefs).filter(eid => (cv.view.examDefs[eid] || []).indexOf(id) !== -1).map(eid => ({ id: eid, title: cv.view.exams[eid].title }))
+      });
+    }
+    if (method === 'PUT') {
+      const existing = cv.view.questions[id];
+      if (!existing) return fail('السؤال غير موجود.', 404);
+      const clean = sanitizeQuestionInput(await readJson(request, 64 * 1024), existing);
+      const doc = cv.doc;
+      const isBase = !!BANKS.questions[id];
+      if (isBase) {
+        doc.questions[id] = Object.assign({}, doc.questions[id], clean, { edited: true, updatedAt: new Date().toISOString() });
+      } else {
+        doc.questions[id] = Object.assign({}, doc.questions[id], clean, { custom: true, updatedAt: new Date().toISOString() });
+      }
+      await saveContentDoc(env, doc);
+      return json({ ok: true, id });
+    }
+    if (method === 'DELETE') {
+      const doc = cv.doc;
+      if (doc.deletedQuestions.indexOf(id) === -1) doc.deletedQuestions.push(id);
+      await saveContentDoc(env, doc);
+      const affected = Object.keys(buildView(doc).examDefs).filter(eid => (BANKS.examDefs[eid] || []).indexOf(id) !== -1);
+      return json({ ok: true, deleted: true, affectedExams: affected.length });
+    }
+  }
+  /* restore a tombstoned question */
+  const qRestore = pathname.match(/^\/api\/admin\/questions\/([A-Za-z0-9_.:-]+)\/restore$/);
+  if (qRestore && method === 'POST') {
+    const doc = await getContentDoc(env);
+    const i = doc.deletedQuestions.indexOf(qRestore[1]);
+    if (i === -1) return fail('السؤال ليس في سلة المحذوفات.', 404);
+    doc.deletedQuestions.splice(i, 1);
+    await saveContentDoc(env, doc);
+    return json({ ok: true });
+  }
+  /* duplicate a question (creates a NEW custom question; the bank copy stays) */
+  const qDup = pathname.match(/^\/api\/admin\/questions\/([A-Za-z0-9_.:-]+)\/duplicate$/);
+  if (qDup && method === 'POST') {
+    const cv = await contentView(env);
+    const src = cv.view.questions[qDup[1]];
+    if (!src) return fail('السؤال غير موجود.', 404);
+    const doc = cv.doc;
+    const id = uniqueQuestionId(doc);
+    doc.questions[id] = {
+      id, custom: true, text: src.text, options: src.options.slice(), answer: src.answer,
+      meta: Object.assign({}, src.meta, { source: 'نسخة من ' + qDup[1] + ' (لوحة التحكم)', duplicatedFrom: qDup[1] }),
+      createdAt: new Date().toISOString()
+    };
+    await saveContentDoc(env, doc);
+    return json({ ok: true, id });
+  }
+  /* create a brand-new question */
+  if (pathname === '/api/admin/questions' && method === 'POST') {
+    const cv = await contentView(env);
+    const clean = sanitizeQuestionInput(await readJson(request, 64 * 1024), null);
+    const doc = cv.doc;
+    const id = uniqueQuestionId(doc);
+    clean.meta.subjectId = clean.meta.subjectId === 'psychology' ? 'psychology' : (clean.meta.subjectId === 'philosophy' ? 'philosophy' : 'philosophy');
+    clean.meta.source = clean.meta.source || 'أُنشئ من لوحة التحكم';
+    clean.meta.verificationStatus = clean.meta.verificationStatus || 'admin';
+    doc.questions[id] = Object.assign({ id, custom: true, createdAt: new Date().toISOString() }, clean);
+    await saveContentDoc(env, doc);
+    return json({ ok: true, id });
+  }
+
+  /* ---------- exams list (admin; merged + custom + disabled flags) ---------- */
   if (pathname === '/api/admin/exams' && method === 'GET') {
-    return json({ exams: BANKS.exams, catalog: BANKS.catalog });
+    const url = new URL(request.url);
+    const cv = await contentView(env);
+    const q = (url.searchParams.get('q') || '').trim();
+    const subject = url.searchParams.get('subject') || '';
+    const term = url.searchParams.get('term') || '';
+    const status = url.searchParams.get('status') || ''; // enabled|disabled|custom|edited
+    let rows = Object.values(cv.view.exams)
+      .filter(e => !subject || e.subjectId === subject)
+      .filter(e => !term || String(e.term == null ? '' : e.term) === term)
+      .filter(e => !q || (e.title || '').includes(q) || e.id.toLowerCase().includes(q.toLowerCase()))
+      .filter(e => !status || (status === 'enabled' ? e.enabled !== false : status === 'disabled' ? e.enabled === false : status === 'custom' ? e.custom === true : e.modified === true));
+    rows.sort((a, b) => (a.subjectId + '|' + (a.term == null ? '' : a.term) + '|' + a.title).localeCompare(b.subjectId + '|' + (b.term == null ? '' : b.term) + '|' + b.title, 'ar'));
+    return json({
+      exams: rows, catalog: cv.catalog, deleted: cv.doc.deletedExams,
+      counts: {
+        all: Object.keys(cv.view.exams).length,
+        custom: Object.values(cv.view.exams).filter(e => e.custom === true).length,
+        disabled: Object.values(cv.view.exams).filter(e => e.enabled === false).length,
+        edited: Object.values(cv.view.exams).filter(e => e.modified === true && e.custom !== true).length,
+        deleted: cv.doc.deletedExams.length
+      }
+    });
+  }
+  /* deleted exams — restorable */
+  if (pathname === '/api/admin/exams/deleted' && method === 'GET') {
+    const cv = await contentView(env);
+    return json({
+      exams: cv.doc.deletedExams.map(id => {
+        const p = cv.doc.exams[id] || {};
+        return { id, title: p.title || (BANKS.exams[id] ? BANKS.exams[id].title : '(غير متاح)'), custom: !!(p.custom === true) };
+      })
+    });
+  }
+
+  /* ---------- single exam (admin editor payload: includes keys) ---------- */
+  const eMatch = pathname.match(/^\/api\/admin\/exams\/([A-Za-z0-9_.:-]+)$/);
+  if (eMatch) {
+    const cv = await contentView(env);
+    const id = eMatch[1];
+    if (method === 'GET') {
+      const e = cv.view.exams[id];
+      if (!e) return fail('الامتحان غير موجود.', 404);
+      const ids = cv.view.examDefs[id] || [];
+      return json({
+        exam: e, questionIds: ids,
+        questions: ids.map(qid => {
+          const q = cv.view.questions[qid];
+          return { id: qid, text: q.text, options: q.options, answer: q.answer, meta: q.meta, custom: q.custom === true };
+        })
+      });
+    }
+    if (method === 'PUT') {
+      const existing = cv.view.exams[id];
+      if (!existing) return fail('الامتحان غير موجود.', 404);
+      const body = await readJson(request, 512 * 1024);
+      const doc = cv.doc;
+      const isBase = !!BANKS.examDefs[id];
+      const patch = doc.exams[id] || (isBase ? {} : { custom: true, createdAt: new Date().toISOString() });
+      if (body.title !== undefined) {
+        const t = String(body.title || '').trim();
+        if (!t) throw bad('اسم الامتحان مطلوب.');
+        patch.title = t.slice(0, 200);
+      }
+      if (body.subjectId !== undefined) patch.subjectId = body.subjectId === 'psychology' ? 'psychology' : 'philosophy';
+      if (body.term !== undefined) patch.term = (body.term === null || body.term === '') ? null : (parseInt(body.term, 10) === 2 ? 2 : 1);
+      if (body.grade !== undefined) patch.grade = String(body.grade || '').trim().slice(0, 80);
+      if (body.type !== undefined && !isBase) patch.type = String(body.type || 'custom').slice(0, 30);
+      if (body.unitTitle !== undefined) patch.unitTitle = String(body.unitTitle || '').trim().slice(0, 120);
+      if (body.lessonTitle !== undefined) patch.lessonTitle = String(body.lessonTitle || '').trim().slice(0, 200);
+      if (body.enabled !== undefined) patch.enabled = body.enabled !== false;
+      if (body.questionIds !== undefined) {
+        if (!Array.isArray(body.questionIds)) throw bad('قائمة الأسئلة غير صالحة.');
+        const seen = new Set(); const ids = [];
+        for (const qid of body.questionIds) {
+          if (typeof qid !== 'string' || !cv.view.questions[qid]) throw bad('سؤال غير موجود في البنك: ' + qid);
+          if (seen.has(qid)) throw bad('السؤال ' + qid + ' مكرر داخل الامتحان.');
+          seen.add(qid); ids.push(qid);
+        }
+        if (!ids.length) throw bad('لا يمكن حفظ امتحان بلا أسئلة.');
+        if (ids.length > 200) throw bad('الحد الأقصى 200 سؤال لكل امتحان.');
+        patch.questionIds = ids;
+      }
+      patch.updatedAt = new Date().toISOString();
+      doc.exams[id] = patch;
+      await saveContentDoc(env, doc);
+      return json({ ok: true, id, count: (buildView(doc).examDefs[id] || []).length });
+    }
+    if (method === 'DELETE') {
+      const doc = cv.doc;
+      if (doc.deletedExams.indexOf(id) === -1) doc.deletedExams.push(id);
+      await saveContentDoc(env, doc);
+      return json({ ok: true, deleted: true });
+    }
+  }
+  /* restore a tombstoned exam */
+  const eRestore = pathname.match(/^\/api\/admin\/exams\/([A-Za-z0-9_.:-]+)\/restore$/);
+  if (eRestore && method === 'POST') {
+    const doc = await getContentDoc(env);
+    const i = doc.deletedExams.indexOf(eRestore[1]);
+    if (i === -1) return fail('الامتحان ليس في سلة المحذوفات.', 404);
+    doc.deletedExams.splice(i, 1);
+    await saveContentDoc(env, doc);
+    return json({ ok: true });
+  }
+  /* revert an exam to its pristine bank definition (drop the overlay patch) */
+  const eRevert = pathname.match(/^\/api\/admin\/exams\/([A-Za-z0-9_.:-]+)\/revert$/);
+  if (eRevert && method === 'POST') {
+    const cv = await contentView(env);
+    const id = eRevert[1];
+    if (!BANKS.examDefs[id]) return fail('هذا الامتحان مخصّص (ليس من البنك الأصلي) — لا يمكن استعادة أصل له.', 400);
+    const doc = cv.doc;
+    delete doc.exams[id];
+    await saveContentDoc(env, doc);
+    return json({ ok: true });
+  }
+  /* revert a base question to its pristine bank wording/key */
+  const qRevert = pathname.match(/^\/api\/admin\/questions\/([A-Za-z0-9_.:-]+)\/revert$/);
+  if (qRevert && method === 'POST') {
+    const cv = await contentView(env);
+    const id = qRevert[1];
+    if (!BANKS.questions[id]) return fail('هذا السؤال مخصّص (ليس من البنك الأصلي) — لا يمكن استعادة أصل له.', 400);
+    const doc = cv.doc;
+    delete doc.questions[id];
+    await saveContentDoc(env, doc);
+    return json({ ok: true });
+  }
+  /* create a new (custom) exam */
+  if (pathname === '/api/admin/exams' && method === 'POST') {
+    const cv = await contentView(env);
+    const body = await readJson(request, 512 * 1024);
+    const title = String(body.title || '').trim();
+    if (!title) throw bad('اسم الامتحان مطلوب.');
+    const subjectId = body.subjectId === 'psychology' ? 'psychology' : 'philosophy';
+    const doc = cv.doc;
+    const ids = [];
+    if (Array.isArray(body.questionIds)) {
+      const seen = new Set();
+      for (const qid of body.questionIds) {
+        if (typeof qid !== 'string' || !cv.view.questions[qid]) throw bad('سؤال غير موجود: ' + qid);
+        if (seen.has(qid)) throw bad('السؤال ' + qid + ' مكرر داخل الامتحان.');
+        seen.add(qid); ids.push(qid);
+      }
+    }
+    if (ids.length > 200) throw bad('الحد الأقصى 200 سؤال لكل امتحان.');
+    const id = uniqueExamId(doc);
+    doc.exams[id] = {
+      custom: true, title: title.slice(0, 200), subjectId,
+      term: body.term === null || body.term === undefined || body.term === '' ? null : (parseInt(body.term, 10) === 2 ? 2 : 1),
+      grade: String(body.grade || '').trim().slice(0, 80),
+      type: 'custom', unitTitle: String(body.unitTitle || '').trim().slice(0, 120), lessonTitle: String(body.lessonTitle || '').trim().slice(0, 200),
+      enabled: body.enabled !== false, questionIds: ids,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    };
+    await saveContentDoc(env, doc);
+    return json({ ok: true, id });
+  }
+  /* export an exam in the canonical import format (ADMIN ONLY — includes keys) */
+  const eExport = pathname.match(/^\/api\/admin\/exams\/([A-Za-z0-9_.:-]+)\/export$/);
+  if (eExport && method === 'GET') {
+    const cv = await contentView(env);
+    const id = eExport[1];
+    if (!cv.view.exams[id]) return fail('الامتحان غير موجود.', 404);
+    const canonical = examToCanonical(cv.view, id);
+    return new Response(JSON.stringify(canonical, null, 2), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="exam-' + id + '.json"',
+        'Cache-Control': 'no-store'
+      }
+    });
+  }
+  /* import: validate + preview ONLY (nothing is stored) */
+  if (pathname === '/api/admin/import/preview' && method === 'POST') {
+    const body = await readJson(request, 6 * 1024 * 1024);
+    const raw = typeof body.text === 'string' ? body.text : (typeof body.json === 'string' ? body.json : '');
+    if (!raw) throw bad('لم يُستلم محتوى الملف.');
+    const parsed = parseImportPayload(raw);
+    const cv = await contentView(env);
+    const report = validateImport(parsed, cv.view);
+    return json({ report });
+  }
+  /* import: commit AFTER an explicit preview+confirm (server re-validates) */
+  if (pathname === '/api/admin/import/commit' && method === 'POST') {
+    const body = await readJson(request, 6 * 1024 * 1024);
+    if (body.confirm !== true) throw bad('التأكيد مطلوب قبل الاستيراد.');
+    const raw = typeof body.text === 'string' ? body.text : '';
+    if (!raw) throw bad('لم يُستلم محتوى الملف.');
+    const parsed = parseImportPayload(raw);
+    const cv = await contentView(env);
+    const report = validateImport(parsed, cv.view);
+    if (!report.ok) throw bad('لا يمكن الاستيراد: ' + (report.errors[0] ? report.errors[0].message : 'الملف غير صالح.'));
+    const doc = cv.doc;
+    const view = cv.view;
+    const textIndex = buildTextIndex(view);
+    const ids = []; const seenFp = new Map(); const created = [];
+    report.rows.forEach((row) => {
+      // invalid rows are rejected; intra-file duplicates are added ONCE (first occurrence wins)
+      if (row.status === 'invalid' || row.status === 'duplicate-file') return;
+      const fp = questionFingerprint(view, row.text);
+      if (fp && seenFp.has(fp)) return;
+      if (row.status === 'exists' && row.existingId) { seenFp.set(fp, row.existingId); ids.push(row.existingId); return; }
+      // brand-new question — unless the bank already holds this exact wording (race-safe re-check)
+      const bankHit = textIndex.get(fp);
+      if (bankHit) { seenFp.set(fp, bankHit); ids.push(bankHit); return; }
+      const qid = uniqueQuestionId(doc);
+      doc.questions[qid] = {
+        id: qid, custom: true, text: row.text,
+        options: [row.options.A, row.options.B, row.options.C, row.options.D],
+        answer: row.correctAnswer,
+        meta: {
+          subject: parsed.subjectId === 'psychology' ? 'علم النفس' : 'الفلسفة والمنطق',
+          subjectId: parsed.subjectId, term: parsed.term, lesson: parsed.grade || '',
+          source: 'استيراد من ملف (لوحة التحكم)', verificationStatus: 'imported'
+        },
+        createdAt: new Date().toISOString()
+      };
+      seenFp.set(fp, qid); ids.push(qid); created.push(qid);
+    });
+    if (!ids.length) throw bad('لا توجد أسئلة صالحة للاستيراد.');
+    const examId = uniqueExamId(doc);
+    doc.exams[examId] = {
+      custom: true, title: parsed.title.slice(0, 200), subjectId: parsed.subjectId,
+      term: parsed.term, grade: parsed.grade, type: 'custom',
+      unitTitle: '', lessonTitle: '', enabled: true, questionIds: ids,
+      createdAt: new Date().toISOString(), updatedAt: new Date().toISOString()
+    };
+    await saveContentDoc(env, doc);
+    return json({ ok: true, examId, createdQuestions: created.length, reusedQuestions: ids.length - created.length, total: ids.length });
   }
 
   /* ---------- results ---------- */
@@ -1084,7 +1763,9 @@ async function sanitizeTeacher(body, existing, env) {
     phone = isValidEgMobile(np) ? np : phone.replace(/[\s\-.()]/g, '');
     if (!/^[0-9+]{4,25}$/.test(phone)) throw bad('رقم هاتف المعلم غير صالح.');
   }
-  let photo = String(body.photo || existing?.photo || '');
+  /* photo: '' صريحة = «إزالة الصورة» (زر الإزالة في لوحة التحكم)؛ غياب الحقل = إبقاء الحالية.
+   * الخلط بين الحالتين كان يجعل إزالة الصورة مستحيلة من اللوحة. */
+  let photo = body.photo === undefined ? String(existing?.photo || '') : String(body.photo || '');
   if (photo && !/^data:image\/(png|jpe?g|webp);base64,/i.test(photo)) throw bad('صورة غير صالحة.');
   if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير جدًا (الحد 2.5 ميجابايت).');
   // الهوية البصرية موحدة للجميع (styles.css) — لا ألوان مخصصة لكل معلم؛
@@ -1120,6 +1801,9 @@ async function sanitizeTeacher(body, existing, env) {
     specialty: String(body.specialty ?? existing?.specialty ?? '').trim().slice(0, 120),
     bio: String(body.bio ?? existing?.bio ?? '').trim().slice(0, 500),
     photo,
+    // عرض الصورة: contain (افتراضي للشفاف) أو cover (قص متناسق) — فارغ = تلقائي حسب نوع الملف
+    photoFit: body.photoFit === 'cover' || body.photoFit === 'contain' ? body.photoFit
+      : (body.photoFit === '' || body.photoFit === null ? '' : (existing?.photoFit || '')),
     socialLinks: social,
     requirePhone: body.requirePhone !== undefined ? body.requirePhone !== false : (existing ? existing.requirePhone !== false : (tdefs ? tdefs.requirePhone !== false : true)),
     enabled: body.enabled !== undefined ? body.enabled !== false : (existing ? existing.enabled !== false : true),
@@ -1262,6 +1946,8 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
       if (photo && photo.length > 2.5 * 1024 * 1024) throw bad('حجم الصورة كبير.');
       updated.photo = photo;
     }
+    if (body.photoFit === 'cover' || body.photoFit === 'contain') updated.photoFit = body.photoFit;
+    else if (body.photoFit === '') updated.photoFit = '';
     updated.updatedAt = new Date().toISOString();
     teachers[idx] = updated;
     await kvPut(env, 'teachers', JSON.stringify(teachers));
@@ -1313,7 +1999,7 @@ function teacherAdminPayload(t) {
     id: t.id, teacherCode: t.teacherCode || '', slug: t.slug, name: t.name,
     email: t.email || '', username: t.username || '',
     phone: t.phone || '', specialty: t.specialty || '', bio: t.bio || '',
-    photo: t.photo || '', socialLinks: t.socialLinks || {},
+    photo: t.photo || '', photoFit: t.photoFit || '', socialLinks: t.socialLinks || {},
     requirePhone: t.requirePhone !== false, enabled: t.enabled !== false,
     archived: !!t.archived,
     unlimited: t.unlimited !== false, maxAttempts: t.maxAttempts || 3,
