@@ -1188,6 +1188,15 @@ async function handleAdmin(request, env, ctx, pathname) {
   // First-run: if initial-admin secrets are configured, provision now (idempotent).
   await ensureAdminBootstrap(env).catch(() => {});
 
+  /* ---------- حالة الإعداد الأولي (عام — لا يكشف إلا وجود حساب من عدمه) ----------
+   * كان اكتشاف «أول تشغيل» يتم بمحاولة دخول ببيانات فارغة على /api/admin/login؛
+   * وبما أن هذا المسار خاضع لحد المحاولات، كان استنفاد المحاولات من نفس IP يخفي
+   * شاشة الإعداد الأولي عن المالك على نشر جديد. نقطة حالة مخصّصة تحل المشكلة. */
+  if (pathname === '/api/admin/status' && method === 'GET') {
+    const admin = await getAdminRecord(env).catch(() => null);
+    return json({ setup: !admin, envBootstrap: !!(env.ADMIN_INITIAL_EMAIL && env.ADMIN_INITIAL_PASSWORD) }, 200, { 'Cache-Control': 'no-store' });
+  }
+
   /* ---------- login ---------- */
   if (pathname === '/api/admin/login' && method === 'POST') {
     const fails = loginFails.get(ip) || { n: 0, until: 0 };

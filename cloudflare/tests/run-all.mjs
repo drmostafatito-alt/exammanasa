@@ -367,6 +367,8 @@ try {
   console.log('\n[8] حساب المسؤول');
   let cookie;
   {
+    const st0 = await jfetch('/api/admin/status');
+    ok('GET /api/admin/status قبل الإعداد → setup:true', st0.status === 200 && st0.data.setup === true, JSON.stringify(st0.data));
     const noAdmin = await post('/api/admin/login', { email: 'x@y.z', password: 'whatever1' });
     ok('لا دخول قبل إنشاء الحساب (رسالة إعداد)', noAdmin.status === 404);
     const weak = await post('/api/admin/setup', { email: 'bad', password: 'short' });
@@ -375,6 +377,8 @@ try {
     ok('الإعداد الأولي ناجح', setup.status === 200);
     const dup = await post('/api/admin/setup', { email: 'a@b.c', password: 'longenough1' });
     ok('لا يمكن إنشاء حساب مسؤول ثانٍ', dup.status === 409);
+    const st1 = await jfetch('/api/admin/status');
+    ok('GET /api/admin/status بعد الإعداد → setup:false (ولا يكشف أي سر)', st1.status === 200 && st1.data.setup === false && !JSON.stringify(st1.data).includes('pass'), JSON.stringify(st1.data));
     const wrong = await post('/api/admin/login', { email: 'admin@test.local', password: 'wrong-password' });
     ok('رفض كلمة مرور خاطئة', wrong.status === 401);
     const login = await post('/api/admin/login', { email: 'admin@test.local', password: 'TestAdminPass-2026' });
@@ -1246,6 +1250,11 @@ try {
       if (r.status === 429) { sawLockA = true; break; }
     }
     ok('دخول المسؤول: قفل مؤقت بعد تكرار الفشل (429)', sawLockA);
+    // انحدار: اكتشاف «أول تشغيل» كان يعتمد على /api/admin/login — ومع القفل كان
+    // يخفي شاشة الإعداد عن المالك على نشر جديد. نقطة الحالة المخصّصة لا تُقفل.
+    const stLocked = await jfetch('/api/admin/status');
+    ok('قفل المحاولات لا يخفي نقطة حالة الإعداد (شاشة الإعداد تبقى متاحة)',
+      stLocked.status === 200 && typeof stLocked.data.setup === 'boolean', 'got ' + stLocked.status);
   }
 
   console.log('\n══════════════════════════════');

@@ -1466,10 +1466,18 @@
   window.importCommit = importCommit;
   window.downloadTemplate = downloadTemplate;
 
-  /* boot */
-  api('/api/admin/session').then(enter).catch(function () {
-    api('/api/admin/login', { method: 'POST', body: JSON.stringify({ email: '', password: '' }) })
-      .then(function () { renderLogin(false); })
-      .catch(function (e) { renderLogin(String(e.message).indexOf('لم يُنشأ') !== -1); });
-  });
+  /* boot — كشف أول تشغيل عبر نقطة حالة مخصّصة (لا عبر محاولة دخول فارغة:
+   * /api/admin/login خاضع لحد المحاولات فكان يخفي شاشة الإعداد عن المالك). */
+  function boot() {
+    return api('/api/admin/status').then(function (d) {
+      if (d && d.setup === true) return renderLogin(true);
+      return api('/api/admin/session').then(enter).catch(function () { renderLogin(false); });
+    }).catch(function () {
+      // احتياط للتوافق مع نشر قديم لا يعرف /api/admin/status
+      api('/api/admin/login', { method: 'POST', body: JSON.stringify({ email: '', password: '' }) })
+        .then(function () { renderLogin(false); })
+        .catch(function (e) { renderLogin(String(e.message).indexOf('لم يُنشأ') !== -1); });
+    });
+  }
+  boot();
 })();
