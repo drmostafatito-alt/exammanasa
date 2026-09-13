@@ -1149,6 +1149,20 @@ async function handleApi(request, env, ctx, pathname) {
 
 /* ============================ admin API ============================ */
 const loginFails = new Map(); // per-isolate best effort
+/* خريطة الإخفاقات تعيش بعمر الـisolate نفسِه — فلو لم تُنظَّف لأمكن لرشٍّ من محاولات
+ * دخول فاشلة من آلاف الـIP أن يضخّمها بلا حد (تسريب ذاكرة/تضخيم). كنس الداخل المنتهي
+ * عند كل محاولة، وسقف صلب يتخلص من الأقدم عند تجاوزه. */
+function sweepThrottles(map) {
+  const now = Date.now();
+  if (map.size >= 256) {
+    for (const [k, v] of map) if (!v.until || v.until <= now) map.delete(k);
+  }
+  if (map.size > 4096) {
+    let excess = map.size - 4096;
+    for (const k of map.keys()) { if (excess-- <= 0) break; map.delete(k); }
+  }
+  return map;
+}
 
 async function getAdminRecord(env) {
   return kvGetJson(env, 'admin');
@@ -1208,6 +1222,7 @@ async function handleAdmin(request, env, ctx, pathname) {
 
   /* ---------- login ---------- */
   if (pathname === '/api/admin/login' && method === 'POST') {
+    sweepThrottles(loginFails);
     const fails = loginFails.get(ip) || { n: 0, until: 0 };
     if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة. حاول بعد قليل.', 429);
 
@@ -1988,6 +2003,7 @@ async function teacherCookiePayload(request, env) {
 }
 async function handleTeacherLogin(request, env) {
   const ip = request.headers.get('CF-Connecting-IP') || 'unknown';
+  sweepThrottles(teacherLoginFails);
   const fails = teacherLoginFails.get(ip) || { n: 0, until: 0 };
   if (fails.n >= 10 && Date.now() < fails.until) return fail('محاولات كثيرة.', 429);
   // نفس قواعد الحماية من CSRF: لا تسجيل دخول مُجبر من موقع آخر (login CSRF)،
