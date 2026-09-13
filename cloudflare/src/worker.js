@@ -1896,7 +1896,11 @@ async function handleAdmin(request, env, ctx, pathname) {
 async function sanitizeTeacher(body, existing, env) {
   // اسم/نبذة/تخصص المعلم تظهر في صفحته العامة — تُهرَّب عند العرض، وتُنظَّف هنا
   // من محارف التحكم حتى لا تُستخدم لتسميم CSV أو السجلات.
-  const name = stripControl(body.name, 80);
+  /* نفس قاعدة بقية الحقول: غياب `name` في طلب PUT = إبقاء الاسم المخزَّن.
+   * كان الاسم هو الحقل الوحيد المطلوب دائمًا، فأي تحديث جزئي (تعطيل/تفعيل،
+   * تغيير حد الطلاب، تغيير عدد المحاولات) كان يُرفض بـ«اسم المعلم مطلوب» —
+   * رغم أن العقد الموثَّق أدناه ينص على أن الحقل الغائب يحافظ على قيمته المخزّنة. */
+  const name = stripControl(body.name !== undefined ? body.name : (existing?.name ?? ''), 80);
   if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
