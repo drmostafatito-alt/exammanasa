@@ -1027,6 +1027,40 @@ try {
     await jfetch('/api/admin/teachers/' + id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 19ه. استيراد/تصدير: رحلة كاملة (round-trip) ============ */
+  console.log('\n[19ه] تصدير ←→ استيراد (نفس الصيغة القياسية)');
+  {
+    const AH = { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', Cookie: cookie };
+    const src = 'T1-PH-01';
+    const exp = await jfetch('/api/admin/exams/' + src + '/export', { headers: AH });
+    ok('تصدير امتحان من البنك بصيغة v1', exp.status === 200 && exp.data.version === 1 && exp.data.exam && exp.data.questions.length === BANKS.examDefs[src].length,
+      'got ' + exp.status);
+    ok('التصدير يحوي المفاتيح (إدارة فقط) ولا يحوي بيانات خادم داخلية',
+      exp.data.questions.every(q => /^[ABCD]$/.test(q.correctAnswer)) && !('passHash' in exp.data));
+    const canonical = JSON.stringify(exp.data);
+    const prev = await jfetch('/api/admin/exams', { headers: AH });
+    // معاينة: كل الأسئلة «موجودة مسبقًا» → لا إنشاء مكرر
+    const pv = await jfetch('/api/admin/import/preview', { method: 'POST', headers: AH, body: JSON.stringify({ text: canonical }) });
+    ok('معاينة الرحلة الكاملة: لا أسئلة جديدة (كلها موجودة في البنك)',
+      pv.status === 200 && pv.data.report.ok === true && pv.data.report.stats.newCount === 0 && pv.data.report.stats.existsInBank === BANKS.examDefs[src].length,
+      JSON.stringify(pv.data.report && pv.data.report.stats));
+    ok('المعاينة لا تحفظ شيئًا', (await jfetch('/api/admin/exams', { headers: AH })).data.counts.all === prev.data.counts.all);
+    const cm = await jfetch('/api/admin/import/commit', { method: 'POST', headers: AH, body: JSON.stringify({ text: canonical, confirm: true }) });
+    ok('الاستيراد المؤكَّد ينشئ امتحانًا مخصّصًا دون تكرار أي سؤال',
+      cm.status === 200 && cm.data.createdQuestions === 0 && cm.data.total === BANKS.examDefs[src].length, JSON.stringify(cm.data));
+    // الامتحان المستورد يطابق الأصل ترتيبًا ونصًا ومفتاحًا
+    const got = await jfetch('/api/admin/exams/' + cm.data.examId, { headers: AH });
+    const same = got.status === 200 &&
+      got.data.questionIds.join('|') === BANKS.examDefs[src].join('|') &&
+      got.data.questions.every((q, i) => q.text === BANKS.questions[BANKS.examDefs[src][i]].text && q.answer === BANKS.questions[BANKS.examDefs[src][i]].answer && q.options.join('|') === BANKS.questions[BANKS.examDefs[src][i]].options.join('|'));
+    ok('الامتحان المستورد مطابق للأصل (الترتيب/النص/الخيارات/المفتاح)', same);
+    ok('بنك الأسئلة لم يُعدَّل بالاستيراد (لا duplicate مقصود)', (await jfetch('/api/admin/questions', { headers: AH })).data.counts.all === Object.keys(BANKS.questions).length);
+    // رفض حمولة ضخمة/تالفة
+    const huge = await jfetch('/api/admin/import/preview', { method: 'POST', headers: AH, body: JSON.stringify({ text: 'x'.repeat(7 * 1024 * 1024) }) });
+    ok('حمولة استيراد أكبر من ٦ ميجابايت → 413', huge.status === 413, 'got ' + huge.status);
+    await jfetch('/api/admin/exams/' + cm.data.examId, { method: 'DELETE', headers: AH });
+  }
+
   /* ============ 21. PLATFORM SETTINGS + TEACHER YOUTUBE/BIO ============ */
   console.log('\n[21] إعدادات المنصة + حقول المعلم الجديدة');
   {
