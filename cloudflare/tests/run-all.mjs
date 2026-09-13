@@ -1309,6 +1309,126 @@ try {
     await jfetch('/api/admin/teachers/' + mkT.data.teacher.id, { method: 'DELETE', headers: { 'X-Requested-With': 'fetch', Cookie: cookie } });
   }
 
+  /* ============ 23. تدقيق 2026-09-13: انحدارات مُصلَحة ============ */
+  console.log('\n[23] انحدارات التدقيق المستقل (تحديث جزئي، تخزين الاستجابات الخاصة، ترويسات، إصدار الاستيراد)');
+  {
+    const AH2 = { 'X-Requested-With': 'fetch', Cookie: cookie };
+    /* --- 23a: PUT جزئي على المعلم. العقد الموثَّق في sanitizeTeacher هو
+     * «الحقل الغائب يحافظ على قيمته المخزّنة»، لكن الاسم كان مطلوبًا دائمًا —
+     * فأي تحديث جزئي (تعطيل/تفعيل، تغيير حد الطلاب) كان يسقط بـ400
+     * «اسم المعلم مطلوب» رغم أن الاسم لم يتغيّر. --- */
+    const mk = await post('/api/admin/teachers', {
+      name: 'أ. جزئي الاختبار', slug: 'partialreg', email: 'partial@reg.test', username: 'partialreg',
+      password: 'Partial#Pass2026', phone: '01188887777', bio: 'نبذة أصلية', specialty: 'تخصص أصلي',
+      socialLinks: { whatsapp: 'https://wa.me/201188887777' }
+    }, { Cookie: cookie });
+    ok('إنشاء معلم لاختبار التحديث الجزئي', mk.status === 200, mk.status + ' ' + JSON.stringify(mk.data));
+    const pid = mk.data.teacher.id;
+    const created = mk.data.teacher;
+
+    const onlyEnabled = await jfetch('/api/admin/teachers/' + pid, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...AH2 },
+      body: JSON.stringify({ enabled: false })
+    });
+    ok('PUT يرسل enabled فقط → 200 (لا «اسم المعلم مطلوب»)', onlyEnabled.status === 200, onlyEnabled.status + ' ' + onlyEnabled.text);
+    // guard: إن فشل الطلب لا تُسقِط المجموعة كلها — تُبلَّغ بقية الفحوص كفشل
+    const T1 = (onlyEnabled.data && onlyEnabled.data.teacher) || {};
+    ok('  التعطيل طُبّق فعلًا', T1.enabled === false, JSON.stringify(T1.enabled));
+    ok('  الاسم الغائب بقي كما هو', T1.name === created.name, JSON.stringify(T1.name));
+    ok('  النبذة/التخصص/الواتساب لم تُمسح', T1.bio === 'نبذة أصلية'
+      && T1.specialty === 'تخصص أصلي'
+      && (T1.socialLinks || {}).whatsapp === 'https://wa.me/201188887777',
+      JSON.stringify(T1.socialLinks));
+    ok('  كلمة المرور والمعرف وتاريخ الإنشاء محفوظة', T1.hasPassword === true
+      && T1.id === pid && T1.createdAt === created.createdAt);
+
+    const disabledSession = await post('/api/t/login', { email: 'partial@reg.test', password: 'Partial#Pass2026' });
+    ok('المعلم المعطّل لا يستطيع الدخول', disabledSession.status === 401, disabledSession.status);
+
+    const onlyLimit = await jfetch('/api/admin/teachers/' + pid, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...AH2 },
+      body: JSON.stringify({ enabled: true, studentLimitUnlimited: false, studentLimit: 10 })
+    });
+    ok('PUT يرسل حد الطلاب فقط → 200', onlyLimit.status === 200, onlyLimit.status + ' ' + onlyLimit.text);
+    const T2 = (onlyLimit.data && onlyLimit.data.teacher) || {};
+    ok('  الحد طُبّق والاسم بقي', T2.studentLimit === 10
+      && T2.studentLimitUnlimited === false && T2.name === created.name,
+      JSON.stringify({ l: T2.studentLimit, n: T2.name }));
+    ok('  إعادة التفعيل نجحت', T2.enabled === true, JSON.stringify(T2.enabled));
+
+    const onlyAttempts = await jfetch('/api/admin/teachers/' + pid, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...AH2 },
+      body: JSON.stringify({ maxAttempts: 7 })
+    });
+    const T3 = (onlyAttempts.data && onlyAttempts.data.teacher) || {};
+    ok('PUT يرسل maxAttempts فقط → 200 ولا يصفّر الحد', onlyAttempts.status === 200
+      && T3.maxAttempts === 7 && T3.studentLimit === 10,
+      onlyAttempts.status + ' ' + JSON.stringify(T3.maxAttempts));
+
+    const emptyName = await jfetch('/api/admin/teachers/' + pid, {
+      method: 'PUT', headers: { 'Content-Type': 'application/json', ...AH2 },
+      body: JSON.stringify({ name: '' })
+    });
+    ok('اسم صريح فارغ ما زال مرفوضًا (400)', emptyName.status === 400, emptyName.status);
+    const noNameCreate = await post('/api/admin/teachers', { slug: 'nonamereg' }, { Cookie: cookie });
+    ok('الإنشاء بلا اسم ما زال مرفوضًا (400)', noNameCreate.status === 400, noNameCreate.status);
+
+    /* --- 23b: الاستجابات الخاصة لا تُخزَّن. نتائج CSV تحمل أسماء الطلاب
+     * وأرقام هواتفهم؛ كانت تُبنى كـResponse يدويًا فتفلت من no-store الذي
+     * يضبطه json() تلقائيًا لبقية نقاط /api/admin/*. --- */
+    const csvRes = await jfetch('/api/admin/results.csv', { headers: AH2 });
+    ok('CSV النتائج → 200', csvRes.status === 200, csvRes.status);
+    ok('CSV النتائج: Cache-Control: no-store (بيانات طلاب خاصة)', /no-store/.test(csvRes.headers.get('cache-control') || ''), csvRes.headers.get('cache-control'));
+    ok('CSV النتائج: Pragma: no-cache', /no-cache/.test(csvRes.headers.get('pragma') || ''), csvRes.headers.get('pragma'));
+    ok('CSV النتائج: ما زال مرفقًا بترميز UTF-8', /attachment/.test(csvRes.headers.get('content-disposition') || '') && /charset=utf-8/.test(csvRes.headers.get('content-type') || ''));
+    const csvUnauth = await jfetch('/api/admin/results.csv');
+    ok('CSV النتائج بلا جلسة → 401', csvUnauth.status === 401, csvUnauth.status);
+
+    /* --- 23c: ترويسات الأمان على كل استجابة، بما فيها OPTIONS وHSTS.
+     * OPTIONS كانت تُعاد مباشرةً فتصل بلا CSP/nosniff/X-Frame-Options. --- */
+    for (const path of ['/', '/admin', '/teacher', '/api/catalog', '/api/admin/overview', '/slug-غير-موجود-xyz']) {
+      const r = await jfetch(path);
+      ok('HSTS على ' + path, /max-age=31536000/.test(r.headers.get('strict-transport-security') || ''), r.headers.get('strict-transport-security'));
+    }
+    const optRes = await fetch(BASE + '/api/admin/overview', { method: 'OPTIONS' });
+    ok('OPTIONS → 204', optRes.status === 204, optRes.status);
+    ok('OPTIONS يحمل CSP (لم يعد يتجاوز securityHeaders)', !!optRes.headers.get('content-security-policy'), String(optRes.headers.get('content-security-policy')));
+    ok('OPTIONS يحمل nosniff + X-Frame-Options + HSTS', optRes.headers.get('x-content-type-options') === 'nosniff'
+      && optRes.headers.get('x-frame-options') === 'DENY' && !!optRes.headers.get('strict-transport-security'));
+    ok('OPTIONS لا يضيف ترويسات CORS (same-origin فقط)', !optRes.headers.get('access-control-allow-origin'), String(optRes.headers.get('access-control-allow-origin')));
+
+    /* --- 23d: بوابة إصدار صيغة الاستيراد. `version` ليس حقلًا مجهولًا —
+     * قبول رقم مجهول يعني استيراد صيغة قد تختلف دلالاتها بلا تحذير. --- */
+    const impQ = [{ text: 'سؤال اختبار إصدار الصيغة', options: { A: 'أ', B: 'ب', C: 'ج', D: 'د' }, correctAnswer: 'A' }];
+    const impOk = await post('/api/admin/import/preview', { text: JSON.stringify({ version: 1, exam: { title: 'امتحان الإصدار', subject: 'فلسفة' }, questions: impQ }) }, { Cookie: cookie });
+    ok('استيراد version:1 مقبول', impOk.status === 200 && impOk.data.report && impOk.data.report.ok === true, JSON.stringify(impOk.data.report && impOk.data.report.errors));
+    const impAbsent = await post('/api/admin/import/preview', { text: JSON.stringify({ exam: { title: 'امتحان الإصدار', subject: 'فلسفة' }, questions: impQ }) }, { Cookie: cookie });
+    ok('استيراد بلا version → يُعامل كـ1 (مقبول)', impAbsent.status === 200 && impAbsent.data.report && impAbsent.data.report.ok === true, JSON.stringify(impAbsent.data.report && impAbsent.data.report.errors));
+    for (const badVersion of [99, 2, '2', 0]) {
+      const r = await post('/api/admin/import/preview', { text: JSON.stringify({ version: badVersion, exam: { title: 'امتحان الإصدار', subject: 'فلسفة' }, questions: impQ }) }, { Cookie: cookie });
+      const rep = (r.data && r.data.report) || {};
+      ok('معاينة ترفض version=' + JSON.stringify(badVersion), r.status === 200 && rep.ok === false
+        && (rep.errors || []).some(e => e.where === 'version'), JSON.stringify(rep.errors));
+    }
+    const badCommit = await post('/api/admin/import/commit', { text: JSON.stringify({ version: 99, exam: { title: 'امتحان الإصدار', subject: 'فلسفة' }, questions: impQ }), confirm: true }, { Cookie: cookie });
+    ok('الالتزام يرفض إصدارًا غير مدعوم (لا يحفظ شيئًا)', badCommit.status === 400, badCommit.status + ' ' + badCommit.text);
+    /* التحقق من «لم يحفظ شيئًا» يجب أن يكون على قائمة الامتحانات نفسها —
+     * نظرة عامة لا تحتوي عناوين الامتحانات فكان الفحص يمرّ حتى مع وجود الخلل. */
+    const examsAfterBad = await jfetch('/api/admin/exams', { headers: { Cookie: cookie } });
+    const leaked = (examsAfterBad.data.exams || []).filter(e => e.title === 'امتحان الإصدار');
+    ok('الالتزام المرفوض لم ينشئ امتحانًا في القائمة', leaked.length === 0, 'وُجد: ' + leaked.map(e => e.id).join(','));
+    for (const e of leaked) await jfetch('/api/admin/exams/' + e.id, { method: 'DELETE', headers: AH2 });
+    /* الملف المصدَّر الحقيقي يبقى قابلًا لإعادة الاستيراد (round-trip سليم) */
+    const rtExams = await jfetch('/api/admin/exams', { headers: { Cookie: cookie } });
+    const rtId = rtExams.data.exams[0].id;
+    const rtExport = await jfetch('/api/admin/exams/' + rtId + '/export', { headers: { Cookie: cookie } });
+    const rtPreview = await post('/api/admin/import/preview', { text: rtExport.text }, { Cookie: cookie });
+    const rtRep = (rtPreview.data && rtPreview.data.report) || {};
+    ok('الملف المصدَّر (version:1) ما زال يمرّ من المعاينة', rtPreview.status === 200 && rtRep.ok === true, JSON.stringify(rtRep.errors));
+
+    await jfetch('/api/admin/teachers/' + pid, { method: 'DELETE', headers: AH2 });
+  }
+
   /* ============ 20. LOGIN THROTTLE (MUST BE LAST — locks out this dev instance) ============ */
   console.log('\n[20] قفل المحاولات المتكررة (الأخير)');
   {

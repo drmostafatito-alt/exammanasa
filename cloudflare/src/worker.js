@@ -90,6 +90,12 @@ function securityHeaders(res) {
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   h.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  /* HSTS: المنصة تُخدَم خلف Cloudflare (HTTPS دائمًا) والكوكيز معلَّمة Secure —
+   * فأي طلب عبر HTTP غير المشفّر تسريب محتمل لكوكي الجلسة. الترويسة تُجبر
+   * المتصفح على HTTPS مباشرةً. بلا preload ولا includeSubDomains حتى لا تمتد
+   * السياسة إلى نطاقات فرعية أخرى. المتصفحات تتجاهلها على http://localhost
+   * فلا تكسر التطوير المحلي. */
+  h.set('Strict-Transport-Security', 'max-age=31536000');
   return new Response(res.body, { status: res.status, headers: h });
 }
 
@@ -729,6 +735,10 @@ function validateImport(parsed, view) {
   const errors = [], warnings = [], rows = [];
   const textIndex = buildTextIndex(view);
   const seenInFile = new Map();
+  /* رقم إصدار الصيغة: الحقول المجهولة تُتجاهل بهدوء، لكن `version` ليس حقلًا مجهولًا —
+   * إنه إعلان الصيغة نفسها. قبول رقم مجهول (v2/v99) يعني استيراد ملف قد تكون دلالاته
+   * مختلفة دون أي تحذير، فالأصوب أن يُرفض بوضوح. الغائب/null يبقى 1 (parseImportPayload). */
+  if (parsed.version !== 1) errors.push({ where: 'version', message: 'إصدار الصيغة غير مدعوم: «' + String(parsed.version).slice(0, 20) + '» — المدعوم هو version: 1 (docs/exam-import-format.md).' });
   if (!parsed.title) errors.push({ where: 'exam.title', message: 'اسم الامتحان مطلوب (exam.title).' });
   if (!parsed.subjectId) errors.push({ where: 'exam.subject', message: 'المادة مطلوبة: «الفلسفة والمنطق» أو «علم النفس» (exam.subject).' });
   if (!parsed.rawQuestions.length) errors.push({ where: 'questions', message: 'لا توجد أسئلة في الملف (questions).' });
@@ -1886,7 +1896,17 @@ async function handleAdmin(request, env, ctx, pathname) {
       r.score + '/' + r.total, r.percentage, r.teacherSlug
     ].map(esc).join(',')));
     return new Response('\uFEFF' + rows.join('\r\n'), {
-      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="results.csv"' }
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="results.csv"',
+        /* الملف يحمل أسماء الطلاب وأرقام هواتفهم (بيانات شخصية) — استجابة خاصة
+         * بجلسة المسؤول. بدون no-store يجوز للمتصفح والوكلاء تخزينها، وهذا هو
+         * نفسه ما يمنعه مبدأ «لا تخزين للاستجابات الخاصة». بقية نقاط /api/admin/*
+         * تمرّ عبر json() الذي يضبط no-store تلقائيًا؛ هذا المسار يبني Response
+         * يدويًا فكان الوحيد الذي يفلت من القاعدة. */
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache'
+      }
     });
   }
 
@@ -1896,7 +1916,11 @@ async function handleAdmin(request, env, ctx, pathname) {
 async function sanitizeTeacher(body, existing, env) {
   // اسم/نبذة/تخصص المعلم تظهر في صفحته العامة — تُهرَّب عند العرض، وتُنظَّف هنا
   // من محارف التحكم حتى لا تُستخدم لتسميم CSV أو السجلات.
-  const name = stripControl(body.name, 80);
+  /* نفس قاعدة بقية الحقول: غياب `name` في طلب PUT = إبقاء الاسم المخزَّن.
+   * كان الاسم هو الحقل الوحيد المطلوب دائمًا، فأي تحديث جزئي (تعطيل/تفعيل،
+   * تغيير حد الطلاب، تغيير عدد المحاولات) كان يُرفض بـ«اسم المعلم مطلوب» —
+   * رغم أن العقد الموثَّق أدناه ينص على أن الحقل الغائب يحافظ على قيمته المخزّنة. */
+  const name = stripControl(body.name !== undefined ? body.name : (existing?.name ?? ''), 80);
   if (!name || name.length > 80) throw bad('اسم المعلم مطلوب (80 حرفًا كحد أقصى).');
   let slug = String(body.slug || existing?.slug || '').trim().toLowerCase()
     .replace(/[\s_]+/g, '-').replace(/[^a-z0-9-]/g, '').replace(/-{2,}/g, '-').replace(/^-|-$/g, '');
@@ -2403,7 +2427,12 @@ export default {
       const url = new URL(request.url);
       const pathname = decodeURIComponent(url.pathname);
 
-      if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+      /* OPTIONS: إجابة فارغة، لكنها تمرّ عبر securityHeaders() مثل أي استجابة أخرى.
+       * كانت تُعاد مباشرةً فتصل بلا CSP/nosniff/X-Frame-Options — أي ثغرة صغيرة في
+       * «كل طلب يمر على securityHeaders» التي يقوم عليها run_worker_first.
+       * لا نضيف ترويسات CORS: المنصة same-origin فقط، وغيابها يعني رفض الطلب
+       * عبر المواقع (وهو المطلوب). */
+      if (request.method === 'OPTIONS') return securityHeaders(new Response(null, { status: 204 }));
 
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         try {
