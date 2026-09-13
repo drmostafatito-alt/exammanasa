@@ -55,7 +55,13 @@
     opts.headers = Object.assign({ 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' }, opts.headers || {});
     return fetch(path, opts).then(function (r) {
       return r.json().catch(function () { return {}; }).then(function (data) {
-        if (r.status === 401 && path !== '/api/admin/login') { A.session = null; renderLogin(); throw new Error(data.error || 'انتهت الجلسة.'); }
+        /* 401 = جلسة منتهية، 403 = مرفوض (CSRF/صلاحية) — الحالتان تعنيان أن الجلسة
+         * الحالية لم تعد صالحة للاستخدام، فتُعرض شاشة الدخول برسالة واضحة. */
+        if ((r.status === 401 || r.status === 403) && path !== '/api/admin/login' && path !== '/api/admin/setup') {
+          A.session = null;
+          renderLogin({ error: r.status === 403 ? (data.error || 'تم رفض الطلب — سجّل الدخول من جديد.') : (data.error || 'انتهت الجلسة.') });
+          throw new Error(data.error || 'انتهت الجلسة.');
+        }
         if (!r.ok) throw new Error(data.error || ('خطأ ' + r.status));
         return data;
       });
@@ -70,7 +76,10 @@
   }
 
   /* ================= تسجيل الدخول / الإعداد الأولي ================= */
-  function renderLogin(setupMode) {
+  /* opts: { setup: true } لشاشة الإعداد الأولي، { error: '…' } لرسالة خطأ ظاهرة. */
+  function renderLogin(opts) {
+    var setupMode = !!(opts && opts.setup);
+    var initErr = (opts && opts.error) ? String(opts.error) : '';
     var app = $('app');
     app.innerHTML =
       '<div class="tlogin"><div class="tlogin-brand">' +
@@ -83,10 +92,11 @@
       '<div class="field"><label for="admEmail">البريد الإلكتروني</label><input type="email" id="admEmail" autocomplete="username"></div>' +
       '<div class="field"><label for="admPass">كلمة المرور</label><input type="password" id="admPass" autocomplete="current-password"></div>' +
       (setupMode ? '<div class="field"><label for="admPass2">تأكيد كلمة المرور</label><input type="password" id="admPass2"></div>' : '') +
-      '<div id="loginErr" class="t-err"></div>' +
+      '<div id="loginErr" class="t-err">' + esc(initErr) + '</div>' +
       '<button class="btn" type="submit">' + (setupMode ? 'إنشاء الحساب' : 'دخول') + '</button>' +
       '</form></div></div></div>';
     setTimeout(function () { var el = $('admEmail'); if (el) el.focus(); }, 50);
+    return undefined;
   }
   function doLogin(isSetup) {
     var email = $('admEmail').value.trim();
@@ -96,7 +106,7 @@
     if (isSetup && pass !== $('admPass2').value) { err.textContent = 'كلمتا المرور غير متطابقتين.'; return; }
     api(isSetup ? '/api/admin/setup' : '/api/admin/login', { method: 'POST', body: JSON.stringify({ email: email, password: pass }) })
       .then(function () {
-        if (isSetup) { toast('تم إنشاء الحساب — سجّل الدخول الآن.'); renderLogin(false); }
+        if (isSetup) { toast('تم إنشاء الحساب — سجّل الدخول الآن.'); renderLogin(); }
         else enter();
       })
       .catch(function (e) { err.textContent = e.message; });
@@ -1470,13 +1480,13 @@
    * /api/admin/login خاضع لحد المحاولات فكان يخفي شاشة الإعداد عن المالك). */
   function boot() {
     return api('/api/admin/status').then(function (d) {
-      if (d && d.setup === true) return renderLogin(true);
-      return api('/api/admin/session').then(enter).catch(function () { renderLogin(false); });
+      if (d && d.setup === true) return renderLogin({ setup: true });
+      return api('/api/admin/session').then(enter).catch(function () { renderLogin(); });
     }).catch(function () {
       // احتياط للتوافق مع نشر قديم لا يعرف /api/admin/status
       api('/api/admin/login', { method: 'POST', body: JSON.stringify({ email: '', password: '' }) })
-        .then(function () { renderLogin(false); })
-        .catch(function (e) { renderLogin(String(e.message).indexOf('لم يُنشأ') !== -1); });
+        .then(function () { renderLogin(); })
+        .catch(function (e) { renderLogin({ setup: String(e.message).indexOf('لم يُنشأ') !== -1 }); });
     });
   }
   boot();
