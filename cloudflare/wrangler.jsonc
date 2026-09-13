@@ -1,8 +1,11 @@
 {
   // Cloudflare Workers configuration — FREE plan
   // Deploy guide: see cloudflare/README.md (النشر على Cloudflare مجانًا)
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "exammanasa-platform",
+  //
+  // اسم الـWorker الإنتاجي الفعلي على حساب Cloudflare (mansa-eg) هو «exams»:
+  // https://exams.mansa-eg.workers.dev — أي اسم آخر هنا كان سينشر Worker مختلفًا
+  // بلا الإعدادات/الـbindings الإنتاجية، وهذا كان سبب انحراف النشر اليدوي السابق.
+  "name": "exams",
   "main": "src/worker.js",
   "compatibility_date": "2025-06-01",
   "assets": {
@@ -19,9 +22,11 @@
   "kv_namespaces": [
     {
       "binding": "PLATFORM_KV",
-      // ⚠️ استبدل هذا بمعرف مساحة KV الحقيقية بعد إنشائها:
-      //   npx wrangler kv namespace create PLATFORM_KV
-      "id": "00000000000000000000000000000000"
+      // معرّف مساحة KV الإنتاجية الفعلي على حساب mansa-eg
+      // (Account 6b40845f434a3a8b346da67d4f21507e). نفس المعرّف مؤكَّد من
+      // Dashboard ومن الكتابة اليدوية. تغييره ⇒ binding يشير لمساحة أخرى.
+      // للاختبار المحلي يستخدم wrangler تلقائيًا نسخة محلية (لا يلمس هذه المساحة).
+      "id": "b2335d799e2a4caabff6d9d4530f425c"
     }
   ],
   // عدّادات حدود المحاولات — Durable Object (ضمن الخطة المجانية):
@@ -30,11 +35,15 @@
     "bindings": [{ "name": "ATTEMPT_LIMITER", "class_name": "AttemptLimiter" }]
   },
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["AttemptLimiter"] }],
-  // Optional secrets (see README):
-  //   npx wrangler secret put SESSION_SECRET
+  // أسرار الـWorker الإنتاجية (لا تُكتب هنا إطلاقًا — تُدار عبر wrangler/Dashboard):
+  //   npx wrangler secret put SESSION_SECRET        (اختياري — وإلا يُولّد ويُحفظ في KV)
   //   npx wrangler secret put GAS_WEBAPP_URL
   //   npx wrangler secret put GAS_RESULTS_SECRET
-  //   npx wrangler secret put ADMIN_INITIAL_EMAIL
-  //   npx wrangler secret put ADMIN_INITIAL_PASSWORD
-  "observability": { "enabled": false }
+  //   npx wrangler secret put ADMIN_INITIAL_EMAIL   ← يُنشأ حساب المسؤول تلقائيًا
+  //   npx wrangler secret put ADMIN_INITIAL_PASSWORD    عند أول طلب على /api/admin/*
+  //
+  // سجلات الـWorker مطلوبة لتشخيص أعطال KV (مثل حصة الكتابة اليومية) —
+  // لا تكشف أي شيء للعميل (الاستجابات تبقى رسائل عربية عامة)، وتُعرض عبر
+  // Dashboard › Workers › exams › Logs أو `npx wrangler tail exams`.
+  "observability": { "enabled": true }
 }

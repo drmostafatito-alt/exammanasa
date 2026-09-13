@@ -21,6 +21,10 @@
  *  17. عزل بيانات المعلمين (Teacher A ∌ بيانات Teacher B)
  *  18. مسارات /teacher الثابتة (تسجيل دخول فقط — بلا إنشاء حساب)
  *  19. نسبة النتائج للمعلم خادومياً + سدّ تجاوز الحد عبر slug وهمي/فارغ
+ *  24. متانة KV داخل العزلة: فشل الكتابة (429/حصة يومية) → إعادة محاولة، رسائل 503 آمنة
+ *      بلا تسريب stack، bootstrap متين، عزل مفقود، استمرار واجهات الطلاب
+ *  25. الإقلاع التلقائي لحساب المسؤول من أسرار ADMIN_INITIAL_* على خادم wrangler معزول
+ *      (حالة KV فارغة) + دورة حياة الجلسة/كلمة المرور + عدم انحدار المعلم/الطالب
  *  20. قفل المحاولات المتكررة لتسجيل الدخول (المعلم والمسؤول) — يجب أن يبقى في النهاية
  *
  * Usage: npm test   (from cloudflare/)
@@ -1446,6 +1450,332 @@ try {
     ok('الملف المصدَّر (version:1) ما زال يمرّ من المعاينة', rtPreview.status === 200 && rtRep.ok === true, JSON.stringify(rtRep.errors));
 
     await jfetch('/api/admin/teachers/' + pid, { method: 'DELETE', headers: AH2 });
+  }
+
+  /* ============ 24. KV resilience (in-process, faulty KV mocks) ============ */
+  console.log('\n[24] متانة KV: فشل الكتابة (429/العطل)، إعادة المحاولة، رسائل آمنة، bootstrap متين');
+  {
+    /* نحمّل worker.js كوحدة data-URL داخل نفس الـrealm الخاص بـNode (مع حقن BANKS)
+     * حتى نُمرّر env وهمية بـ KV معطّب حسب الطلب — يعيد إنتاج سيناريو الإنتاج
+     * «القراءة تعمل والكتابة تفشل» دون لمس خادم أو شبكة. */
+    async function loadWorkerModule() {
+      let src = fs.readFileSync(path.join(ROOT, 'cloudflare/src/worker.js'), 'utf8');
+      src = src.replace(/^import BANKS[^\n]*$/m, 'const BANKS = globalThis.__BANKS;');
+      src = src.replace(/^export class AttemptLimiter/m, 'class AttemptLimiter');
+      src = src.replace(/^export default \{/m, 'const __worker = {');
+      src = '// nonce:' + Math.random() + '\n' + src + '\nexport default __worker;\n';
+      const url = 'data:text/javascript;base64,' + Buffer.from(src, 'utf8').toString('base64');
+      globalThis.__BANKS = BANKS;
+      return (await import(url)).default;
+    }
+    /* KV وهمي: يقلّد سلوك KV الحقيقي — تخزين ذاكرة، مع حقن أعطال:
+     *   failFirstPuts: أول N كتابة تفشل بـ429 (لاختبار إعادة المحاولة)
+     *   putError: كتابات دائمة الفشل (محاكاة استنزاف حصة الألف كتابة يوميًا)
+     *   getError: فشل قراءة دائم
+     *   sameKeyWindow: نافذة «كتابة واحدة/ثانية/مفتاح» الحقيقية */
+    class FaultyKv {
+      constructor(opts = {}) {
+        this.opts = opts;
+        this.store = new Map(opts.seedEntries || []);
+        this.putCalls = 0; this.getCalls = 0; this.keysWritten = [];
+        this.lastByKey = new Map();
+      }
+      async get(key) {
+        this.getCalls++;
+        if (this.opts.getError) throw new Error(typeof this.opts.getError === 'function' ? this.opts.getError(key) : this.opts.getError);
+        return this.store.has(key) ? this.store.get(key) : null;
+      }
+      async put(key, value) {
+        this.putCalls++;
+        const now = Date.now();
+        if (this.opts.sameKeyWindow && now - (this.lastByKey.get(key) || 0) < this.opts.sameKeyWindow) {
+          throw new Error('KV PUT failed: 429 Too Many Requests');
+        }
+        this.lastByKey.set(key, now);
+        if (this.putCalls <= (this.opts.failFirstPuts || 0)) throw new Error('KV PUT failed: 429 Too Many Requests');
+        if (this.opts.putError) throw new Error(typeof this.opts.putError === 'function' ? this.opts.putError(key) : this.opts.putError);
+        this.keysWritten.push(key);
+        this.store.set(key, String(value));
+      }
+      async delete(key) { this.store.delete(key); }
+      async list() { return { keys: [...this.store.keys()].map(name => ({ name })) }; }
+    }
+    function makeCaller(worker) {
+      return async function call(method, p, { body, headers = {}, cookie, envKv, envExtra = {} } = {}) {
+        const h = Object.assign({}, headers);
+        if (cookie) h.Cookie = cookie;
+        if (body) h['Content-Type'] = 'application/json';
+        const request = new Request('https://example.com' + p, {
+          method, headers: h, body: body ? JSON.stringify(body) : undefined
+        });
+        const pending = [];
+        const env = Object.assign({
+          PLATFORM_KV: envKv,
+          ATTEMPT_LIMITER: undefined,
+          ASSETS: undefined
+        }, envExtra);
+        const ctx = { waitUntil: (p2) => pending.push(Promise.resolve(p2).catch(() => {})) };
+        const res = await worker.fetch(request, env, ctx);
+        const text = await res.text();
+        let data = null; try { data = JSON.parse(text); } catch {}
+        await Promise.allSettled(pending);
+        return { status: res.status, text, data, headers: res.headers };
+      };
+    }
+    /* لا تسريب internals: رسائل KV/المسارات/الأنواع/الـstack لا تصل للمستخدم أبدًا */
+    const leaksInternals = (t) => /KV PUT|KV GET|workerd|\.js:\d|ApiError|TypeError|ReferenceError|at\s+\w+|stack/i.test(t);
+    const XRW = { 'X-Requested-With': 'fetch' };
+
+    /* ---- 24-a: إقلاع تلقائي من الأسرار مع فشل أول كتابتين ثم نجاح (retry/backoff) ---- */
+    {
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const kv = new FaultyKv({ failFirstPuts: 2 });
+      const envExtra = { ADMIN_INITIAL_EMAIL: 'owner@example.com', ADMIN_INITIAL_PASSWORD: 'BootSecretPass2026' };
+      const st = await call('GET', '/api/admin/status', { envKv: kv, envExtra });
+      ok('24-a الحالة الأولى بعد الأسرار: setup=false رغم فشل أول كتابتين (إعادة المحاولة أنقذت الإقلاع)',
+        st.status === 200 && st.data.setup === false && st.data.envBootstrap === true, st.text.slice(0, 200));
+      ok('24-a سجل admin كُتب بالفعل وبريد السر داخله',
+        /owner@example\.com/.test(kv.store.get('admin') || '') && kv.keysWritten.filter(k => k === 'admin').length === 1,
+        'keys=' + kv.keysWritten.join('|'));
+      const login = await call('POST', '/api/admin/login', { envKv: kv, envExtra, headers: XRW, body: { email: 'owner@example.com', password: 'BootSecretPass2026' } });
+      ok('24-a دخول المالك بعد الإقلاع التلقائي 200', login.status === 200 && login.data.ok === true, login.text.slice(0, 200));
+      const sc = login.headers.get('set-cookie') || '';
+      ok('24-a كوكي الإدارة HttpOnly + Secure + SameSite=Strict', /HttpOnly/.test(sc) && /Secure/.test(sc) && /SameSite=Strict/.test(sc), sc);
+      const cookie = sc.split(';')[0];
+      const sess = await call('GET', '/api/admin/session', { envKv: kv, envExtra, cookie });
+      ok('24-a نقطة الجلسة المحمية تعمل', sess.status === 200 && sess.data.email === 'owner@example.com', sess.text.slice(0, 200));
+      const sessv = JSON.parse(kv.store.get('sessv:admin') || '[]');
+      ok('24-a session_secret وسجل نسخ الجلسة (sessv:admin) كُتبت في KV',
+        kv.store.has('session_secret') && Array.isArray(sessv) && sessv.length === 1 && /^[0-9a-f]+$/.test(sessv[0]),
+        'session_secret=' + kv.store.has('session_secret') + ' sessv=' + (kv.store.get('sessv:admin') || 'MISSING'));
+    }
+
+    /* ---- 24-b: استنزاف حصة الكتابة (كل الكتابات تفشل 429) — رسائل 503 آمنة بلا تسريب ---- */
+    {
+      // نبني سجل admin سليمًا أولًا على KV سليم (يماثل الزرع اليدوي في الإنتاج)
+      const seeder = await loadWorkerModule();
+      const seedCall = makeCaller(seeder);
+      const healthy = new FaultyKv();
+      const seed = await seedCall('POST', '/api/admin/setup', {
+        envKv: healthy, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' }
+      });
+      ok('24-b إعداد تمهيدي على KV سليم', seed.status === 200, seed.text.slice(0, 200));
+      const seedEntries = [...healthy.store.entries()];
+
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const deadWrites = new FaultyKv({ seedEntries, putError: 'KV PUT failed: 429 Too Many Requests' });
+      const st = await call('GET', '/api/admin/status', { envKv: deadWrites });
+      ok('24-b الحالة تعمل (القراءة سليمة): setup=false', st.status === 200 && st.data.setup === false, st.text.slice(0, 200));
+      const login = await call('POST', '/api/admin/login', {
+        envKv: deadWrites, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' }
+      });
+      ok('24-b دخول صحيح أثناء فشل الكتابة → 503 آمن (لا 500 غامض)', login.status === 503 && login.data && /التخزين/.test(login.data.error),
+        login.status + ' ' + login.text.slice(0, 200));
+      ok('24-b رسالة الخطأ آمنة: بلا KV/stack/أنواع أخطاء', !leaksInternals(login.text), login.text.slice(0, 300));
+      ok('24-b لم يُصدر كوكي جلسة غير مسجّلة', !(login.headers.get('set-cookie') || '').includes('admin_session='), login.headers.get('set-cookie') || '');
+
+      const worker3 = await loadWorkerModule();
+      const call3 = makeCaller(worker3);
+      const emptyDead = new FaultyKv({ putError: 'KV PUT failed: 429 Too Many Requests' });
+      const setupFail = await call3('POST', '/api/admin/setup', {
+        envKv: emptyDead, headers: XRW, body: { email: 'x@y.test', password: 'longenough1' }
+      });
+      ok('24-b شاشة الإعداد أثناء فشل الكتابة → 503 آمن بلا internals', setupFail.status === 503 && !leaksInternals(setupFail.text), setupFail.text.slice(0, 200));
+
+      // واجهات الطلاب العامة تستمر عبر القيم الافتراضية (لا تتأثر بفشل KV)
+      const cat = await call3('GET', '/api/catalog', { envKv: emptyDead });
+      ok('24-b كتالوج الطلاب يعمل رغم فشل التخزين (هبوط رشيق للافتراضي)', cat.status === 200 && cat.data.owner.slug === 'mostafa', cat.text.slice(0, 120));
+      const settings = await call3('GET', '/api/settings', { envKv: emptyDead });
+      ok('24-b إعدادات المنصة العامة تعمل رغم فشل التخزين', settings.status === 200 && !!settings.data.identity, settings.text.slice(0, 120));
+    }
+
+    /* ---- 24-c: الـbinding مفقود تمامًا (env.PLATFORM_KV = null) ---- */
+    {
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const st = await call('GET', '/api/admin/status', { envKv: null });
+      ok('24-c الحالة 200 حتى بدون KV (هبوط رشيق)', st.status === 200 && st.data.setup === true, st.text.slice(0, 150));
+      const login = await call('POST', '/api/admin/login', { envKv: null, headers: XRW, body: { email: 'a@b.test', password: 'longenough1' } });
+      ok('24-c الدخول بدون KV → 503 برسالة تهيئة آمنة', login.status === 503 && /تهيئة الخادم/.test(login.data.error) && !leaksInternals(login.text), login.text.slice(0, 200));
+      const setup = await call('POST', '/api/admin/setup', { envKv: null, headers: XRW, body: { email: 'a@b.test', password: 'longenough1' } });
+      ok('24-c الإعداد بدون KV → 503 آمن', setup.status === 503 && !leaksInternals(setup.text), setup.text.slice(0, 200));
+      const cat = await call('GET', '/api/catalog', { envKv: null });
+      ok('24-c كتالوج الطلاب يعمل بدون KV (البنك مضمّن + المعلم الافتراضي)', cat.status === 200 && !!cat.data.exams, cat.text.slice(0, 120));
+    }
+
+    /* ---- 24-d: سباق الإقلاع بين طلبات متزامنة — كتابة واحدة فقط + كل الطلبات setup=false ---- */
+    {
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const kv = new FaultyKv({ sameKeyWindow: 1000 });
+      const envExtra = { ADMIN_INITIAL_EMAIL: 'owner@example.com', ADMIN_INITIAL_PASSWORD: 'BootSecretPass2026' };
+      const results = await Promise.all(Array.from({ length: 6 }, () => call('GET', '/api/admin/status', { envKv: kv, envExtra })));
+      ok('24-d كل الطلبات المتزامنة ترى الحساب مُنشأً (setup=false)',
+        results.every(r => r.status === 200 && r.data.setup === false), results.map(r => r.status).join(','));
+      ok('24-d كتابة واحدة فقط لمفتاح admin (إلغاء ازدواج داخل العزلة + عدم تجاوز قيد كتابة/ثانية)',
+        kv.keysWritten.filter(k => k === 'admin').length === 1, kv.keysWritten.join('|'));
+      // إقلاع idempotent: طلبات تالية لا تكتب admin إطلاقًا
+      const again = await call('GET', '/api/admin/status', { envKv: kv, envExtra });
+      ok('24-d الطلبات التالية لا تعيد إنشاء الحساب', again.data.setup === false && kv.keysWritten.filter(k => k === 'admin').length === 1);
+    }
+
+    /* ---- 24-e: فشل القراءة → 503 آمن في المصادقة، و200 متسامح في الحالة ---- */
+    {
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const kv = new FaultyKv({ getError: 'KV GET failed: 500 Internal Server Error' });
+      const st = await call('GET', '/api/admin/status', { envKv: kv });
+      ok('24-e الحالة تبقى 200 مع فشل قراءة KV (لا تنهار)', st.status === 200 && typeof st.data.setup === 'boolean', st.text.slice(0, 150));
+      const login = await call('POST', '/api/admin/login', { envKv: kv, headers: XRW, body: { email: 'a@b.test', password: 'longenough1' } });
+      ok('24-e الدخول مع فشل القراءة → 503 آمن بلا internals', login.status === 503 && !leaksInternals(login.text), login.status + ' ' + login.text.slice(0, 200));
+    }
+
+    /* ---- 24-f: دورة حياة كاملة على KV سليم وهمي (دخول → نقطة محمية → خروج → إبطال) ---- */
+    {
+      const worker = await loadWorkerModule();
+      const call = makeCaller(worker);
+      const kv = new FaultyKv();
+      await call('POST', '/api/admin/setup', { envKv: kv, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' } });
+      const login = await call('POST', '/api/admin/login', { envKv: kv, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' } });
+      ok('24-f دخول 200 على المحاكاة السليمة', login.status === 200, login.text.slice(0, 120));
+      const cookie = (login.headers.get('set-cookie') || '').split(';')[0];
+      const ov = await call('GET', '/api/admin/overview', { envKv: kv, cookie });
+      ok('24-f نقطة إدارية محمية بالكوكي تعمل', ov.status === 200 && ov.data.exams === 127, ov.text.slice(0, 120));
+      const logout = await call('POST', '/api/admin/logout', { envKv: kv, headers: XRW, cookie });
+      ok('24-f الخروج 200', logout.status === 200, logout.text.slice(0, 120));
+      const after = await call('GET', '/api/admin/session', { envKv: kv, cookie });
+      ok('24-f الجلسة أُبطلت على الخادم بعد الخروج (401)', after.status === 401, after.text.slice(0, 120));
+      // تغيير كلمة المرور يُسقط النسخ القديمة
+      const login2 = await call('POST', '/api/admin/login', { envKv: kv, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' } });
+      const c2 = (login2.headers.get('set-cookie') || '').split(';')[0];
+      const ch = await call('POST', '/api/admin/password', { envKv: kv, headers: XRW, cookie: c2, body: { current: 'TestAdminPass-2026', next: 'NewPass-2027' } });
+      ok('24-f تغيير كلمة المرور 200 ويعيد إصدار كوكي', ch.status === 200 && /admin_session=/.test(ch.headers.get('set-cookie') || ''), ch.text.slice(0, 120));
+      const old = await call('POST', '/api/admin/login', { envKv: kv, headers: XRW, body: { email: 'admin@test.local', password: 'TestAdminPass-2026' } });
+      const fresh = await call('POST', '/api/admin/login', { envKv: kv, headers: XRW, body: { email: 'admin@test.local', password: 'NewPass-2027' } });
+      ok('24-f كلمة المرور القديمة مرفوضة والجديدة تعمل', old.status === 401 && fresh.status === 200, old.status + '/' + fresh.status);
+    }
+  }
+
+  /* ============ 25. Secret-based admin bootstrap on a REAL isolated wrangler server ============ */
+  console.log('\n[25] الإقلاع التلقائي لحساب المسؤول من أسرار ADMIN_INITIAL_* (خادم wrangler حقيقي، KV فارغة)');
+  {
+    const PORT2 = 8800 + Math.floor(Math.random() * 100);
+    const BASE2 = `http://127.0.0.1:${PORT2}`;
+    const STATE2 = fs.mkdtempSync('/tmp/wrangler-secrets-');
+    const proc2 = spawn('npx', [
+      'wrangler', 'dev', '--port', String(PORT2), '--persist-to', STATE2,
+      '--var', 'ADMIN_INITIAL_EMAIL:owner@example.com',
+      '--var', 'ADMIN_INITIAL_PASSWORD:BootSecretPass-2026'
+    ], {
+      cwd: path.join(ROOT, 'cloudflare'),
+      env: { ...process.env, WRANGLER_SEND_METRICS: 'false', CLOUDFLARE_API_TOKEN: '' },
+      stdio: ['ignore', 'pipe', 'pipe'], detached: true
+    });
+    let logs2 = '';
+    proc2.stdout.on('data', d => { logs2 += d; });
+    proc2.stderr.on('data', d => { logs2 += d; });
+    const jf2 = async (p, opts) => {
+      const r = await fetch(BASE2 + p, { redirect: 'manual', ...(opts || {}) });
+      const text = await r.text();
+      let data = null; try { data = JSON.parse(text); } catch {}
+      return { status: r.status, data, text, headers: r.headers };
+    };
+    const post2 = (p, body, headers = {}) => jf2(p, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch', ...headers },
+      body: JSON.stringify(body)
+    });
+    try {
+      // الانتظار حتى يعمل الخادم (لا نلمس أي مسار admin قبل الاختبار حتى تبقى لحظة الإقلاع الأولى فعلية)
+      const t0 = Date.now();
+      let ready = false;
+      while (Date.now() - t0 < 90000) {
+        try { const r = await fetch(BASE2 + '/api/catalog', { signal: AbortSignal.timeout(2000) }); if (r.ok) { ready = true; break; } } catch {}
+        if (proc2.exitCode !== null) throw new Error('secrets wrangler exited:\n' + logs2.slice(-1500));
+        await new Promise(r => setTimeout(r, 700));
+      }
+      if (!ready) throw new Error('secrets server did not start:\n' + logs2.slice(-1500));
+
+      // A) أول طلب admin على KV فارغة تمامًا — يجب أن يُنشئ الحساب ضمن الطلب نفسه
+      const st0 = await jf2('/api/admin/status');
+      ok('25-A أول طلب status على KV فارغة → setup=false (إقلاع فوري من الأسرار)',
+        st0.status === 200 && st0.data.setup === false && st0.data.envBootstrap === true && st0.data.authed === false,
+        JSON.stringify(st0.data));
+      ok('25-A الحالة لا تسرّب البريد قبل المصادقة', !('email' in st0.data) && !/pass|salt|hash/i.test(st0.text));
+      const dup = await post2('/api/admin/setup', { email: 'intruder@x.test', password: 'AnotherPass1' });
+      ok('25-A شاشة الإعداد مغلقة نهائيًا بعد الإقلاع (409)', dup.status === 409, dup.text.slice(0, 150));
+      // هجمة متزامنة على الحالة — لا إعادة إنشاء/فشل
+      const hammer = await Promise.all(Array.from({ length: 8 }, () => jf2('/api/admin/status')));
+      ok('25-A ضرب متزامن لـstatus أثناء/بعد الإقلاع: كلها setup=false', hammer.every(r => r.data.setup === false));
+
+      // B) الدخول بكلمة سر السر + الكوكي
+      const wrong = await post2('/api/admin/login', { email: 'owner@example.com', password: 'wrong-pass-123' });
+      ok('25-B كلمة مرور خاطئة مرفوضة 401', wrong.status === 401, wrong.text.slice(0, 120));
+      const login = await post2('/api/admin/login', { email: 'owner@example.com', password: 'BootSecretPass-2026' });
+      ok('25-B الدخول بالسر الابتدائي ناجح', login.status === 200 && login.data.email === 'owner@example.com', login.text.slice(0, 150));
+      const sc = login.headers.get('set-cookie') || '';
+      ok('25-B الكوكي HttpOnly + Secure + SameSite=Strict', /HttpOnly/.test(sc) && /Secure/.test(sc) && /SameSite=Strict/.test(sc), sc);
+      const cookie = sc.split(';')[0];
+      const sess = await jf2('/api/admin/session', { headers: { Cookie: cookie } });
+      ok('25-B الجلسة المحمية تعمل بالبريد الصحيح', sess.status === 200 && sess.data.email === 'owner@example.com', sess.text.slice(0, 120));
+      const stAuth = await jf2('/api/admin/status', { headers: { Cookie: cookie } });
+      ok('25-B status بالكوكي → authed=true + البريد', stAuth.data.authed === true && stAuth.data.email === 'owner@example.com');
+      const overview = await jf2('/api/admin/overview', { headers: { Cookie: cookie } });
+      ok('25-B نقطة إدارية محمية (overview) تعمل', overview.status === 200 && overview.data.exams === 127, overview.text.slice(0, 120));
+
+      // C) خروج ثم رفض
+      const logout = await post2('/api/admin/logout', {}, { Cookie: cookie });
+      ok('25-C الخروج 200', logout.status === 200, logout.text.slice(0, 120));
+      const dead = await jf2('/api/admin/session', { headers: { Cookie: cookie } });
+      ok('25-C الجلسة القديمة ميتة بعد الخروج (401)', dead.status === 401, dead.text.slice(0, 120));
+
+      // D) تغيير كلمة المرور: إبطال الجلسات + القديمة تتوقف
+      const login2 = await post2('/api/admin/login', { email: 'owner@example.com', password: 'BootSecretPass-2026' });
+      const cookie2 = (login2.headers.get('set-cookie') || '').split(';')[0];
+      const ch = await post2('/api/admin/password', { current: 'BootSecretPass-2026', next: 'BootSecretPass-2027' }, { Cookie: cookie2 });
+      ok('25-D تغيير كلمة المرور 200', ch.status === 200, ch.text.slice(0, 120));
+      const stale = await jf2('/api/admin/session', { headers: { Cookie: cookie2 } });
+      ok('25-D كوكي ما قبل التغيير أُبطل فورًا (401)', stale.status === 401, stale.text.slice(0, 120));
+      const oldPw = await post2('/api/admin/login', { email: 'owner@example.com', password: 'BootSecretPass-2026' });
+      const newPw = await post2('/api/admin/login', { email: 'owner@example.com', password: 'BootSecretPass-2027' });
+      ok('25-D القديمة 401 والجديدة 200', oldPw.status === 401 && newPw.status === 200, oldPw.status + '/' + newPw.status);
+      const cookie3 = (newPw.headers.get('set-cookie') || '').split(';')[0];
+
+      // E) لا انحدار على حسابات المعلمين مع إقلاع الأسرار
+      const mk = await post2('/api/admin/teachers', {
+        name: 'معلم الأسرار', slug: 'sec-teacher', email: 'teacher@sec.test', username: 'secteacher',
+        password: 'teacherPass123', requirePhone: true
+      }, { Cookie: cookie3 });
+      ok('25-E إنشاء معلم من لوحة الأسرار', mk.status === 200, mk.text.slice(0, 150));
+      const tlogin = await post2('/api/t/login', { email: 'teacher@sec.test', password: 'teacherPass123' });
+      ok('25-E دخول المعلم 200', tlogin.status === 200 && tlogin.data.ok === true, tlogin.text.slice(0, 120));
+      const tc = 'teacher_session=' + (tlogin.headers.get('set-cookie') || '').match(/teacher_session=([^;]+)/)[1];
+      const tsess = await jf2('/api/t/session', { headers: { Cookie: tc } });
+      ok('25-E جلسة المعلم تعمل', tsess.status === 200 && tsess.data.slug === 'sec-teacher', tsess.text.slice(0, 120));
+
+      // F) بدء امتحان طالب + تصحيح كامل على نفس الخادم (DO + KV + session_secret)
+      const start = await post2('/api/exam/start', { examId: 'U1-T1', name: 'طالب الأسرار', phone: '01033334444' });
+      ok('25-F بدء امتحان طالب 200 مع 20 سؤالًا بلا تسريب مفاتيح',
+        start.status === 200 && start.data.questions.length === 20 && !/"answer"|correctAnswer/.test(JSON.stringify(start.data.questions)), start.text.slice(0, 150));
+      const seed = decodeToken(start.data.token).seed;
+      const submit = await post2('/api/exam/submit', { token: start.data.token, answers: correctPositions('U1-T1', seed) });
+      ok('25-F التصحيح الخادومي 20/20 (100%) على خادم إقلاع الأسرار',
+        submit.status === 200 && submit.data.score === 20 && submit.data.percentage === 100, submit.text.slice(0, 150));
+      // إجابة خاطئة لا تكشف المفتاح: حمولة البدء لا تتضمن أبدًا نص الإجابة الصحيحة كحقل
+      ok('25-F لا مفاتيح في أي واجهة عامة (كتالوج/إعدادات/بدء)',
+        !/correctAnswer|"answer"\s*:/.test((await jf2('/api/catalog')).text + start.text));
+
+      // G) البنك والمحتوى لم يتغيرا (127 امتحانًا، المالك الافتراضي)
+      const cat = await jf2('/api/catalog');
+      ok('25-G فهرس الامتحانات 127 ومعلم الجذر mostafa',
+        Object.keys(cat.data.exams).length === 127 && cat.data.owner.slug === 'mostafa',
+        Object.keys(cat.data.exams).length);
+    } finally {
+      try { process.kill(-proc2.pid, 'SIGTERM'); } catch { try { proc2.kill('SIGTERM'); } catch {} }
+      try { fs.rmSync(STATE2, { recursive: true, force: true }); } catch {}
+    }
   }
 
   /* ============ 20. LOGIN THROTTLE (MUST BE LAST — locks out this dev instance) ============ */

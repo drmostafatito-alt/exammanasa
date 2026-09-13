@@ -48,6 +48,43 @@ const fail = (message, status = 400) => json({ error: message }, status);
 class ApiError extends Error { constructor(message, status = 400) { super(message); this.status = status; } }
 const bad = (message, status = 400) => new ApiError(message, status);
 
+const sleep = (ms) => new Promise(r => setTimeout(r, ms));
+/* تسجيل العيوب الداخلية في سجل الـWorker فقط (يلزم تفعيل observability في
+ * wrangler.jsonc). لا يُعاد هذا السجل للمستخدم إطلاقًا — رسائل KV قد تكشف
+ * اسم المفتاح/نوع العطل، فمكانها السجل وليس الاستجابة. نقتطع الرسالة أيضًا حتى
+ * لا تتسرب بيانات حرة طويلة عبر السجلات. */
+function serverLog(scope, err) {
+  try {
+    const e = err || {};
+    const name = e && e.name ? e.name : 'Error';
+    const msg = String((e && e.message) || e || '').slice(0, 300);
+    console.error('[exammanasa:' + scope + '] ' + name + ': ' + msg);
+  } catch { /* logging must never break the request */ }
+}
+/* حدود الكتابة على KV في الخطة المجانية: ١٠٠٠ كتابة/يوم لكل حساب + كتابة واحدة
+ * في الثانية لكل مفتاح. كلا التجاوزين يُرجع الخطأ
+ * "KV PUT failed: 429 Too Many Requests"، وأعطال الحافة العابرة تظهر كـ5xx أو
+ * انقطاع شبكة — كلها أخطاء عابرة تستحق إعادة المحاونة بتراجع أسي. الأخطاء
+ * الدائمة (مفتاح/قيمة غير صالحة، الحجم أكبر من ٢٥MiB) لا تُعاد محاولتها. */
+function isTransientKvError(err) {
+  const m = String((err && err.message) || err || '');
+  return /KV (?:PUT|GET|DELETE|LIST) failed: (?:429|5\d\d)|Too Many Requests|Network connection lost|connection (?:closed|lost)|operation timed out|timeout/i.test(m);
+}
+async function withKvRetry(op, scope, delays) {
+  let lastErr;
+  for (let attempt = 0; attempt <= delays.length; attempt++) {
+    try { return await op(); }
+    catch (e) {
+      lastErr = e;
+      if (!isTransientKvError(e) || attempt === delays.length) break;
+      // جَيْتر صغير يمنع تزامن إعادة المحاولة عبر العُزلات، وفواصل زمنية تتجاوز
+      // نافذة «كتابة واحدة/ثانية/مفتاح» قبل المحاولة الأخيرة.
+      await sleep(delays[attempt] + Math.floor(Math.random() * 150));
+    }
+  }
+  throw lastErr;
+}
+
 /* ---- phone normalization (Egyptian mobiles; server-side identity) ----
  * Accepts Arabic-Indic/Persian digits, spaces/dashes, +20/0020 prefixes.
  * Canonical form: 01XXXXXXXXX (11 digits). Used for attempt-limit identity
@@ -393,18 +430,41 @@ function publicSettings(s) {
 
 async function kvGet(env, key) {
   if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
-  const v = await env.PLATFORM_KV.get(key);
-  return v === null ? null : v;
+  try {
+    const v = await withKvRetry(() => env.PLATFORM_KV.get(key), 'kv-get', [200, 500]);
+    return v === null ? null : v;
+  } catch (e) {
+    // خطأ عابر لم تُسعفه إعادة المحاولة (مثل تجاوز حصة القراءة أو عطل الحافة):
+    // نُسجّل السبب الحقيقي خادوميًا ونُرجع خطأً آمنًا (503) بدل 500 غامض.
+    if (e instanceof ApiError) throw e;
+    serverLog('kv-get:' + key, e);
+    throw bad('تعذّر الوصول إلى التخزين مؤقتًا. حاول مرة أخرى.', 503);
+  }
 }
 async function kvGetJson(env, key) {
-  const v = await kvGet(env, key).catch(() => null);
+  // عطل التخزين يظهر كـApiError 503: المسارات المتسامحة (الواجهات العامة)
+  // تلتقطه بـ.catch وتسقط للقيم الافتراضية، أما مسارات المصادقة فتُمرره للمستخدم
+  // كرسالة 503 آمنة. القيمة المفقودة (null) والقيمة التالفة (JSON غير صالح) = null.
+  const v = await kvGet(env, key);
   if (v == null) return null;
   try { return JSON.parse(v); } catch { return null; }
 }
 async function kvPut(env, key, value, ttlSeconds) {
   if (!env.PLATFORM_KV) throw bad('تهيئة الخادم غير مكتملة (KV).', 503);
   const opts = ttlSeconds ? { expirationTtl: Math.max(60, ttlSeconds) } : undefined;
-  await env.PLATFORM_KV.put(key, value, opts);
+  try {
+    // إعادة المحاونة تعالج «كتابة واحدة/ثانية/مفتاح» (429) وأعطال الحافة العابرة.
+    await withKvRetry(() => env.PLATFORM_KV.put(key, value, opts), 'kv-put', [250, 600, 1200]);
+  } catch (e) {
+    if (e instanceof ApiError) throw e;
+    serverLog('kv-put:' + key, e);
+    if (/429|Too Many Requests/i.test(String(e && e.message))) {
+      // استُنزفت حصة الكتابة اليومية (١٠٠٠ كتابة/يوم على الخطة المجانية) —
+      // رسالة مميزة تُرشد المالك، بلا أي تفاصيل داخلية.
+      throw bad('خدمة التخزين مشغولة مؤقتًا بسبب كثرة عمليات الحفظ. أعد المحاولة بعد دقيقة.', 503);
+    }
+    throw bad('تعذّر حفظ البيانات مؤقتًا. حاول مرة أخرى.', 503);
+  }
 }
 
 async function getTeachers(env) {
@@ -455,14 +515,43 @@ async function saveTeachers(env, teachers, photoUpdates) {
 async function saveArchived(env, archived) {
   await kvPut(env, 'teachers:archived', JSON.stringify(leanTeachers(archived).slice(0, 200)));
 }
+/* سر توقيع الجلسات يُخزَّن مرة واحدة في KV. كنا نعيد محاولة قراءته وكتابته على
+ * كل طلب طالما تأخر انتشار الكتابة (حتى ٦٠ ثانية عبر العُزلات) — حِزمة طلبات
+ * متزامنة كانت تطلق عشرات الكتابات المتتالية لنفس المفتاح فتلامس حد «كتابة/ثانية
+ * للمفتاح» وتستنزف حصة الألف كتابة يوميًا بلا داع. التخزين المؤقت بعمر الـisolate
+ * يحسم ذلك: كتابة واحدة لكل عزلة على الأكثر. */
+let _sessionSecretCache = null;        // سر دائم (من KV أو أُعلن للتو بنجاح)
+let _sessionSecretEphemeralUntil = 0;  // مهلة استخدام سر مؤقت بعد فشل الكتابة
 async function getSessionSecret(env) {
   if (env.SESSION_SECRET) return env.SESSION_SECRET;
-  let s = await kvGet(env, 'session_secret').catch(() => null);
-  if (!s) {
-    s = randomHex(32);
-    try { await kvPut(env, 'session_secret', s); } catch { /* KV missing — caller handles */ }
+  if (_sessionSecretCache) return _sessionSecretCache; // سر دائم، أو سر مؤقت داخل نافذة الـ30 ثانية
+  // بعد انقضاء نافذة السر المؤقت يُصفَّر التخزين المؤقت (المؤقت أدناه) فنعيد
+  // القراءة من KV: تتقارب العُزلات تلقائيًا عند عودة التخزين دون استنزاف الحصة.
+  const existing = await kvGet(env, 'session_secret').catch(() => null);
+  if (existing) { _sessionSecretCache = existing; _sessionSecretEphemeralUntil = 0; return existing; }
+  const generated = randomHex(32);
+  try {
+    // kvPut يعيد المحاولة داخليًا عند 429/العطل العابر.
+    await kvPut(env, 'session_secret', generated);
+    _sessionSecretCache = generated; // كتابة ناجحة → السر هو المرجع الدائم للعزلة
+    _sessionSecretEphemeralUntil = 0;
+  } catch (e) {
+    // التخزين متعذر حاليًا: سر مؤقت لمدة قصيرة يبقي المنصة تعمل (جلسات العزلة
+    // سليمة)، ثم نحاول الالتقاط السر الدائم من KV — بحد أقصى محاولتي كتابة/دقيقة
+    // لكل عزلة حتى لا نستنزف حصة الكتابة.
+    serverLog('session-secret-write', e);
+    _sessionSecretCache = generated;
+    _sessionSecretEphemeralUntil = Date.now() + 30000;
+    const clearAt = _sessionSecretEphemeralUntil + 1000;
+    setTimeout(() => {
+      // لا نمسح سرًا دائمًا رُبط لاحقًا (قراءة ناجحة أو كتابة ناجحة).
+      if (_sessionSecretEphemeralUntil && clearAt >= _sessionSecretEphemeralUntil) {
+        _sessionSecretCache = null;
+        _sessionSecretEphemeralUntil = 0;
+      }
+    }, 31000);
   }
-  return s;
+  return _sessionSecretCache;
 }
 
 /* ============================ content overlay — Admin CMS ============================
@@ -1115,7 +1204,11 @@ async function handleApi(request, env, ctx, pathname) {
             if (tslug) await kvAppendResult(env, 'results:teacher:' + tslug, entry, 200, false).catch(() => {});
           }
         }
-      } catch { /* storage failure must not lose the student's result response */ }
+      } catch (e) {
+        /* storage failure must not lose the student's result response — but log it
+         * server-side so a quota outage or binding problem is diagnosable in wrangler tail. */
+        serverLog('result-persist', e);
+      }
 
       if (env.GAS_WEBAPP_URL && env.GAS_RESULTS_SECRET) {
         try {
@@ -1182,17 +1275,69 @@ async function getAdminRecord(env) {
  * ADMIN_INITIAL_EMAIL/ADMIN_INITIAL_PASSWORD are set as Worker secrets, the admin
  * account is created automatically on the first admin-API request — the public
  * setup screen is then permanently closed (409) and was never usable to race the
- * owner. Without the secrets, the one-time setup screen remains the bootstrap path. */
+ * owner. Without the secrets, the one-time setup screen remains the bootstrap path.
+ *
+ * Robustness properties:
+ *  - Idempotent: any valid existing record (or a record another isolate/the setup
+ *    screen just created) is kept forever — never overwritten.
+ *  - Race-safe within an isolate: concurrent admin requests share ONE in-flight
+ *    provisioning attempt; across isolates kvPut() retries same-key 429 with
+ *    backoff and every round re-reads first (KV propagation can lag ~60s).
+ *  - Not a silent dead-end: storage failures are logged server-side and retried
+ *    on the next request after a short cooldown (so a day-quota overrun heals
+ *    itself after reset instead of showing the setup screen forever).
+ */
+let _bootstrapResult = null;       // 'exists' | 'created' | 'invalid-secrets' — cached for the isolate's life
+let _bootstrapInFlight = null;     // de-duplicates concurrent requests in this isolate
+let _bootstrapCooldownUntil = 0;   // after failed storage writes, pause retries briefly
+function validAdminRecord(rec) {
+  return !!rec && typeof rec === 'object' && typeof rec.email === 'string'
+    && typeof rec.salt === 'string' && typeof rec.hash === 'string';
+}
 async function ensureAdminBootstrap(env) {
-  if (!env.ADMIN_INITIAL_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return;
-  const existing = await kvGetJson(env, 'admin').catch(() => null);
-  if (existing) return;
-  const email = String(env.ADMIN_INITIAL_EMAIL).trim().toLowerCase();
-  const password = String(env.ADMIN_INITIAL_PASSWORD);
-  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || password.length < 8) return; // invalid secret → fall back to setup screen
-  const salt = randomHex(16);
-  const hash = await pbkdf2(password, salt);
-  await kvPut(env, 'admin', JSON.stringify({ email, salt, hash, iterations: 120000, createdAt: new Date().toISOString(), via: 'env-secret' }));
+  if (!env.ADMIN_INITIAL_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return 'no-secrets';
+  if (_bootstrapResult) return _bootstrapResult;
+  if (Date.now() < _bootstrapCooldownUntil) return 'cooldown';
+  if (_bootstrapInFlight) return _bootstrapInFlight;
+  _bootstrapInFlight = (async () => {
+    const email = String(env.ADMIN_INITIAL_EMAIL).trim().toLowerCase();
+    const password = String(env.ADMIN_INITIAL_PASSWORD);
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email) || password.length < 8) {
+      // أسرار غير صالحة → شاشة الإعداد الأولي تبقى هي المسار، ولا فائدة من إعادة المحاولة.
+      _bootstrapResult = 'invalid-secrets';
+      return _bootstrapResult;
+    }
+    let lastErr = null;
+    for (let round = 0; round < 2; round++) {
+      if (round === 1) await sleep(1000); // أتح لكتابة العزلة الأخرى أن تنتشر قبل إعادة القراءة
+      let existing = null;
+      try { existing = await kvGetJson(env, 'admin'); }
+      catch (e) { lastErr = e; serverLog('admin-bootstrap-read', e); }
+      if (validAdminRecord(existing)) { _bootstrapResult = 'exists'; return _bootstrapResult; }
+      const salt = randomHex(16);
+      const hash = await pbkdf2(password, salt);
+      const record = JSON.stringify({
+        email, salt, hash, iterations: 120000,
+        createdAt: new Date().toISOString(), via: 'env-secret'
+      });
+      try {
+        // kvPut يعيد المحاولة عند 429 (كتابة/ثانية لمفتاح) وأعطال الحافة العابرة.
+        await kvPut(env, 'admin', record);
+        _bootstrapResult = 'created';
+        return _bootstrapResult;
+      } catch (e) {
+        lastErr = e;
+        serverLog('admin-bootstrap-write', e);
+      }
+    }
+    // فشلت الكتابة بعد كل المحاولات (غالبًا حصة الألف كتابة/يوم مستنزفة): هدّئ
+    // الطلبات المتلاحقة ٣٠ ثانية، ثم أعد المحاولة تلقائيًا — لا فشل صامت دائم.
+    _bootstrapCooldownUntil = Date.now() + 30000;
+    if (lastErr) serverLog('admin-bootstrap-deferred', lastErr);
+    return 'failed';
+  })();
+  try { return await _bootstrapInFlight; }
+  finally { _bootstrapInFlight = null; }
 }
 
 async function adminCookiePayload(request, env) {
@@ -1257,7 +1402,15 @@ async function handleAdmin(request, env, ctx, pathname) {
     const secret = await getSessionSecret(env).catch(() => null);
     if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
     const v = randomHex(8);
-    await addV(env, 'sessv:admin', v); // server-side revocation registry for admin sessions
+    try {
+      await addV(env, 'sessv:admin', v); // server-side revocation registry for admin sessions
+    } catch (e) {
+      // فشل حفظ نسخة الجلسة: لا نُصدر كوكي لن يستطيع أي طلب التحقق منه —
+      // رسالة 503 آمنة بدل 500 غامض، والسبب الحقيقي في سجل الـWorker فقط.
+      serverLog('admin-login-session', e);
+      if (e instanceof ApiError) throw e;
+      throw bad('تعذّر بدء الجلسة مؤقتًا بسبب خدمة التخزين. حاول مرة أخرى.', 503);
+    }
     const token = await signToken({ t: 'admin', email, v, exp: Math.floor(Date.now() / 1000) + ADMIN_SESSION_TTL }, secret);
     const res = json({ ok: true, email });
     const headers = new Headers(res.headers);
@@ -2058,7 +2211,13 @@ async function handleTeacherLogin(request, env) {
   const secret = await getSessionSecret(env).catch(() => null);
   if (!secret) return fail('تهيئة الخادم غير مكتملة (KV).', 503);
   const v = randomHex(8);
-  await addV(env, 'sessv:t:' + t.id, v); // server-side revocation registry
+  try {
+    await addV(env, 'sessv:t:' + t.id, v); // server-side revocation registry
+  } catch (e) {
+    serverLog('teacher-login-session', e);
+    if (e instanceof ApiError) throw e;
+    throw bad('تعذّر بدء الجلسة مؤقتًا بسبب خدمة التخزين. حاول مرة أخرى.', 503);
+  }
   const token = await signToken({ t: 'teacher', tid: t.id, slug: t.slug, v, exp: Math.floor(Date.now() / 1000) + TEACHER_SESSION_TTL }, secret);
   const res = json({ ok: true, name: t.name, slug: t.slug, id: t.id });
   const headers = new Headers(res.headers);
@@ -2450,6 +2609,9 @@ export default {
         } catch (e) {
           // Only ApiError messages reach the client; anything else is an internal fault → generic text, no details.
           if (e instanceof ApiError) return securityHeaders(fail(e.message, e.status));
+          // السبب الحقيقي (مثل فشل كتابة KV) يُسجَّل خادوميًا فقط — لا stack ولا
+          // رسالة داخلية تصل للمستخدم.
+          serverLog('api ' + request.method + ' ' + pathname, e);
           return securityHeaders(fail('خطأ غير متوقع في الخادم. حاول مرة أخرى.', 500));
         }
       }
@@ -2512,6 +2674,8 @@ export default {
       }
       return securityHeaders(res);
     } catch (e) {
+      // عطل عام (توجيه/أصول): رسالة آمنة فقط، والتفاصيل في سجل الـWorker.
+      serverLog('fetch ' + request.method + ' ' + (request.url || ''), e);
       return securityHeaders(fail('خطأ في الخادم.', 500));
     }
   }
