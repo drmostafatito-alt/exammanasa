@@ -735,6 +735,10 @@ function validateImport(parsed, view) {
   const errors = [], warnings = [], rows = [];
   const textIndex = buildTextIndex(view);
   const seenInFile = new Map();
+  /* رقم إصدار الصيغة: الحقول المجهولة تُتجاهل بهدوء، لكن `version` ليس حقلًا مجهولًا —
+   * إنه إعلان الصيغة نفسها. قبول رقم مجهول (v2/v99) يعني استيراد ملف قد تكون دلالاته
+   * مختلفة دون أي تحذير، فالأصوب أن يُرفض بوضوح. الغائب/null يبقى 1 (parseImportPayload). */
+  if (parsed.version !== 1) errors.push({ where: 'version', message: 'إصدار الصيغة غير مدعوم: «' + String(parsed.version).slice(0, 20) + '» — المدعوم هو version: 1 (docs/exam-import-format.md).' });
   if (!parsed.title) errors.push({ where: 'exam.title', message: 'اسم الامتحان مطلوب (exam.title).' });
   if (!parsed.subjectId) errors.push({ where: 'exam.subject', message: 'المادة مطلوبة: «الفلسفة والمنطق» أو «علم النفس» (exam.subject).' });
   if (!parsed.rawQuestions.length) errors.push({ where: 'questions', message: 'لا توجد أسئلة في الملف (questions).' });
