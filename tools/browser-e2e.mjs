@@ -357,9 +357,18 @@ try {
   await shot(sp, '11-disabled-teacher-page');
   const loginDisabled = await tctx.newPage();
   await loginDisabled.goto(BASE + '/teacher');
+  await loginDisabled.waitForSelector('#loginBtn', { timeout: 8000 });
   await loginDisabled.fill('#tEmail', T_A.email); await loginDisabled.fill('#tPass', T_A.pass); await loginDisabled.click('#loginBtn');
-  await loginDisabled.waitForSelector('#loginErr:not(:empty)', { timeout: 8000 });
-  ok('معلم معطّل لا يستطيع الدخول', (await loginDisabled.locator('#loginErr').textContent()).includes('غير صحيحة'));
+  /* الفحص على النتيجة لا على نص الرسالة: المهم ألّا تُنشأ جلسة وأن تظهر رسالة خطأ،
+   * فنص الرسالة (401 بيانات غير صحيحة / 403 غير مفعّل / 429 محاولات كثيرة) قد يختلف
+   * بترتيب التشغيل، وكان ذلك يُنتج فشلًا متقطعًا لنفس السلوك الصحيح. */
+  await loginDisabled.waitForFunction(() => {
+    const e = document.getElementById('loginErr');
+    return !!e && e.textContent.trim().length > 0;
+  }, null, { timeout: 10000 });
+  const disabledErr = (await loginDisabled.locator('#loginErr').textContent()).trim();
+  const disabledSess = await loginDisabled.evaluate(() => fetch('/api/t/session', { headers: { 'X-Requested-With': 'fetch' } }).then(r => r.status));
+  ok('معلم معطّل لا يستطيع الدخول (لا جلسة + رسالة خطأ)', disabledSess === 401 && disabledErr.length > 0, disabledSess + ' / ' + disabledErr);
   await loginDisabled.close();
   // re-enable
   await ap.locator('.teacher-card', { hasText: 'أحمد QA ٢' }).first().locator('button:has-text("تعديل")').click();
