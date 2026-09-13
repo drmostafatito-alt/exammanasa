@@ -47,7 +47,7 @@ const ok = (name, cond, extra) => {
 
 /* ---------- tiny fetch helpers ---------- */
 async function jfetch(path, opts) {
-  const r = await fetch(BASE + path, opts);
+  const r = await fetch(BASE + path, { redirect: 'manual', ...(opts || {}) });
   const text = await r.text();
   let data = null; try { data = JSON.parse(text); } catch {}
   return { status: r.status, data, text, headers: r.headers };
@@ -155,6 +155,34 @@ try {
     ok('GET /styles.css → 200 CSS', css.status === 200 && css.text.includes('--primary'));
     const robots = await jfetch('/robots.txt');
     ok('robots.txt يمنع /admin و /api', robots.status === 200 && robots.text.includes('Disallow: /admin'));
+  }
+
+  /* ============ 1ب. ترويسات الأمان على كل استجابة (لا استثناءات) ============ */
+  console.log('\n[1ب] ترويسات الأمان على الصفحات والأصول الثابتة');
+  {
+    /* انحدار: خادم الأصول كان يخدم أي ملف موجود في ./public قبل الـWorker، فتُسلَّم
+     * كل صفحات HTML وملفات JS/CSS بلا أي ترويسة أمان. run_worker_first يضمن مرور
+     * كل طلب على securityHeaders(). */
+    const paths = ['/', '/admin', '/teacher', '/mostafa', '/app.js', '/styles.css', '/favicon.svg', '/robots.txt', '/art/wave.svg', '/nope-404'];
+    for (const p of paths) {
+      const r = await jfetch(p);
+      ok('ترويسات أمان كاملة على ' + p,
+        r.headers.get('x-content-type-options') === 'nosniff' &&
+        r.headers.get('x-frame-options') === 'DENY' &&
+        r.headers.get('referrer-policy') === 'strict-origin-when-cross-origin' &&
+        !!r.headers.get('content-security-policy') &&
+        /frame-ancestors 'none'/.test(r.headers.get('content-security-policy') || ''),
+        'got ' + JSON.stringify(Object.fromEntries(r.headers.entries())).slice(0, 200));
+    }
+    const idx = await jfetch('/index.html');
+    ok('/index.html → 308 دائم إلى /', idx.status === 308 && (idx.headers.get('location') || '') === '/', 'got ' + idx.status);
+    const adm = await jfetch('/admin.html');
+    ok('/admin.html → 308 دائم إلى /admin', adm.status === 308 && (adm.headers.get('location') || '') === '/admin', 'got ' + adm.status);
+    ok('واجهات المعلم/المسؤول بلا تخزين مؤقت (no-cache)',
+      (await jfetch('/admin')).headers.get('cache-control') === 'no-cache' &&
+      (await jfetch('/teacher')).headers.get('cache-control') === 'no-cache');
+    const head = await jfetch('/api/catalog', { method: 'HEAD' });
+    ok('HEAD على /api/* يكافئ GET (لا 404)', head.status === 200, 'got ' + head.status);
   }
 
   /* ============ 2. catalog ============ */

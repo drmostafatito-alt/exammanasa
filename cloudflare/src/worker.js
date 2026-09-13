@@ -66,12 +66,30 @@ function normalizePhone(raw) {
 function isValidEgMobile(d) { return /^01[0125][0-9]{8}$/.test(d); }
 function normalizeName(s) { return String(s || '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 
+/* سياسة محتوى مقيدة قدر الإمكان بدون كسر التطبيق (الواجهة تستخدم معالجات
+ * onclick داخلية وألوانًا تُضبط عبر CSSOM، لذا 'unsafe-inline' مطلوب فعليًا).
+ * القيمة الحقيقية هنا: frame-ancestors 'none' (يمنع التأطير/النقر المخفي)،
+ * object-src 'none'، base-uri 'self'، form-action 'self'. */
+const CONTENT_SECURITY_POLICY = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+  "font-src 'self' data: https://fonts.gstatic.com",
+  "img-src 'self' data: https:",
+  "connect-src 'self'",
+  "frame-ancestors 'none'",
+  "base-uri 'self'",
+  "form-action 'self'",
+  "object-src 'none'"
+].join('; ');
+
 function securityHeaders(res) {
   const h = new Headers(res.headers);
   h.set('X-Content-Type-Options', 'nosniff');
   h.set('X-Frame-Options', 'DENY');
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  h.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
   return new Response(res.body, { status: res.status, headers: h });
 }
 
@@ -735,7 +753,8 @@ function teacherPublic(t) {
 }
 
 async function handleApi(request, env, ctx, pathname) {
-  const method = request.method;
+  // HEAD must behave exactly like GET (same routing, empty body).
+  const method = request.method === 'HEAD' ? 'GET' : request.method;
 
   /* ---------- public: catalog ---------- */
   if (pathname === '/api/catalog' && method === 'GET') {
@@ -2128,7 +2147,13 @@ export default {
 
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         try {
-          return securityHeaders(await handleApi(request, env, ctx, pathname));
+          const res = await handleApi(request, env, ctx, pathname);
+          // HEAD must behave exactly like GET (status + headers) with no body —
+          // previously every HEAD on /api/* fell through to a 404.
+          const out = (request.method === 'HEAD')
+            ? new Response(null, { status: res.status, headers: res.headers })
+            : res;
+          return securityHeaders(out);
         } catch (e) {
           // Only ApiError messages reach the client; anything else is an internal fault → generic text, no details.
           if (e instanceof ApiError) return securityHeaders(fail(e.message, e.status));
@@ -2138,6 +2163,15 @@ export default {
 
       if (request.method !== 'GET' && request.method !== 'HEAD') {
         return securityHeaders(fail('الطريقة غير مسموح بها.', 405));
+      }
+
+      /* الملفات نفسها تُخدَم من مساراتها القياسية فقط (/ و /admin و /teacher):
+       * /index.html و /admin.html و /teacher.html تُحوَّل تحويلًا دائمًا حتى لا
+       * يُفهرس المحتوى نفسه تحت أكثر من رابط (كان خادم الأصول يحوّل /index.html
+       * → / تلقائيًا، ومع run_worker_first صار التحويل مسؤولية الـWorker). */
+      const canonicalHtml = { '/index.html': '/', '/admin.html': '/admin', '/teacher.html': '/teacher' };
+      if (canonicalHtml[pathname]) {
+        return securityHeaders(new Response(null, { status: 308, headers: { Location: canonicalHtml[pathname], 'Cache-Control': 'no-store' } }));
       }
 
       // teacher SPA: /teacher (login + dashboard) — shell must always revalidate (assets are ?v= versioned)

@@ -8,7 +8,13 @@
   "assets": {
     "directory": "./public",
     "binding": "ASSETS",
-    "not_found_handling": "none"
+    "not_found_handling": "none",
+    // ⚠️ مهم (أمان): بدون run_worker_first يخدم Cloudflare أي ملف موجود في
+    // ./public مباشرةً *دون المرور على الـWorker* — فتُسلَّم كل صفحات HTML
+    // وملفات JS/CSS بلا ترويسات الأمان (nosniff / X-Frame-Options …) وبلا
+    // سياسة التخزين المؤقت التي يضبطها الـWorker. بتشغيل الـWorker أولًا
+    // يمرّ كل طلب على securityHeaders() في src/worker.js.
+    "run_worker_first": true
   },
   "kv_namespaces": [
     {
