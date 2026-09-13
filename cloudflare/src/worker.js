@@ -90,6 +90,12 @@ function securityHeaders(res) {
   h.set('Referrer-Policy', 'strict-origin-when-cross-origin');
   h.set('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   h.set('Content-Security-Policy', CONTENT_SECURITY_POLICY);
+  /* HSTS: المنصة تُخدَم خلف Cloudflare (HTTPS دائمًا) والكوكيز معلَّمة Secure —
+   * فأي طلب عبر HTTP غير المشفّر تسريب محتمل لكوكي الجلسة. الترويسة تُجبر
+   * المتصفح على HTTPS مباشرةً. بلا preload ولا includeSubDomains حتى لا تمتد
+   * السياسة إلى نطاقات فرعية أخرى. المتصفحات تتجاهلها على http://localhost
+   * فلا تكسر التطوير المحلي. */
+  h.set('Strict-Transport-Security', 'max-age=31536000');
   return new Response(res.body, { status: res.status, headers: h });
 }
 
@@ -1886,7 +1892,17 @@ async function handleAdmin(request, env, ctx, pathname) {
       r.score + '/' + r.total, r.percentage, r.teacherSlug
     ].map(esc).join(',')));
     return new Response('\uFEFF' + rows.join('\r\n'), {
-      headers: { 'Content-Type': 'text/csv; charset=utf-8', 'Content-Disposition': 'attachment; filename="results.csv"' }
+      headers: {
+        'Content-Type': 'text/csv; charset=utf-8',
+        'Content-Disposition': 'attachment; filename="results.csv"',
+        /* الملف يحمل أسماء الطلاب وأرقام هواتفهم (بيانات شخصية) — استجابة خاصة
+         * بجلسة المسؤول. بدون no-store يجوز للمتصفح والوكلاء تخزينها، وهذا هو
+         * نفسه ما يمنعه مبدأ «لا تخزين للاستجابات الخاصة». بقية نقاط /api/admin/*
+         * تمرّ عبر json() الذي يضبط no-store تلقائيًا؛ هذا المسار يبني Response
+         * يدويًا فكان الوحيد الذي يفلت من القاعدة. */
+        'Cache-Control': 'no-store',
+        'Pragma': 'no-cache'
+      }
     });
   }
 
@@ -2407,7 +2423,12 @@ export default {
       const url = new URL(request.url);
       const pathname = decodeURIComponent(url.pathname);
 
-      if (request.method === 'OPTIONS') return new Response(null, { status: 204 });
+      /* OPTIONS: إجابة فارغة، لكنها تمرّ عبر securityHeaders() مثل أي استجابة أخرى.
+       * كانت تُعاد مباشرةً فتصل بلا CSP/nosniff/X-Frame-Options — أي ثغرة صغيرة في
+       * «كل طلب يمر على securityHeaders» التي يقوم عليها run_worker_first.
+       * لا نضيف ترويسات CORS: المنصة same-origin فقط، وغيابها يعني رفض الطلب
+       * عبر المواقع (وهو المطلوب). */
+      if (request.method === 'OPTIONS') return securityHeaders(new Response(null, { status: 204 }));
 
       if (pathname === '/api' || pathname.startsWith('/api/')) {
         try {
