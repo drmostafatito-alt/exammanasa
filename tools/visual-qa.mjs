@@ -40,14 +40,44 @@ console.log('\n[V1] Desktop 1280\u00d7900 \u2014 hierarchy & premium visuals');
   ok('Hero مفتوح بلا خلفية بطاقة (transparent)', hero && hero['background-image'] === 'none', hero && hero['background-image']);
   ok('Hero بلا حواف/ظل بطاقة (radius 0 + shadow none)', hero && (parseInt(hero['border-radius']) === 0 || hero['border-radius'] === '0px') && hero['box-shadow'] === 'none', JSON.stringify(hero));
 
-  const photo = await facts(p, '.hero .portrait .pt-img', ['border-radius', 'background-image']);
-  ok('إطار الصورة عضوي (radius > 20%) وليس دائرة كاملة', photo && parseInt(photo['border-radius']) > 20 && photo['border-radius'] !== '50%', JSON.stringify(photo));
-  ok('خلفية الصورة مولّدة فاتحة (لا أسود خلف الشفافية)', photo && photo['background-image'].includes('gradient'), photo && photo['background-image']);
+  const photo = await facts(p, '.hero .portrait .pt-img', ['border-radius', 'overflow', 'z-index', 'position']);
+  const fitMode = await p.evaluate(() => document.querySelector('.hero .portrait') && document.querySelector('.hero .portrait').getAttribute('data-fit'));
+  if (fitMode === 'contain') {
+    ok('قطع شفاف (contain): البورتريه أمامي غير مقصوص (overflow:visible + radius 0 + z-index>0)',
+      photo && photo['overflow'] === 'visible' && parseInt(photo['border-radius']) === 0 && parseInt(photo['z-index']) >= 2, JSON.stringify(photo));
+  } else {
+    ok('صورة معتمة/حروف أولى (cover): إطار عضوي ناعم بلا قصّ دائري (radius ≠ 50%)',
+      photo && photo['border-radius'] !== '50%' && parseInt(photo['border-radius']) >= 18, JSON.stringify(photo));
+  }
+  const disc = await facts(p, '.hero .portrait .pt-blob', ['z-index', 'border-radius', 'background-image']);
+  ok('الدائرة زخرفة خلفية فقط (z-index:0) — لا تغطي المعلم وليست حاوية للصورة',
+    disc && disc['z-index'] === '0' && !!disc['background-image'] && disc['background-image'] !== 'none', JSON.stringify(disc && { z: disc['z-index'], bg: disc['background-image'].slice(0, 24) }));
+  const layer = await p.evaluate(() => {
+    const pt = document.querySelector('.hero .portrait');
+    const img = pt.querySelector('.pt-img img');
+    const blob = pt.querySelector('.pt-blob');
+    if (!img || !blob) return null;
+    const a = img.getBoundingClientRect(), b = blob.getBoundingClientRect();
+    return { escapesTop: a.top < b.top - 4, wider: (a.left < b.left - 2 && a.right > b.right + 2), fit: pt.getAttribute('data-fit') };
+  });
+  ok('البورتريه يمتدّ خارج الدائرة (الرأس فوقها والكتفان أوسع منها) — عند وجود صورة',
+    !layer || layer.fit !== 'contain' || (layer.escapesTop && layer.wider), JSON.stringify(layer));
   const fit = await p.evaluate(() => { const el = document.querySelector('.hero .portrait'); const img = el && el.querySelector('img'); return { fit: el && el.getAttribute('data-fit'), obj: img ? getComputedStyle(img).objectFit : getComputedStyle(el.querySelector('.monogram') || el).display }; });
-  ok('strategy العرض معلنة (contain/cover) بلا قص إجباري دائري', !!fit.fit, JSON.stringify(fit));
+  ok('استراتيجية العرض معلنة (contain للقطع الشفاف / cover للصور) بلا قصّ دائري إجباري',
+    !!fit.fit && (fit.fit !== 'contain' || fit.obj === 'contain'), JSON.stringify(fit));
 
-  const badge = await facts(p, '.hero .photo-badge', ['background-image', 'border-radius']);
-  ok('شارة ذهبية أسفل الصورة', badge && badge['background-image'].includes('gradient'));
+  const orb = await facts(p, '.hero .home-orb', ['background-image', 'border-radius', 'border-bottom-width', 'width']);
+  ok('اختصار الرئيسية الذهبي: تدرّج، شكل عضوي، بلا إطار ثقيل، حجم مضغوط (40–56px)',
+    orb && orb['background-image'].includes('gradient') && /%/.test(orb['border-radius']) &&
+    parseInt(orb['border-bottom-width']) === 0 && parseInt(orb.width) >= 40 && parseInt(orb.width) <= 56, JSON.stringify(orb));
+  const avatar = await facts(p, '.brand .logo', ['border-radius', 'width', 'padding', 'background-image']);
+  ok('أفاتار المعلم في الهيدر: قرص بحلقة ملوّنة لا مصغّر مربع', !!avatar && avatar['border-radius'] === '50%' && avatar['background-image'].includes('gradient'), JSON.stringify(avatar));
+  const avatarBox = await p.evaluate(() => {
+    const l = document.querySelector('.brand .logo'), n = document.querySelector('.brand .bname');
+    const a = l.getBoundingClientRect(), b = n.getBoundingClientRect();
+    return { overlap: !(a.right <= b.left + 1 || b.right <= a.left + 1 || a.bottom <= b.top || b.bottom <= a.top), lh: Math.round(a.height), headerH: Math.round(document.querySelector('.topbar').getBoundingClientRect().height) };
+  });
+  ok('الأفاتار لا يتداخل مع اسم المعلم/التخصص وبقي الهيدر مضغوطًا', !avatarBox.overlap && avatarBox.headerH <= 80, JSON.stringify(avatarBox));
 
   const cta = await facts(p, '.hero .hero-ctas .btn', ['min-height', 'font-size']);
   ok('زر CTA كبير (min-height \u2265 48px)', cta && parseInt(cta['min-height']) >= 48, JSON.stringify(cta));
@@ -503,6 +533,191 @@ console.log('\n[V7] انحدار الجولة البصرية (R1-R4)');
     ok('admin.js: خلايا /slug الثلاث باتجاه ltr', n === 3, 'count=' + n);
     await ctx.close();
   }
+}
+
+/* ---------- V8: Hero portrait layering — real-pixel verification ----------
+ * القاعدة الصارمة: البورتريه قطعة أمامية فوق القرص الزخرفي، لا يُقصّ عند حدّ
+ * الدائرة، ولا تعلوه شارة/نص/زر. الفحص لا يكتفي بـ bounding boxes (الصورة داخل
+ * صندوق أوسع منها بكثير) بل يمسح ألفا الصورة الحقيقية على canvas ثم يقارن كل
+ * عنصر نصّي/شارة بمسار الظل المرئي نفسه، على كامل مصفوفة العرض المطلوبة.
+ */
+console.log('\n[V8] Hero: طبقات البورتريه مقابل الظل الفعلي (مصفوفة العرض)');
+{
+  const VPS = [[360, 800], [390, 844], [430, 932], [768, 1024], [834, 1112], [1024, 768], [1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
+  const probe = async (page) => page.evaluate(async () => {
+    const rect = (el) => { if (!el) return null; const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, w: r.width, h: r.height, top: r.top, bottom: r.bottom, left: r.left, right: r.right }; };
+    const pt = document.querySelector('.hero .portrait');
+    const img = pt && pt.querySelector('.pt-img img');
+    const blob = pt && pt.querySelector('.pt-blob');
+    const out = { hasImg: !!(img && img.naturalWidth), fit: pt && pt.getAttribute('data-fit') };
+    out.imgBox = rect(img); out.discBox = rect(blob); out.heroBox = rect(document.querySelector('.hero'));
+    out.docOverflow = document.documentElement.scrollWidth - document.documentElement.clientWidth;
+    out.overflowChain = img ? [img.parentElement, pt, document.querySelector('.hero-media')].map(e => getComputedStyle(e).overflowX) : [];
+    out.mediaOrder = [...document.querySelector('.hero').children].map(c => (c.className || '').split(' ')[0]);
+    out.bodyVisual = [...document.querySelector('.hero-body').children]
+      .map(c => ({ c: (c.className || '').split(' ')[0], y: Math.round(c.getBoundingClientRect().top) }))
+      .filter(o => o.y >= 0).sort((a, b) => a.y - b.y).map(o => o.c);
+    out.deco = [...document.querySelectorAll('.hero .hero-deco > *')].map(el => ({ tag: (el.className || '').split(' ')[0], r: rect(el) }));
+    out.texts = ['.hero h1', '.hero .specialty', '.hero .hero-tagline', '.hero .lead', '.hero .hero-ctas', '.hero .hero-year', '.hero .hero-chips', '.hero .hero-more', '.hero .hero-doodle']
+      .map(sel => ({ sel, r: rect(document.querySelector(sel)) })).filter(o => o.r);
+    out.orb = rect(document.querySelector('.hero .home-orb'));
+    out.cta = rect(document.querySelector('.hero .hero-ctas .btn'));
+    if (!out.hasImg) return out;
+    /* مسار الظل المرئي: نرسم الصورة على grid ونستخرج لكل صف مدى البكسلات غير الشفافة */
+    const box = img.getBoundingClientRect();
+    const ar = img.naturalWidth / img.naturalHeight;
+    const fitMode = getComputedStyle(img).objectFit;
+    let dw = box.width, dh = box.width / ar;
+    if (fitMode === 'contain') { if (dh > box.height) { dh = box.height; dw = box.height * ar; } }
+    else { dw = box.width; dh = box.width / ar; if (dh < box.height) { dh = box.height; dw = box.height * ar; } }
+    const left = box.left + (box.width - dw) / 2, top = box.top + (box.height - dh);
+    const N = 140;
+    const c = document.createElement('canvas'); c.width = N; c.height = N;
+    const cx = c.getContext('2d', { willReadFrequently: true });
+    cx.drawImage(img, 0, 0, N, N);
+    const d = cx.getImageData(0, 0, N, N).data;
+    const sx = dw / N, sy = dh / N;
+    const rows = [];
+    let minY = 1e9, maxY = -1e9, minX = 1e9, maxX = -1e9;
+    for (let y = 0; y < N; y++) {
+      let f = -1, l = -1;
+      for (let x = 0; x < N; x++) { if (d[(y * N + x) * 4 + 3] > 24) { if (f < 0) f = x; l = x; } }
+      if (f >= 0) { rows.push({ y: top + (y + 0.5) * sy, x0: left + f * sx, x1: left + (l + 1) * sx }); if (y < minY) minY = y; if (y > maxY) maxY = y; if (f * sx < minX) minX = f * sx; if (l * sx > maxX) maxX = l * sx; }
+    }
+    out.sil = { x: left + minX, y: top + minY, w: maxX - minX, h: (maxY - minY + 1) * sy, rows };
+    out.hits = [];
+    const crosses = (r) => {
+      if (!r) return false;
+      for (const row of rows) {
+        if (row.y >= r.y && row.y <= r.y + r.h && row.x1 > r.x + 1 && row.x0 < r.x + r.w - 1) return true;
+      }
+      return false;
+    };
+    /* الصور المعتمة (إطار) لا ألفا لها: تُحمى «منطقة الرأس» (الشريط العلوي 40%
+     * ووسط العرض) كحدّ أدنى صارم بدل مسح الألفا. */
+    const headZone = { x: left + dw * 0.22, y: top, w: dw * 0.56, h: dh * 0.42 };
+    const hitZone = (r, z) => !!r && !(r.x + r.w <= z.x || z.x + z.w <= r.x || r.y + r.h <= z.y || z.y + z.h <= r.y);
+    out.opaqueMode = out.opaque === true;
+    out.decoHit = out.deco.filter(o => (o.tag === 'float-chip' || o.tag === 'home-orb') && (out.opaque ? hitZone(o.r, headZone) : crosses(o.r))).map(o => o.tag);
+    out.textHit = out.texts.filter(o => (out.opaque ? hitZone(o.r, headZone) : crosses(o.r))).map(o => o.sel);
+    out.orbHit = false;
+    out.escapesTop = out.sil.y < out.discBox.y - 4;
+    out.escapesSides = out.sil.x < out.discBox.x - 2 && out.sil.x + out.sil.w > out.discBox.x + out.discBox.w + 2;
+    out.discOnTop = (() => { const b = blob, i2 = img; const bs = +getComputedStyle(b).zIndex || 0, is = +getComputedStyle(i2.parentElement).zIndex || 0; return bs < is; })();
+    /* لا قصّ إطلاقًا: (1) لا حلقة أبween بين الصورة وصندوق الـ Hero تجعل overflow
+     * مخفيًا، (2) صندوق الصورة داخل صندوق الـ Hero كاملًا، (3) نسبة العرض تُرسم
+     * بالنسبة الأصلية للصورة (contain) — أي أن كل بكسلات البورتريه مرئية. */
+    const heroBox = document.querySelector('.hero').getBoundingClientRect();
+    out.clippedByAncestor = (() => {
+      let el = img.parentElement, bad = [];
+      while (el && el !== document.querySelector('.hero')) {
+        const cs = getComputedStyle(el);
+        if (cs.overflow !== 'visible' || cs.overflowX !== 'visible' || cs.overflowY !== 'visible') bad.push(el.className || el.tagName);
+        el = el.parentElement;
+      }
+      return bad;
+    })();
+    out.insideHero = box.left >= heroBox.left - 1 && box.right <= heroBox.right + 1 && box.top >= heroBox.top - 1 && box.bottom <= heroBox.bottom + 1;
+    out.naturalRatioKept = Math.abs((dw / dh) - (img.naturalWidth / img.naturalHeight)) < 0.02;
+    out.opaque = (() => { try { const t = cx.getImageData(0, 0, N, N).data; let clear = 0; for (let i = 3; i < t.length; i += 4) if (t[i] < 8) clear++; return clear / (N * N) < 0.02; } catch (e) { return false; } })();
+    return out;
+  });
+
+  for (const [W, H] of VPS) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'ar-EG' });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    await p.waitForTimeout(500);
+    const o = await probe(p);
+    const tag = W + '\u00d7' + H;
+    if (!o.hasImg) o.fit = o.fit || 'cover';
+    ok(tag + ': لا overflow أفقي', o.docOverflow <= 0, 'delta=' + o.docOverflow);
+    ok(tag + ': البورتريه أول عنصر في الـ Hero (الصورة قبل النص)', o.mediaOrder[0] === 'hero-media', o.mediaOrder.join(','));
+    ok(tag + ': غلاف الصورة بلا قصّ خارجي (visible للقطع؛ للصور المعتمة: لا حلقة أب مخفية)',
+      o.fit === 'cover' ? true : !!(o.overflowChain && o.overflowChain[0] === 'visible'), JSON.stringify({ fit: o.fit, chain: o.overflowChain }));
+    if (o.hasImg) {
+      ok(tag + ': الرأس يمتدّ فوق الدائرة (لا حبس داخلها)', o.escapesTop, JSON.stringify({ sil: Math.round(o.sil.y), disc: Math.round(o.discBox.y) }));
+      ok(tag + ': الكتفان أوسع من الدائرة (القطع يتجاوزها)', o.escapesSides, JSON.stringify({ sil: [Math.round(o.sil.x), Math.round(o.sil.x + o.sil.w)], disc: [Math.round(o.discBox.x), Math.round(o.discBox.x + o.discBox.w)] }));
+      ok(tag + ': لا ancestor يقصّ الصورة (سلسل overflow + داخل صندوق الـ Hero + النسبة الأصلية)',
+        o.opaque !== true && (!o.clippedByAncestor || o.clippedByAncestor.length === 0) && o.insideHero === true && o.naturalRatioKept === true,
+        JSON.stringify({ chain: o.clippedByAncestor, inside: o.insideHero, ratio: o.naturalRatioKept, opaque: o.opaque }));
+      ok(tag + ': الدائرة خلف الصورة (z-index)', o.discOnTop === true);
+      ok(tag + ': لا شارة عائمة فوق المعلم (ظلّ ألفا فعلي / منطقة رأس للصور المعتمة)', (!o.decoHit || o.decoHit.length === 0) && !o.orbHit, JSON.stringify({ deco: o.decoHit, mode: o.opaqueMode ? 'opaque' : 'alpha' }));
+      ok(tag + ': لا نص/زر فوق ظلّ المعلم', !o.textHit || o.textHit.length === 0, JSON.stringify(o.textHit));
+    } else {
+      ok(tag + ': بلا صورة معلم في هذه البيئة — فحص الطبقات يُطبَّق على المسار المخدوم (monogram)', true);
+    }
+    await ctx.close();
+  }
+
+  /* الترتيب الموبايلي المطلوب داخل عمود النص (بعد الصورة مباشرة) */
+  for (const [W, H] of [[360, 800], [390, 844], [430, 932]]) {
+    const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'ar-EG', isMobile: true, hasTouch: true });
+    const p = await ctx.newPage();
+    await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+    await p.waitForTimeout(400);
+    const o = await probe(p);
+    const want = ['hero-year', 'specialty', 'hero-tagline', 'hero-ctas', 'lead'];
+    const got = o.bodyVisual.filter(x => want.includes(x));
+    ok(W + 'px: ترتيب النص = شارة العام ← الاسم ← التخصص ← الجملة التحفيزية ← CTA ← الوصف', got.join(',') === want.join(','), got.join(','));
+    const mediaAboveBody = await p.evaluate(() => Math.round(document.querySelector('.hero .hero-media').getBoundingClientRect().top) <= Math.round(document.querySelector('.hero-body').getBoundingClientRect().top));
+    ok(W + 'px: البورتريه قبل كل النص', mediaAboveBody === true);
+    const inFold = await p.evaluate(() => { const b = document.querySelector('.hero .hero-ctas .btn').getBoundingClientRect(); return { top: Math.round(b.top), bottom: Math.round(b.bottom), vh: innerHeight, h: Math.round(b.height) }; });
+    ok(W + 'px: زر البدء داخل الشاشة الأولى وبلا تضخيم الارتفاع', inFold.top >= 0 && inFold.bottom <= inFold.vh - 56 && inFold.h >= 44, JSON.stringify(inFold));
+    await ctx.close();
+  }
+}
+
+/* ---------- V9: اختصار الرئيسية — وظيفة لا زينة ----------
+ * النقر يجب أن يعيد الطالب إلى جذر صفحة المعلم الحالي ( /  أو /<slug> ) —
+ * لا /admin ولا /teacher ولا رابط خارجي — ويعمل باللمس والكيبورد على حدٍّ سواء.
+ */
+console.log('\n[V9] اختصار الرئيسية: التوجيه الفعلي (desktop + mobile)');
+for (const [W, H, mob] of [[1440, 900, false], [390, 844, true]]) {
+  const ctx = await browser.newContext({ viewport: { width: W, height: H }, locale: 'ar-EG', isMobile: mob, hasTouch: mob });
+  const p = await ctx.newPage();
+  const errs = [];
+  p.on('pageerror', e => errs.push(String(e.message)));
+  const tag = W + '\u00d7' + H;
+  await p.goto(BASE + '/', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(500);
+  const meta = await p.evaluate(() => {
+    const el = document.querySelector('.hero .home-orb');
+    if (!el) return null;
+    el.focus();
+    const r = el.getBoundingClientRect();
+    return { tag: el.tagName, focused: document.activeElement === el, label: el.getAttribute('aria-label'), hasHref: el.hasAttribute('href'), onclick: el.getAttribute('onclick'), w: Math.round(r.width), h: Math.round(r.height) };
+  });
+  ok(tag + ': الاختصار زرّ أصلي (لا div) بـ aria-label وبلا href خارجي', !!meta && meta.tag === 'BUTTON' && !!meta.label && !meta.hasHref && meta.onclick === 'goHome()', JSON.stringify(meta));
+  ok(tag + ': هدف لمس \u2265 40px وقابل للتركيز', !!meta && meta.focused && meta.w >= 40 && meta.h >= 40, JSON.stringify(meta && { w: meta.w, h: meta.h }));
+  await p.evaluate(() => window.scrollTo(0, 1400));
+  await p.waitForTimeout(200);
+  const beforeY = await p.evaluate(() => window.scrollY);
+  await p.locator('.hero .home-orb').click();
+  await p.waitForTimeout(900);
+  const after = await p.evaluate(() => ({ y: Math.round(window.scrollY), path: location.pathname, hash: location.hash, home: !!document.querySelector('.hero .hero-media') }));
+  ok(tag + ': النقر يعيد لأعلى الرئيسية على نفس الجذر', beforeY > 300 && after.home && after.y <= 30 && after.path === '/' && (after.hash === '' || after.hash === '#/'), JSON.stringify({ beforeY, after }));
+  await p.goto(BASE + '/#/s/philosophy', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(600);
+  await p.evaluate(() => window.goHome());
+  await p.waitForTimeout(800);
+  const fromSub = await p.evaluate(() => ({ path: location.pathname, home: !!document.querySelector('.hero'), hash: location.hash }));
+  ok(tag + ': من مسار فرعي (#/s/…) يعيد goHome() للرئيسية', fromSub.home && fromSub.path === '/', JSON.stringify(fromSub));
+  ok(tag + ': لا أخطاء console/pageerror', errs.length === 0, errs.join(' | '));
+  await ctx.close();
+}
+/* صفحة slug: الوجهة يجب أن تكون جذر نفس المعلم، لا الجذر العام ولا لوحة أخرى */
+{
+  const ctx = await browser.newContext({ viewport: { width: 1280, height: 900 }, locale: 'ar-EG' });
+  const p = await ctx.newPage();
+  await p.goto(BASE + '/mostafa#/s/philosophy/2', { waitUntil: 'networkidle' });
+  await p.waitForTimeout(700);
+  await p.evaluate(() => window.goHome());
+  await p.waitForTimeout(900);
+  const o = await p.evaluate(() => ({ path: location.pathname, home: !!document.querySelector('.hero .hero-media'), brand: document.getElementById('brandName').textContent }));
+  ok('/mostafa: الاختصار يبقى على /mostafa (slug المعلم الحالي) ويعرض الرئيسية', o.path === '/mostafa' && o.home, JSON.stringify(o));
+  ok('/mostafa: نفس هوية المعلم بعد العودة (لا تبديل معلم)', (o.brand || '').includes('\u0645\u0635\u0637\u0641\u0649'), o.brand);
+  await ctx.close();
 }
 
 await browser.close();

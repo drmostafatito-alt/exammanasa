@@ -111,7 +111,24 @@ console.log('\n[2] الواجهة الرئيسية (Hero) — تكوين الم�
   ok('اسم المعلم هو العنوان الرئيسي + شعار «اختبر نفسك وقيّم مستواك!»', !!doc.querySelector('.hero h1') && doc.querySelector('.hero h1').textContent.includes(catalog.owner.name) && !!doc.querySelector('.hero .hero-tagline') && doc.querySelector('.hero .hero-tagline').textContent.includes('اختبر نفسك'));
   ok('وصف مهني قصير للمنصة (بلا ادعاءات)', !!doc.querySelector('.hero .lead') && doc.querySelector('.hero .lead').textContent.includes('وفق المنهج الرسمي'));
   ok('صورة المعلم كبيرة في الجهة اليمنى (عمود media أول الشبكة)', !!doc.querySelector('.hero .hero-media .portrait .pt-img') && /grid-template-areas:\s*"media body"/.test(css));
-  ok('أشكال زخرفية تعليمية حول الصورة (blob/arc/badge/شارة عائمة)', !!doc.querySelector('.hero .pt-blob') && !!doc.querySelector('.hero .pt-arc') && !!doc.querySelector('.hero .photo-badge') && !!doc.querySelector('.hero .float-chip'));
+  ok('أشكال زخرفية تعليمية حول الصورة (قرص/قوس + شارة عائمة + اختصار الرئيسية)', !!doc.querySelector('.hero .pt-blob') && !!doc.querySelector('.hero .pt-arc') && !!doc.querySelector('.hero .float-chip') && !!doc.querySelector('.hero .hero-deco .home-orb'));
+  {
+    /* البورتريه قطعة أمامية فوق الدائرة: لا overflow-hidden ولا قصّ دائري على غلاف
+     * الصورة في مسار الشفافية (contain)، والدائرة/القوس في طبقة z-index أقل. */
+    const pt = doc.querySelector('.hero .portrait');
+    const wrap = pt && pt.querySelector('.pt-img');
+    const wrapRule = (css.match(/\.portrait \.pt-img\s*{[^}]*}/) || [''])[0];
+    const coverRule = (css.match(/\.portrait\[data-fit="cover"\] \.pt-img\s*{[^}]*}/) || [''])[0];
+    ok('البورتريه غير مقصوص: غلاف الصورة visible وبلا radius في مسار contain',
+      !!wrap && /overflow:\s*visible/.test(wrapRule) && /border-radius:\s*0/.test(wrapRule), wrapRule.slice(0, 80));
+    ok('الدائرة زخرفة خلفية فقط (z-index:0) والبورتريه فوقها (z-index:2)',
+      /\.portrait \.pt-blob\s*{[^}]*z-index:\s*0/.test(css) && /\.portrait \.pt-img\s*{[^}]*z-index:\s*2/.test(css));
+    ok('الإطار العضوي يبقى للصور غير الشفافة فقط (data-fit="cover")', /border-radius:\s*34px/.test(coverRule), coverRule.slice(0, 60));
+    ok('الشارات العائمة في طبقة مستقلة فوق الدائرة ولا تغطي البورتريه (hero-deco z-index:3)',
+      /\.hero \.hero-deco\s*{[^}]*z-index:\s*3/.test(css) && /\.hero \.hero-deco\s*{[^}]*inset:\s*0/.test(css));
+    ok('لا عنصر داخل غلاف البورتريه في DOM (الدائرة ليست حاوية صورة)',
+      !!wrap && wrap.children.length <= 1 && !!wrap.querySelector('img, .monogram'));
+  }
   ok('لا صورة وهمية — حالة فارغة أنيقة (monogram) عند غياب صورة حقيقية', !catalog.owner.photo ? !!doc.querySelector('.hero .monogram') : true);
   ok('زر «ابدأ الامتحان الآن» يؤدي إلى بيانات الطالب (#/start)', !!doc.querySelector('.hero .hero-ctas .btn'));
   doc.querySelector('.hero .hero-ctas .btn').click();
@@ -142,7 +159,17 @@ console.log('\n[3] أقسام الرئيسية — بطاقات الصفين و�
     const ix = a => order.findIndex(x => x === a);
     ok('ترتيب الأقسام: Hero ← اختر صفك ← لماذا المنصة ← نبذة المعلم', ix('hero') === 0 && ix('subjects') > ix('hero') && ix('features') > ix('subjects') && ix('about') > ix('features'), order.join(' → '));
   }
-  ok('تكوين الصورة تحريري: إطار عضوي (ليس دائرة) وخلفية مولّدة بلا أسود', !!doc.querySelector('.hero .portrait[data-fit]') && /\.portrait \.pt-img\s*{[^}]*border-radius:\s*46%/.test(css));
+  ok('تكوين الصورة تحريري: قطع أمامي فوق قرص مولّد (لا أسود ولا قصّ إجباري)', !!doc.querySelector('.hero .portrait[data-fit]') && /\.portrait \.pt-blob\s*{[^}]*radial-gradient/.test(css) && !/\.portrait \.pt-img\s*{[^}]*overflow:\s*hidden/.test(css));
+  {
+    /* اختصار الرئيسية: زرّ حقيقي يعيد لجذر صفحة المعلم الحالي — لا /admin ولا /teacher
+     * ولا رابط خارجي، ولا <a href> ثابت يمكن أن يُخطئ الوجهة. */
+    const orb = doc.querySelector('.hero .home-orb');
+    ok('اختصار الرئيسية زرّ (ليس div) بمُعرّف وصول و onclick=goHome()',
+      !!orb && orb.tagName === 'BUTTON' && orb.getAttribute('onclick') === 'goHome()' && !!orb.getAttribute('aria-label'));
+    ok('goHome موجّه لجذر المعلم (teacherRootPath) ولا يذكر /admin ولا /teacher',
+      /function teacherRootPath\(\)\s*{\s*return S\.slug \? \('\/' \+ S\.slug \+ '\/'\) : '\/';\s*}/.test(appJs) &&
+      !/goHome[\s\S]{0,400}?\/admin|goHome[\s\S]{0,400}?\/teacher/.test(appJs));
+  }
   ok('هيدر الطالب بلا خط فاصل قاسٍ (انتقال ناعم)', /\.topbar\s*{[^}]*border-bottom:\s*none/.test(css));
   ok('لا إحصاءات مزيفة (عدد طلاب/شهادات/تقييمات)', !/\d+\s*(طالب|شاهد|تقييم|شهادة)/.test(html));
   ok('لا قيم undefined/null مسربة', !/\bundefined\b/.test(html) && !/>null</.test(html));
@@ -472,7 +499,7 @@ console.log('\n[7] الهوية البصرية (أزرق/ذهبي فاتح) + ت
   const used = renderedClasses;
   ['lesson comp', 'lno', 'linfo', 'lt', 'ls', 'lgo', 'comp-badge', 'final-comp', 'unit-card', 'unit-head', 'uno', 'chapter', 'ch-title',
    'grade-card', 'grade-opt sel', 'gcheck', 'gstats', 'stu-sum', 'sn', 'sp', 'linkbtn', 'hero-media', 'blob', 'ring',
-   'photo-badge', 'float-chip', 'hero-body', 'kicker', 'lead', 'hero-chips', 'hero-ctas', 'features', 'feature',
+   'home-orb', 'hero-deco', 'float-chip', 'hero-body', 'kicker', 'lead', 'hero-chips', 'hero-ctas', 'features', 'feature',
    'fi f1', 'fi f2', 'fi f3', 'fi f4', 'about-card', 'abody', 'specialty', 'bio', 'social-row', 'social-big', 'grade-pick', 'mainnav', 'socials',
    'nchip answered current', 'opt selected', 'rv-item', 'rq correct', 'rq wrong', 'ans mine wrong', 'ans correct', 'score-ring pass',
    'score-ring fail', 'tab active', 'badge green', 'badge gold', 'badge red', 'toast err', 'progressbar', 'navstrip', 'qcard', 'qtext',
