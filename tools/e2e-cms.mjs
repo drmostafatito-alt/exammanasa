@@ -43,10 +43,25 @@ p.on('pageerror', e => consoleIssues.push('pageerror: ' + String(e && e.message)
 const api = (path, opts) => p.evaluate(([path, opts]) => fetch(path, Object.assign({ headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'fetch' } }, opts || {})).then(r => r.json().then(b => ({ status: r.status, body: b }))), [path, opts]);
 
 await p.goto(BASE + '/admin', { waitUntil: 'domcontentloaded' });
+/* اكتفاء ذاتي: كان التشغيل يفترض وجود حساب مسؤول مسبقًا، فعلى قاعدة KV جديدة كانت
+ * الشاشة الأولى هي «إنشاء الحساب» لا «الدخول»، فيفشل الانتظار دون سبب واضح. */
+{
+  const st = await p.evaluate(() => fetch('/api/admin/status').then(r => r.json()).catch(() => ({})));
+  if (st && st.setup === true) {
+    await p.waitForSelector('#admPass2', { timeout: 15000 });
+    await p.fill('#admEmail', ADMIN.email);
+    await p.fill('#admPass', ADMIN.pass);
+    await p.fill('#admPass2', ADMIN.pass);
+    await p.click('.tlogin-card button[type=submit]');
+    await p.waitForSelector('#admPass2', { state: 'detached', timeout: 15000 }).catch(() => {});
+    await sleep(600);
+  }
+}
+await p.waitForSelector('#admEmail', { timeout: 15000 });
 await p.fill('#admEmail', ADMIN.email);
 await p.fill('#admPass', ADMIN.pass);
 await p.click('.tlogin-card button[type=submit]');
-await p.waitForSelector('.a-shell', { timeout: 15000 });
+await p.waitForSelector('.a-shell', { timeout: 20000 });
 console.log('\n[CMS-1] دخول المسؤول + تنظيف بقايا_runs سابقة + خط الأساس');
 // تطهير ذاتي: أي امتحانات/أسئلة مخصّصة تخلّفت عن تشغيل سابق تُنقل للسلة قبل قياس الأساس
 const leftoverExams = (await api('/api/admin/exams?status=custom&perPage=100')).body.exams || [];
@@ -158,10 +173,10 @@ const impDoc = {
     { text: 'سؤال جديد تمامًا أنشأه تدقيق CMS الجولة الخامسة رقم ' + Date.now() + ' — ما عنوانه؟', options: { A: 'خ1', B: 'خ2', C: 'خ3', D: 'خ4' }, correctAnswer: 'C' }
   ]
 };
-writeFileSync('/tmp/shots/import-ok.json', JSON.stringify(impDoc, null, 2));
+writeFileSync(SHOTS + '/import-ok.json', JSON.stringify(impDoc, null, 2));
 await p.evaluate(() => window.setTab('import'));
 await p.waitForSelector('#impDrop', { timeout: 8000 });
-await p.setInputFiles('#impFile', '/tmp/shots/import-ok.json');
+await p.setInputFiles('#impFile', SHOTS + '/import-ok.json');
 await sleep(400);
 await p.click('#impPrevBtn');
 await sleep(1500);
