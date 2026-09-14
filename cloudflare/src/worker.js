@@ -13,7 +13,8 @@
  *    algorithm as Code.gs shuffledOrder_().
  *  - Submissions require a valid token, are validated for completeness, and are
  *    de-duplicated (Cache API + KV) to prevent double submission / tampering.
- *  - Admin auth: PBKDF2-SHA256 (120k iterations) password hash in KV + signed
+ *  - Admin auth: PBKDF2-SHA256 (100k iterations — the production-safe maximum on
+ *    Cloudflare Workers; see PBKDF2_MAX_ITERATIONS) password hash in KV + signed
  *    HttpOnly SameSite=Strict session cookie + login rate limiting.
  *  - Answer keys live ONLY inside the Worker bundle (banks.json) and are exposed
  *    exclusively through authenticated admin endpoints.
@@ -184,14 +185,42 @@ function shuffledOrder(seed, index) {
   return arr; // arr[positionShownToStudent] = originalIndex
 }
 
-/* ---- HMAC / hashing ---- */
+/* ---- HMAC / hashing ----
+ * ⚠️ PRODUCTION ROOT CAUSE (PR #23 regression → HTTP 500 on /api/admin/setup):
+ * The Cloudflare Workers runtime (workerd) HARD-CAPS Web Crypto PBKDF2 at
+ * 100,000 iterations. Requesting more throws a DOMException that is NOT an
+ * ApiError, so it escaped as the generic HTTP 500 "خطأ غير متوقع في الخادم":
+ *   NotSupportedError: Pbkdf2 failed: iteration counts above 100000 are not
+ *   supported (requested 120000).
+ * The cap exists because workerd's CPU-time limiter cannot interrupt BoringSSL
+ * mid-derivation, so it bounds the iteration count up-front to fit the request
+ * CPU budget (100,000 on the Free plan). NOTE: the LOCAL dev runtime (wrangler
+ * dev / Miniflare workerd alpha) does NOT enforce this cap — it happily runs
+ * 1,000,000 iterations — which is why PR #23's local-only tests passed while
+ * production 500'd. See tests/prod-runtime-crypto.mjs for a regression test that
+ * reproduces the production cap inside the real workerd runtime.
+ *
+ * We keep PBKDF2-SHA256 with a per-user random salt + constant-time comparison
+ * (safeEqualHex). 100,000 iterations is the strongest configuration that is
+ * guaranteed production-safe on Workers — this is NOT a downgrade to a weak or
+ * plain-SHA256 hash; it is the same NIST-approved KDF at the platform maximum. */
+const PBKDF2_MAX_ITERATIONS = 100000;   // workerd throws NotSupportedError above this
+const PBKDF2_ITERATIONS = 100000;       // production-safe cost for NEW password hashes
+
 async function hmac(secret, value) {
   const key = await crypto.subtle.importKey('raw', enc.encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
   return crypto.subtle.sign('HMAC', key, enc.encode(value));
 }
-async function pbkdf2(password, salt, iterations = 120000) {
+async function pbkdf2(password, salt, iterations = PBKDF2_ITERATIONS) {
+  /* Clamp to the platform-supported maximum BEFORE calling deriveBits so a stored
+   * record that claims a higher cost (e.g. a legacy 120000 record written by the
+   * broken PR #23 build) can NEVER crash the Worker with NotSupportedError. New
+   * hashes always use PBKDF2_ITERATIONS (≤ cap), so clamping is a no-op for them;
+   * for an over-cap legacy record the derived hash simply won't match → a safe 401
+   * instead of a 500, and the owner recovers via setup / env-secret bootstrap. */
+  const iters = Math.min(PBKDF2_MAX_ITERATIONS, Math.max(1, iterations | 0));
   const key = await crypto.subtle.importKey('raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']);
-  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations }, key, 256);
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: enc.encode(salt), iterations: iters }, key, 256);
   return hex(bits);
 }
 const randomHex = (n = 16) => hex(crypto.getRandomValues(new Uint8Array(n)));
@@ -1290,9 +1319,21 @@ async function getAdminRecord(env) {
 let _bootstrapResult = null;       // 'exists' | 'created' | 'invalid-secrets' — cached for the isolate's life
 let _bootstrapInFlight = null;     // de-duplicates concurrent requests in this isolate
 let _bootstrapCooldownUntil = 0;   // after failed storage writes, pause retries briefly
+/* A stored password-hashing cost is usable only if the runtime can actually
+ * recompute it. workerd rejects PBKDF2 above PBKDF2_MAX_ITERATIONS, so a record
+ * claiming a higher cost (e.g. 120000 written by the broken PR #23 build) can
+ * never be verified — treat it as absent so the owner recovers via the one-time
+ * setup screen or the ADMIN_INITIAL_* env-secret bootstrap instead of being stuck
+ * (409 "already exists" + 401 on login). */
+function iterationsUsable(it) {
+  if (it === undefined || it === null) return true; // defaults to PBKDF2_ITERATIONS
+  const n = Number(it);
+  return Number.isFinite(n) && n >= 1 && n <= PBKDF2_MAX_ITERATIONS;
+}
 function validAdminRecord(rec) {
   return !!rec && typeof rec === 'object' && typeof rec.email === 'string'
-    && typeof rec.salt === 'string' && typeof rec.hash === 'string';
+    && typeof rec.salt === 'string' && typeof rec.hash === 'string'
+    && iterationsUsable(rec.iterations);
 }
 async function ensureAdminBootstrap(env) {
   if (!env.ADMIN_INITIAL_EMAIL || !env.ADMIN_INITIAL_PASSWORD) return 'no-secrets';
@@ -1314,12 +1355,22 @@ async function ensureAdminBootstrap(env) {
       try { existing = await kvGetJson(env, 'admin'); }
       catch (e) { lastErr = e; serverLog('admin-bootstrap-read', e); }
       if (validAdminRecord(existing)) { _bootstrapResult = 'exists'; return _bootstrapResult; }
-      const salt = randomHex(16);
-      const hash = await pbkdf2(password, salt);
-      const record = JSON.stringify({
-        email, salt, hash, iterations: 120000,
-        createdAt: new Date().toISOString(), via: 'env-secret'
-      });
+      let record;
+      try {
+        const salt = randomHex(16);
+        const hash = await pbkdf2(password, salt);
+        record = JSON.stringify({
+          email, salt, hash, iterations: PBKDF2_ITERATIONS,
+          createdAt: new Date().toISOString(), via: 'env-secret'
+        });
+      } catch (e) {
+        // KDF stage — this is exactly where PR #23 died in production (PBKDF2 over
+        // the workerd iteration cap). pbkdf2() now clamps, so this is defensive;
+        // log the real cause server-side (never to the client) and retry/defer.
+        lastErr = e;
+        serverLog('admin-bootstrap-kdf', e);
+        continue;
+      }
       try {
         // kvPut يعيد المحاولة عند 429 (كتابة/ثانية لمفتاح) وأعطال الحافة العابرة.
         await kvPut(env, 'admin', record);
@@ -1365,10 +1416,13 @@ async function handleAdmin(request, env, ctx, pathname) {
      * سارية؟ — دمجتهما في طلب واحد حتى لا يبدأ التطبيق بطلب /status ثم /session.
      * البريد يُرسَل فقط مع جلسة سارية (لا كشف لحساب بلا مصادقة). */
     const admin = await getAdminRecord(env).catch(() => null);
+    // An over-cap legacy record (unverifiable on this runtime) counts as "needs setup"
+    // so the owner is never stuck between a 409 on setup and a 401 on login.
+    const usable = validAdminRecord(admin);
     const session = await adminCookiePayload(request, env).catch(() => null);
-    const authed = !!(admin && session && session.t === 'admin' && await hasV(env, 'sessv:admin', session.v));
+    const authed = !!(usable && session && session.t === 'admin' && await hasV(env, 'sessv:admin', session.v));
     return json({
-      setup: !admin,
+      setup: !usable,
       authed,
       email: authed ? session.email : undefined,
       envBootstrap: !!(env.ADMIN_INITIAL_EMAIL && env.ADMIN_INITIAL_PASSWORD)
@@ -1387,12 +1441,22 @@ async function handleAdmin(request, env, ctx, pathname) {
     // detect first run — a fresh deployment must receive the 404 "not created yet"
     // signal (and switch to the one-time setup screen) instead of a generic 400.
     const admin = await getAdminRecord(env);
-    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد. افتح صفحة الإعداد الأولي.', 404);
+    if (!validAdminRecord(admin)) return fail('لم يُنشأ حساب المسؤول بعد. افتح صفحة الإعداد الأولي.', 404);
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     if (!email || !password) return fail('البريد وكلمة المرور مطلوبان.');
 
-    const hash = await pbkdf2(password, admin.salt, admin.iterations);
+    let hash;
+    try {
+      hash = await pbkdf2(password, admin.salt, admin.iterations);
+    } catch (e) {
+      // KDF stage diagnostics (server-side only). pbkdf2() clamps to the workerd
+      // iteration cap, so this should not trigger; if the runtime crypto still
+      // fails, return a safe 503 (never a generic 500, never internals).
+      serverLog('admin-login:pbkdf2', e);
+      if (e instanceof ApiError) throw e;
+      throw bad('تعذّر تسجيل الدخول الآن بسبب خطأ في خدمة الخادم. حاول مرة أخرى.', 503);
+    }
     if (email !== admin.email || !safeEqualHex(hash, admin.hash)) {
       loginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
       return fail('بيانات الدخول غير صحيحة.', 401);
@@ -1426,16 +1490,48 @@ async function handleAdmin(request, env, ctx, pathname) {
     // إضافتها عبر المصادر دون preflight فاشل).
     if (request.headers.get('X-Requested-With') !== 'fetch') return fail('طلب غير مصرح.', 403);
     if (crossSiteRequest(request)) return fail('طلب من مصدر آخر مرفوض.', 403);
-    const existing = await getAdminRecord(env);
-    if (existing) return fail('حساب المسؤول موجود بالفعل.', 409);
-    const body = await readJson(request);
+
+    /* Per-stage diagnostics (requirement: pinpoint the production HTTP 500). Each
+     * stage records stage + error name + message via serverLog() — SERVER-SIDE ONLY
+     * (console.error → Worker logs); the client always receives the same safe Arabic
+     * messages, never internals. The pbkdf2 stage is where PR #23 died in production
+     * (workerd's PBKDF2 iteration cap → NotSupportedError → generic 500). */
+
+    // stage 1 — getAdminRecord
+    let existing;
+    try { existing = await getAdminRecord(env); }
+    catch (e) { serverLog('setup:getAdminRecord', e); throw e; }
+    if (validAdminRecord(existing)) return fail('حساب المسؤول موجود بالفعل.', 409);
+
+    // stage 2 — readJson
+    let body;
+    try { body = await readJson(request); }
+    catch (e) { serverLog('setup:readJson', e); throw e; }
+
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return fail('البريد الإلكتروني غير صالح.');
     if (password.length < 8) return fail('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
-    const salt = randomHex(16);
-    const hash = await pbkdf2(password, salt);
-    await kvPut(env, 'admin', JSON.stringify({ email, salt, hash, iterations: 120000, createdAt: new Date().toISOString() }));
+
+    // stage 3 — randomHex (salt)
+    let salt;
+    try { salt = randomHex(16); }
+    catch (e) { serverLog('setup:randomHex', e); throw e; }
+
+    // stage 4 — pbkdf2 (the production failure point)
+    let hash;
+    try { hash = await pbkdf2(password, salt); }
+    catch (e) {
+      serverLog('setup:pbkdf2', e);
+      if (e instanceof ApiError) throw e;
+      throw bad('تعذّر إنشاء الحساب الآن بسبب خطأ في خدمة الخادم. حاول مرة أخرى.', 503);
+    }
+
+    // stage 5 — kvPut (already maps storage faults to a safe 503; log stage anyway)
+    try {
+      await kvPut(env, 'admin', JSON.stringify({ email, salt, hash, iterations: PBKDF2_ITERATIONS, createdAt: new Date().toISOString() }));
+    } catch (e) { serverLog('setup:kvPut', e); throw e; }
+
     return json({ ok: true });
   }
 
@@ -1481,14 +1577,14 @@ async function handleAdmin(request, env, ctx, pathname) {
     const current = String(body.current || '');
     const next = String(body.next || '');
     const admin = await getAdminRecord(env);
-    if (!admin) return fail('لم يُنشأ حساب المسؤول بعد.', 404);
+    if (!validAdminRecord(admin)) return fail('لم يُنشأ حساب المسؤول بعد.', 404);
     const curHash = await pbkdf2(current, admin.salt, admin.iterations);
     if (!safeEqualHex(curHash, admin.hash)) return fail('كلمة المرور الحالية غير صحيحة.', 401);
     if (next.length < 8) return fail('كلمة المرور الجديدة يجب أن تكون 8 أحرف على الأقل.');
     if (next === current) return fail('كلمة المرور الجديدة مطابقة للحالية.');
     const salt = randomHex(16);
     const hash = await pbkdf2(next, salt);
-    await kvPut(env, 'admin', JSON.stringify({ ...admin, salt, hash, iterations: 120000, updatedAt: new Date().toISOString() }));
+    await kvPut(env, 'admin', JSON.stringify({ ...admin, salt, hash, iterations: PBKDF2_ITERATIONS, updatedAt: new Date().toISOString() }));
     // password change revokes every admin session, then re-issues THIS device only
     const v = randomHex(8);
     await setVList(env, 'sessv:admin', [v]);
@@ -1670,7 +1766,7 @@ async function handleAdmin(request, env, ctx, pathname) {
     if (newPassword.length < 8) return fail('\u0643\u0644\u0645\u0629 \u0627\u0644\u0645\u0631\u0648\u0631 8 \u0623\u062d\u0631\u0641 \u0639\u0644\u0649 \u0627\u0644\u0623\u0642\u0644.');
     const salt = randomHex(16);
     const hash = await pbkdf2(newPassword, salt);
-    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
+    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: PBKDF2_ITERATIONS, updatedAt: new Date().toISOString() };
     await saveTeachers(env, teachers);
     await clearV(env, 'sessv:t:' + teachers[idx].id); // admin reset = the teacher must sign in again everywhere
     return json({ ok: true });
@@ -2125,11 +2221,11 @@ async function sanitizeTeacher(body, existing, env) {
   }
   let passHash = existing?.passHash || '';
   let passSalt = existing?.passSalt || '';
-  let passIterations = existing?.passIterations || 120000;
+  let passIterations = iterationsUsable(existing?.passIterations) ? (existing?.passIterations || PBKDF2_ITERATIONS) : PBKDF2_ITERATIONS;
   if (body.password && String(body.password).length >= 8) {
     passSalt = randomHex(16);
     passHash = await pbkdf2(String(body.password), passSalt);
-    passIterations = 120000;
+    passIterations = PBKDF2_ITERATIONS;
   } else if (body.password && String(body.password).length > 0 && String(body.password).length < 8) {
     throw bad('كلمة المرور يجب أن تكون 8 أحرف على الأقل.');
   }
@@ -2202,7 +2298,7 @@ async function handleTeacherLogin(request, env) {
     return fail('بيانات الدخول غير صحيحة.', 401);
   }
   if (t.enabled === false || t.archived) return fail('حساب المعلم غير مفعّل.', 403);
-  const hash = await pbkdf2(password, t.passSalt, t.passIterations || 120000);
+  const hash = await pbkdf2(password, t.passSalt, t.passIterations || PBKDF2_ITERATIONS);
   if (!safeEqualHex(hash, t.passHash)) {
     teacherLoginFails.set(ip, { n: fails.n + 1, until: Date.now() + 15 * 60 * 1000 });
     return fail('بيانات الدخول غير صحيحة.', 401);
@@ -2247,13 +2343,13 @@ async function handleTeacherAuthenticated(request, env, ctx, pathname) {
     if (!current || !next) return fail('كلمتا المرور مطلوبتان.');
     if (next.length < 8) return fail('كلمة المرور 8 أحرف على الأقل.');
     if (next === current) return fail('كلمتا المرور متطابقتان.');
-    const curHash = await pbkdf2(current, teacher.passSalt, teacher.passIterations || 120000);
+    const curHash = await pbkdf2(current, teacher.passSalt, teacher.passIterations || PBKDF2_ITERATIONS);
     if (!safeEqualHex(curHash, teacher.passHash)) return fail('كلمة المرور الحالية غير صحيحة.', 401);
     const salt = randomHex(16); const hash = await pbkdf2(next, salt);
     const teachers = await getTeachers(env);
     const idx = teachers.findIndex(x => x.id === teacher.id);
     if (idx === -1) return fail('المعلم غير موجود.', 404);
-    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: 120000, updatedAt: new Date().toISOString() };
+    teachers[idx] = { ...teachers[idx], passSalt: salt, passHash: hash, passIterations: PBKDF2_ITERATIONS, updatedAt: new Date().toISOString() };
     await saveTeachers(env, teachers);
     // password change revokes every session, then re-issues the CURRENT device only
     const v = randomHex(8);
